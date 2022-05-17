@@ -1,3 +1,22 @@
+// This software is copyrighted by the HELMHOLTZ-ZENTRUM BERLIN FUER MATERIALIEN UND ENERGIE G.M.B.H., BERLIN, GERMANY (HZB).
+// The following terms apply to all files associated with the software. HZB hereby grants permission to use, copy, and modify
+// this software and its documentation for non-commercial educational or research purposes, provided that existing copyright
+// notices are retained in all copies. The receiver of the software provides HZB with all enhancements, including complete
+// translations, made by the receiver.
+// IN NO EVENT SHALL HZB BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
+// OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES THEREOF, EVEN IF HZB HAS BEEN ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE. HZB SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS,
+// AND HZB HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+//==================================================================================================
+// Name        : caLab.cpp
+// Author      : Carsten Winkler
+// Version     : 1.6.0.11
+// Copyright   : HZB
+// Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
+//==================================================================================================
+
 #include <extcode.h>
 #include <atomic>
 #include <chrono>
@@ -12,7 +31,7 @@
 #include <vector>
 #include <map>
 
-#if defined WIN32 || defined WIN64
+#if defined _WIN32 || defined _WIN64
 #include <alarm.h>
 #include <alarmString.h>
 #include <cadef.h>
@@ -30,7 +49,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.6.0.10"
+#define CALAB_VERSION       "1.6.0.11"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
@@ -138,7 +157,7 @@ typedef struct {
 typedef sResultArray **sResultArrayHdl;
 #include "lv_epilog.h"
 
-#if defined WIN32 || defined WIN64
+#if defined _WIN32 || defined _WIN64
 #else // Workaround for EPICS library unload issue in Linux
 const short *dbf_text_dim = (const short *)dlsym(caLibHandle, "dbf_text_dim");
 const char * epicsAlarmSeverityStrings[] = {
@@ -407,7 +426,7 @@ typedef int(*ca_context_create_t) (ca_preemptive_callback_select select);
 typedef int(*ca_create_channel_t) (const char *pChanName, caCh *pConnStateCallback, void *pUserPrivate, capri priority, chid *pChanID);
 typedef int(*ca_create_subscription_t) (chtype type, unsigned long count, chid chanId, long mask, caEventCallBackFunc *pFunc, void *pArg, evid *pEventID);
 typedef int(*ca_pend_io_t) (ca_real timeOut);
-#if defined WIN32 || defined WIN64
+#if defined _WIN32 || defined _WIN64
 #define EPICS_PRINTF_STYLE(f,a)
 typedef int(__stdcall*epicsSnprintf_t)(char *str, size_t size, const char *format, ...) EPICS_PRINTF_STYLE(3, 4);
 #else
@@ -1101,8 +1120,11 @@ public:
 			case 0:
 				size = stringSize * MAX_STRING_SIZE * sizeof(char);
 				if (writeValueArraySize != size) {
-					writeValueArray = (char*)realloc(writeValueArray, size);
-					writeValueArraySize = size;
+					void* tmp = realloc(writeValueArray, size);
+					if (tmp) {
+						writeValueArray = (char*)tmp;
+						writeValueArraySize = size;
+					}
 				}
 				memset(writeValueArray, 0, size);
 				break;
@@ -1110,16 +1132,22 @@ public:
 				if (nativeType == DBF_STRING) {
 					size = stringSize * MAX_STRING_SIZE * sizeof(char);
 					if (writeValueArraySize != size) {
-						writeValueArray = (char*)realloc(writeValueArray, size);
-						writeValueArraySize = size;
+						void* tmp = realloc(writeValueArray, size);
+						if (tmp) {
+							writeValueArray = (char*)tmp;
+							writeValueArraySize = size;
+						}
 					}
 					memset(writeValueArray, 0, size);
 				}
 				else {
 					size = stringSize * sizeof(float);
 					if (writeValueArraySize != size) {
-						writeValueArray = (float*)realloc(writeValueArray, size);
-						writeValueArraySize = size;
+						void* tmp = realloc(writeValueArray, size);
+						if (tmp) {
+							writeValueArray = (float*)tmp;
+							writeValueArraySize = size;
+						}
 					}
 				}
 				break;
@@ -1127,39 +1155,54 @@ public:
 				if (nativeType == DBF_STRING) {
 					size = stringSize * MAX_STRING_SIZE * sizeof(char);
 					if (writeValueArraySize != size) {
-						writeValueArray = (char*)realloc(writeValueArray, size);
-						writeValueArraySize = size;
+						void* tmp = realloc(writeValueArray, size);
+						if (tmp) {
+							writeValueArray = (char*)tmp;
+							writeValueArraySize = size;
+						}
 					}
 					memset(writeValueArray, 0, size);
 				}
 				else {
 					size = stringSize * sizeof(double);
 					if (writeValueArraySize != size) {
-						writeValueArray = (double*)realloc(writeValueArray, size);
-						writeValueArraySize = size;
+						void* tmp = realloc(writeValueArray, size);
+						if (tmp) {
+							writeValueArray = (double*)tmp;
+							writeValueArraySize = size;
+						}
 					}
 				}
 				break;
 			case 3:
 				size = stringSize * sizeof(char);
 				if (writeValueArraySize != size) {
-					writeValueArray = (char*)realloc(writeValueArray, size);
-					writeValueArraySize = size;
+					void* tmp = realloc(writeValueArray, size);
+					if (tmp) {
+						writeValueArray = (char*)tmp;
+						writeValueArraySize = size;
+					}
 				}
 				break;
 			case 4:
 				size = stringSize * sizeof(short);
 				if (writeValueArraySize != size) {
-					writeValueArray = (short*)realloc(writeValueArray, size);
-					writeValueArraySize = size;
+					void* tmp = realloc(writeValueArray, size);
+					if (tmp) {
+						writeValueArray = (short*)tmp;
+						writeValueArraySize = size;
+					}
 				}
 				break;
 			case 5:
 			case 6:
 				size = stringSize * sizeof(int);
 				if (writeValueArraySize != size) {
-					writeValueArray = (int*)realloc(writeValueArray, size);
-					writeValueArraySize = size;
+					void* tmp = realloc(writeValueArray, size);
+					if (tmp) {
+						writeValueArray = (int*)tmp;
+						writeValueArraySize = size;
+					}
 				}
 				break;
 			default:
@@ -2159,7 +2202,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl *PvNameArray, sStringArrayHdl *F
 					(**ResultArray)->dimSize = (**PvNameArray)->dimSize;
 					//CaLabDbgPrintf("New ResultArray %p(%d)", **ResultArray, (**ResultArray)->dimSize);
 				}
-				if (!PvIndexArray || DSCheckHandle(PvIndexArray) != noErr || (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize) {
+				if (!PvIndexArray || !*PvIndexArray || DSCheckHandle(PvIndexArray) != noErr || (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize) {
 					err += NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, (**PvNameArray)->dimSize);
 					(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
 					//CaLabDbgPrintf("New PvIndexArray %p(%d)", **PvIndexArray, (**PvIndexArray)->dimSize);
@@ -2250,7 +2293,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl *PvNameArray, sStringArrayHdl *F
 			}
 		}
 		//CaLabDbgPrintf("ResultArray %p(%d)", **ResultArray, (**ResultArray)->dimSize);
-		for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
+		for (uInt32 i = 0; *PvIndexArray && i < (**PvIndexArray)->dimSize; i++) {
 			currentItem = (calabItem*)(**PvIndexArray)->elt[i];
 			if (!valid(currentItem)) {
 				*CommunicationStatus = 1;
@@ -2538,7 +2581,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl *PvNameArray, sLongArrayHdl *PvI
 			}
 			wait4value(maxNumberOfValues, PvIndexArray, (time_t)Timeout);
 		}
-		for (uInt32 row = 0; row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
+		for (uInt32 row = 0; *PvIndexArray && row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
 			currentItem = (calabItem*)(**PvIndexArray)->elt[row];
 			if (!valid(currentItem)) {
 				*Status = 1;
@@ -2570,7 +2613,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl *PvNameArray, sLongArrayHdl *PvI
 			double wait = (**PvNameArray)->dimSize * .00005F;
 			do {
 				epicsThreadSleep(wait);
-				for (row = 0; row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
+				for (row = 0; *PvIndexArray && row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
 					currentItem = (calabItem*)(**PvIndexArray)->elt[row];
 					if (!valid(currentItem)) {
 						*Status = 1;
@@ -3045,7 +3088,7 @@ extern "C" EXPORT uInt32 getCounter() {
 	return ++globalCounter;
 }
 
-#if defined WIN32 || defined WIN64
+#if defined _WIN32 || defined _WIN64
 #else
 void loadFunctions() {
 	caLibHandle = dlopen("libca.so", RTLD_LAZY);
@@ -3102,15 +3145,11 @@ void caLabLoad(void) {
 	else {
 		bCaLabPolling = false;
 	}
-	if (getenv("CALAB_NODBG")) {
-		len = strlen(getenv("CALAB_NODBG")) + 1;
-		pValue = (char*)malloc(len * sizeof(char));
-		if (len > 3) {
-			if (pValue)
-				strncpy(pValue, getenv("CALAB_NODBG"), len);
-			pCaLabDbgFile = fopen(pValue, "w");
+	const char* tmp = getenv("CALAB_NODBG");
+	if (tmp) {
+		if (strlen(tmp) > 3) {
+			pCaLabDbgFile = fopen(tmp, "w");
 		}
-		free(pValue);
 	}
 	signal(SIGABRT, signalHandler);
 	signal(SIGFPE, signalHandler);
@@ -3118,7 +3157,7 @@ void caLabLoad(void) {
 	signal(SIGINT, signalHandler);
 	signal(SIGSEGV, signalHandler);
 	signal(SIGTERM, signalHandler);
-#if defined WIN32 || defined WIN64
+#if defined _WIN32 || defined _WIN64
 #else
 	loadFunctions();
 #endif
@@ -3141,7 +3180,7 @@ void caLabLoad(void) {
 
 // clean up library before unload
 void caLabUnload(void) {
-#if defined WIN32 || defined WIN64
+#if defined _WIN32 || defined _WIN64
 #else
 	//dlclose(caLibHandle); <-- caused memory exceptions in memory manager of LV
 	//dlclose(comLibHandle);

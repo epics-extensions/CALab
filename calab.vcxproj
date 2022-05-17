@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- adaptations: 
+  set EPICS IncludePath
+  set LabVIEW IncludePath
+  set EPICS LibraryPath
+  set LabView LibraryPath
+  set correct path in PostBuildEvent->Command
+   -->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\calab.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\caLab.ico" />
+    <Image Include="res\epics.ico" />
+    <Image Include="res\uninstall.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="res\calab.rc" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{bba56dfe-10ff-4892-8c17-11ad883a7cd2}</ProjectGuid>
+    <RootNamespace>calab</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\compiler\msvc;D:\epics\base-3.14.12.8\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-3.14.12.8\lib\win32-x86-debug;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(VC_SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\compiler\msvc;D:\epics\base-3.14.12.8\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-3.14.12.8\lib\win32-x86;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(VC_SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\os\WIN32;D:\epics\base-3.14.12.8\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-3.14.12.8\lib\windows-x64-debug;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(VC_SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\os\WIN32;D:\epics\base-3.14.12.8\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-3.14.12.8\lib\windows-x64;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <SourcePath>$(VC_SourcePath)</SourcePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>EPICS_BUILD_DLL;EPICS_CALL_DLL;_DEBUG;__STDC__=0;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>ca.lib;Com.lib;labview.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\Debug\*.dll" "C:\Program Files (x86)\National Instruments\LabVIEW 2020\user.lib\calab\lib" /Y</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>EPICS_BUILD_DLL;EPICS_CALL_DLL;NDEBUG;__STDC__=0;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>ca.lib;Com.lib;labview.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ImageHasSafeExceptionHandlers />
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\Release\*.dll" "C:\Program Files (x86)\National Instruments\LabVIEW 2020\user.lib\calab\lib" /Y</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>EPICS_BUILD_DLL;EPICS_CALL_DLL;_DEBUG;__STDC__=0;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>ca.lib;Com.lib;labview.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\x64\Debug\*.dll" "C:\Program Files\National Instruments\LabVIEW 2020\user.lib\calab\lib" /Y</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>EPICS_BUILD_DLL;EPICS_CALL_DLL;NDEBUG;__STDC__=0;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>ca.lib;Com.lib;labview.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\x64\Release\*.dll" "C:\Program Files\National Instruments\LabVIEW 2020\user.lib\calab\lib" /Y</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

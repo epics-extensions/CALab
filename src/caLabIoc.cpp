@@ -10,11 +10,11 @@
 // AND HZB HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
 //==================================================================================================
-// Name        : caLab.cpp
+// Name        : caLabIoc.cpp
 // Author      : Carsten Winkler
-// Version     : 1.6.0.0
+// Version     : 1.6.0.11
 // Copyright   : HZB
-// Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
+// Description : library to handle softIoc.exe (Windows only)
 //==================================================================================================
 
 // Definitions
@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <dbDefs.h>
 
-#ifdef WIN32
+#if defined _WIN32 || defined _WIN64
 #define EXPORT __declspec(dllexport)
 #else
 #define EXPORT
@@ -40,59 +40,56 @@ typedef struct {
     size_t dimSize;
     LStrHandle elt[1];
 } sStringArray;
-typedef sStringArray **sStringArrayHdl;
+typedef sStringArray** sStringArrayHdl;
 
 // Search for process and optional terminate it
 //    wcProcessFileName: name of process
 //    kill:              TRUE: if find process terminate it
 //    returns TRUE if process found
-static bool ProcessByName(wchar_t* wcProcessFileName, bool kill) {
+static bool ProcessByName(const char* procname, bool kill) {
     HANDLE hProcessSnap;
     HANDLE hProcess;
     PROCESSENTRY32 pe32;
+    BOOL hResult;
+    BOOL retVal = false;
 
     hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hProcessSnap == INVALID_HANDLE_VALUE)
-        return false;
+        return retVal;
     pe32.dwSize = sizeof(PROCESSENTRY32);
-    if (!Process32First(hProcessSnap, &pe32)) {
-        CloseHandle(hProcessSnap);
-        return false;
-    }
-    do {
-        if (!wcscmp(pe32.szExeFile, wcProcessFileName)) {
+    hResult = Process32First(hProcessSnap, &pe32);
+    while (hResult) {
+        if (strcmp(procname, pe32.szExeFile) == 0) {
             if (kill) {
                 hProcess = OpenProcess(PROCESS_TERMINATE, 0, pe32.th32ProcessID);
-                TerminateProcess(hProcess, 0);
-                CloseHandle(hProcess);
-                CloseHandle(hProcessSnap);
-                return true;
-            }
-            else {
-                CloseHandle(hProcessSnap);
-                return true;
+                if (hProcess != NULL) {
+                    TerminateProcess(hProcess, 0);
+                    CloseHandle(hProcess);
+                    retVal = true;
+                }
             }
         }
-    } while (Process32Next(hProcessSnap, &pe32));
+        hResult = Process32Next(hProcessSnap, &pe32);
+    };
     CloseHandle(hProcessSnap);
-    return false;
+    return retVal;
 }
 
 // Search for "softIoc.exe"
 //    ForceOneIOC: TRUE = terminate if existing
 //    returns TRUE if ForceOneIOC == FALSE AND found any running "softIoc.exe"
-extern "C" EXPORT int softIoc(LVBoolean *ForceOneIOC) {
+extern "C" EXPORT int softIoc(LVBoolean * ForceOneIOC) {
     if (*ForceOneIOC) {
-        ProcessByName(L"softIoc.exe", true);
+        ProcessByName("softIoc.exe", true);
         return (externalIocInstance = false);
     }
-    externalIocInstance = ProcessByName(L"softIoc.exe", false);
+    externalIocInstance = ProcessByName("softIoc.exe", false);
     return externalIocInstance;
 }
 
 // Callback of LabVIEW when any caLab-VI is unloaded
 //		instanceState:	undocumented pointer
-extern "C" EXPORT MgErr unreserved(InstanceDataPtr *instanceState)
+extern "C" EXPORT MgErr unreserved(InstanceDataPtr * instanceState)
 {
     if (iListCount) {
         //removePVs(pszNameList, iListCount);
@@ -106,33 +103,43 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr *instanceState)
         pszNameList = 0x0;
     }
     if (!externalIocInstance)
-        ProcessByName(L"softIoc.exe", true);
+        ProcessByName("softIoc.exe", true);
     return 0;
 }
 
 // Callback of LabVIEW when any caLab-VI is aborted
 //		instanceState:	undocumented pointer
-extern "C" EXPORT MgErr aborted(InstanceDataPtr *instanceState)
+extern "C" EXPORT MgErr aborted(InstanceDataPtr * instanceState)
 {
     return unreserved(instanceState);
 }
 
 // Callback of LabVIEW when any caLab-VI is loaded
 //		instanceState:	undocumented pointer
-extern "C" EXPORT MgErr reserved(InstanceDataPtr *instanceState) {
+extern "C" EXPORT MgErr reserved(InstanceDataPtr * instanceState) {
     return 0;
 }
 
 // Adds a PV list to internal PV cache
 //    PVList: list of PVs
-extern "C" EXPORT void addPVList(sStringArrayHdl* PVList) {
+extern "C" EXPORT void addPVList(sStringArrayHdl * PVList) {
     if (!((***PVList).elt)[0])
         return;
-    iListCount = (**PVList)->dimSize;
-    pszNameList = (char**)realloc(pszNameList, iListCount * sizeof(char*));
-    for (size_t i = 0; i < iListCount; i++) {
-        pszNameList[i] = (char*)malloc(PVNAME_STRINGSZ * sizeof(char));
-        memset(pszNameList[i], 0, PVNAME_STRINGSZ);
-        memcpy_s(pszNameList[i], PVNAME_STRINGSZ, (**((***PVList).elt)[i]).str, (**((***PVList).elt)[i]).cnt);
+    void* tmp = realloc(pszNameList, (**PVList)->dimSize * sizeof(char*));
+    if (tmp) {
+        iListCount = (**PVList)->dimSize;
+        pszNameList = (char**)tmp;
+        for (size_t i = 0; i < iListCount; i++) {
+            size_t destSize = PVNAME_STRINGSZ * sizeof(char);
+            tmp = malloc(destSize);
+            if (tmp) {
+                memset(tmp, 0, destSize);
+                memcpy_s(tmp, destSize, (**((***PVList).elt)[i]).str, (**((***PVList).elt)[i]).cnt);
+                pszNameList[i] = (char*)tmp;
+            }
+            else {
+                pszNameList[i] = 0x0;
+            }
+        }
     }
 }
