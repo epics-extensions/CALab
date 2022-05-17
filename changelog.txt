@@ -1,0 +1,249 @@
+﻿Changelog of CA Lab
+
+V1.6.0.11 (Released: March 2020)
+# BUGFIX 60 characters support for CaLabSoftIOC.vi
+# EPICS base 3.14.12.8
+# Debug window shows more details
+
+----------------------------------------------------------------------
+V1.6.0.10 (Released: June 2018)
+  # PV names can use 60 characters now
+  # constantly changing PV names can be used again (input connector
+    'variable PV names' must be set true)
+    Remark: You will get better performance without this option
+
+----------------------------------------------------------------------
+V1.6.0.9 (Released: March 2018)
+  # fixed multithreaded write values
+  # fixed default input type for name in "CaLabPut.vi"
+  # corrected "Event Demo.vi"
+
+----------------------------------------------------------------------
+V1.6.0.8 (Released: March 2018)
+  + "CaLabDisconnect.vi": Now you can disconnect several or all
+     EPICS variables from network without closing all CaLab-VIs
+  + "CaLabInit.vi": Now you can initialize Channel Access Variables
+     before using in "CaLabGet.vi" and "CaLabPut.vi"
+  + Field values with enums are displayed with correct enum string now
+  # EPICS base 3.14.12.7
+  # Update of online documentation
+  # Online documentation moved to http://hz-b.de/calab
+  - Input "ValueSetsInColums" removed
+  ! Please, replace old CA Lab VIs! The new VIs fit into old structures.
+
+----------------------------------------------------------------------
+V1.5.1.0 (Released: January 2016)
+  + CaLabGet.vi: added optional parameter NoMDEL
+                 NoMEL=true -> ignore monitor dead-band
+                            -> deactivated caching of values
+  - CaLabGet.vi: connector "Initialize" removed
+  # CaLabEvent.vi: restart issues fixed
+  # EPICS base 3.14.12.5
+  # VI versioning started
+  # Update of examples
+  # Update of online documentation
+
+---------------------------------------------------------------------- 
+V1.5.0.5 (Released: August 2014) 
+  + Environment variable for redirecting debug window output to a file
+        CALAB_NODBG = PATH_NAME_OF_LOG_FILE
+  + Environment variable for switching off monitoring EPICS variables
+    This is useful to avoid permanent open network ports. (CompactRIO)
+        CALAB_POLLING = TRUE
+   (CA Lab looks only if CALAB_POLLING is defined. The value does not matter.
+    Events and synchronisation are disabled if you use this polling mode.)
+  + Added CALAB_NODBG and CALAB_POLLING to CaLabInfo
+  # Non-blocking mutexes to avoid freezing
+  # Improved CaLabPut to run more smoothly
+  # Detection of empty PV name in CaLabPut
+  # Good news for all Linux users: CaLabEvent.vi is working again
+    Please link the CA Lab library without the option "-llv"
+
+---------------------------------------------------------------------- 
+V1.5.0.1 (Released: February 2014) 
+  +++ New server component! +++ 
+  + Configure and start an external "soft IOC shell" instance directly 
+    out of LabVIEW (for Windows only, Linux users really doesn't need it) 
+  + New VI "CaLabInfo" to show: 
+                 current (used) EPICS environment variables 
+                 internal EPICS PV cache of CA Lab 
+  # Error code for success is 0 now instead of 1 
+  # Error codes are in user error code range now (7008-7496) 
+    Ca Lab error {7008-7472} - 7000 = Channel Access error code 
+  # Shows more error messages 
+  # Solves problems with restarted VIs 
+  # caLabGet: Solves problems with empty PV name array 
+  # Removes delayed termination of VIs 
+    (found a better way for safe termination) 
+  # PV cache and subcriptions are running until all CA Lab VIs are closed 
+    (stopped VIs have ongoing PV monitors for quick restart) 
+  # Improved Linux compatibility 
+  # EPICS base 3.14.12.4 
+ 
+  Known problems 
+  Linux + current LabVIEW version: The event function is broken. (NI 
+  confirmed the problem and looks for a solution.) The problem is in the 
+  development enviroment only. If you build an executible, all is fine. 
+(NI 2014-02-24: "The problem is expected to be fixed with the version LV 2014.") 
+ 
+---------------------------------------------------------------------- 
+V1.4.1.0 (Released: February 2013) 
+  + New memory management 
+  + Gaps in string arrays are possible now; e.g. ['a', 'b', '', 'd'] 
+    (EPICS data type must be a string array!) 
+  + New LabVIEW control "PV Info" (output cluster),  
+    project "CaLabs.lvproj" and aliases "CaLabs.aliases" 
+    (Thanks to Robert M. Everly) 
+  + Global Channel Access warnings and errors are displayed 
+    via "Debugging window" of LabVIEW 
+  # Just one call of caLab.dll in caLabGet.vi instead of two 
+  # Parallel running instances of CA Lab don't freeze anymore 
+  # Events: Initially disconnected variables receive values 
+    after connection is established (fix) 
+  # Improved LabVIEW convention of VIs 
+    (Thanks to Robert M. Everly) 
+  # Update of ReadMeFirst.txt 
+  # Delayed termination of VIs if they run a very short time (<10sec.) 
+    This guarantees a safe termination of EPICS environment. 
+  # Write values (without synchronous) is up to 10 times faster now 
+  # Read values is up to 5 times faster now 
+  - Removed buffer size (since version 1.3 without function) 
+  - Removed dead lock detecting and auto unfreezing 
+    (No workaround needed anymore) 
+	 
+*** Note *** 
+If you upgrade existing VIs with CA Lab please exchange: 
+    caLabGetxx.vi -> caLabGet.vi 
+    caLabPutxx.vi -> caLabPut.vi 
+and click right on greyed out CA Lab VIs and use "Relink to SubVI" 
+to update type of Polymorphic VI. 
+Watch out! LabVIEW may result in a misalignment of connectors!! 
+ 
+---------------------------------------------------------------------- 
+V1.3.2.1 (Released: August 2012) 
+  # caLabEvent: Solves problems with subscriptions to 
+    multi-element (DBR_TIME_CHAR) variables and NULL values 
+    (Thanks to Phillip J. Wyss -Purdue University-) 
+ 
+---------------------------------------------------------------------- 
+Change-log of CA Lab 
+V1.3.2.0 (Released: July 2012) 
+  # Synchronized puts wait for callbacks now (ca_array_put_callback) 
+  # Less IO delay 
+  # Solved problems with caLabEvent and uninitialized arrays 
+  # Recompiled EPICS base 3.14.12.2 with 
+    rules-db.patch, str-to-enum.patch, fix-907761.patch, comment-nop.patch, 
+    rsrv2.patch, nfsMount.patch and dbReportDev.patch  
+  + Multi threaded get and put = faster io 
+  + Dead lock detecting and auto unfreezing 
+  + Optional warning window 
+ 
+---------------------------------------------------------------------- 
+V1.3.1.3 (Released: March 2012) 
+  # Solved 1D-pv-array to 1D-value-array problem 
+  # caLabGet.vi: optimized memory allocation 
+  # caLabPut.vi: documentation updated 
+  # Examples revised and documented better 
+  # Recompiled EPICS base 3.14.12.2 with 
+    rules-db.patch, fix-907761.patch and str-to-enum.patch 
+ 
+---------------------------------------------------------------------- 
+V1.3.1.2 (Released: February 2012) 
+  + caLabPut: New option valueSetsInColumns to hold value sets in columns 
+     instead of rows (value sets in rows for 2d arrays is default now) 
+  # caLabPut optimized for speed (large arrays) 
+  # BUG: caLabGet and caLabGet had transposed arrays in some cases 
+  # Fixes problems with PV names that contain white spaces 
+  # Better handling of oversized value arrays in caLabPut 
+    (Ca Lab uses max. valid array size [NELM field] instead of size=1 now) 
+ 
+---------------------------------------------------------------------- 
+V1.3.1.0 (Released: January 2012) 
+  + caLabPut: New option "synchronous"  
+             (old connector name was "fire and forget") 
+             true = writes value(s) after waiting for the end 
+                      of record processing 
+             false  = writes value(s) without waiting for the end 
+                      of record processing (DEFAULT) 
+Note: Old projects that use the "fire and forget" feature in caLabPut, 
+      are no longer compatible! 
+ 
+---------------------------------------------------------------------- 
+V1.3.0.4 (Released: December 2011) 
+  # Fixes problems with PV names that contain a point 
+  # Better enum string handling for string value output 
+  # Uninstaller detects and terminates running caRepeater.exe now 
+ 
+--------------------------------------------------------------------- 
+V1.3.0.3 (Released: December 2011) 
+  + Completely rewritten 
+  + EPICS base 3.14.12.2 
+  + 64-bit support 
+  + !!! caLabGet and caLabPut accepts PV arrays now !!! 
+  + Much faster if you use name arrays 
+  + Optional fields are no longer static values 
+    (monitoring of optional fields) 
+ 
+  # No white spaces in results anymore 
+  # Fixes problem with long PV names 
+  # Memory leak for caLabPut Fixes 
+  # Works with LabVIEW 2011 
+  # Improved polymorphic vi handling (boolean input) 
+  # Fixes caLabPut2x.vi (1D-name-array with 1D-value-array) 
+  # Keeps last valid value in error case 
+   
+  - Fire and forget not longer available 
+   (dummy connectors for compatibility) 
+ 
+--------------------------------------------------------------------- 
+V1.2.1.3 (Released: May 2011) 
+  # Fixes multi instances bug 
+  # Fixes for EPICS Base 
+  # Fixes lost values of reconnected channels 
+  # Fixes problems with multiple ioc-server-sources 
+   
+--------------------------------------------------------------------- 
+V1.2.0.0 (Released: February 2011) 
+  + Added "user event" (software trigger) to CA Lab 
+ 
+  # Minor changes in startDemo.bat (11 FEB 2011) 
+  # Fixes LabVIEW crash in case of immediately closing VI after 
+    stopping it 
+  # Faster termination of CA Lab VIs       
+ 
+--------------------------------------------------------------------- 
+V1.1.1.1 (Released: January 2011) 
+  # Holds last valid value of PV after channel disconnection with 
+    current state info 
+  # Fixes for EPICS Base "escape-paths.patch", "errlog-atExit.patch" 
+    and "rsrv.patch" 
+ 
+--------------------------------------------------------------------- 
+V1.1.1.0 (Released: January 2011) 
+  + WORKS WITH LINUX NOW!!! 
+  + Works with LabVIEW 7.0 up to LabVIEW 2010 
+  + Improved performance (much more faster Channel Access IO, 
+    faster reconnect) 
+  + Internal PV cache to improve read and write access and reduce 
+    network traffic 
+  + User defined fields of EPICS PV such as "EGU", "DESCRIPTION" etc. 
+  + New additional fire-and-forget-bit for speeding up write 
+    If you use the fire and forget mode you'll get no success info 
+  + User defined timeout for Channel Access communication (optional) 
+  + User defined buffer for reconnect and put task (optional) 
+  + More PV information bundled in output cluster 
+  + Status bit of PV for easy health check       
+ 
+  - In LabVIEW 8.5 and higher "initPV.vi" and "disconnectPV.vi" 
+    are no longer needed. 
+  - Reduced user-VIs to "caLabGet.vi" and "caLabPut.vi" 
+   
+  # Fixes memory leak 
+  # Holds last valid value of PV after channel disconnection with 
+    current state info 
+  # Better error handling (no frozen LabVIEW anymore) 
+  # Built with EPICS Base 3.14.12 
+ 
+--------------------------------------------------------------------- 
+V1.0.0.3 (Released: June 2010) 
+  - First Release
