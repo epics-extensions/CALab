@@ -65,9 +65,9 @@ static bool ProcessByName(const char* procname, bool kill) {
                 if (hProcess != NULL) {
                     TerminateProcess(hProcess, 0);
                     CloseHandle(hProcess);
-                    retVal = true;
                 }
             }
+            retVal = true;
         }
         hResult = Process32Next(hProcessSnap, &pe32);
     };

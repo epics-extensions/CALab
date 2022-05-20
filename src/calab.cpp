@@ -37,6 +37,8 @@
 #include <cadef.h>
 #include <envDefs.h>
 #include <epicsStdio.h>
+#include <windows.h>
+#include <libloaderapi.h>
 #define EXPORT __declspec(dllexport)
 #else
 #include <dlfcn.h>
@@ -158,6 +160,21 @@ typedef sResultArray **sResultArrayHdl;
 #include "lv_epilog.h"
 
 #if defined _WIN32 || defined _WIN64
+HMODULE libRef = 0x0;
+DWORD dllStatus = DLL_PROCESS_DETACH;
+BOOLEAN WINAPI DllMain(HINSTANCE hDllHandle, DWORD nReason, LPVOID Reserved) {
+	dllStatus = nReason;
+	//DbgPrintf("DllMain: reason=%d", nReason);
+	switch (nReason) {
+		case DLL_PROCESS_ATTACH: {
+			break;
+		}
+		case DLL_PROCESS_DETACH: {
+			break;
+		}
+	}
+	return 1;
+}
 #else // Workaround for EPICS library unload issue in Linux
 const short *dbf_text_dim = (const short *)dlsym(caLibHandle, "dbf_text_dim");
 const char * epicsAlarmSeverityStrings[] = {
@@ -503,6 +520,7 @@ void caLabUnload(void);
 ca_client_context* 			pcac = 0x0;            // EPICS context
 bool                        bCaLabPolling = false; // TRUE: Avoids permanent open network ports. (CompactRIO)
 uInt32            			globalCounter = 0;     // simple counter for debugging
+uInt32            			reservedCounter = 0;     // simple counter for debugging
 static bool                 stopped;               // indicator for closing library
 FILE*                       pCaLabDbgFile = 0x0;   // file handle for optional debug file
 std::atomic<int>            allItemsConnected1(0); // indicator for finished connect
@@ -512,7 +530,22 @@ static bool					err200 = false;        // send one error 200 message only
 uInt32						currentlyConnectedPos = 6 * sizeof(void*) + sizeof(unsigned int); // direct access to connect indicator in channell access object
 epicsMutexId				getLock;				// object mutex
 
-													// internal data object
+void CaLabDbgErrorPrintf(const MgErr& err)
+{
+	LStrHandle hMessage;
+	bool foundErrorText = NIGetOneErrorCode(err, &hMessage);
+	if (foundErrorText) {
+		if (pCaLabDbgFile)
+			CaLabDbgPrintf("%.*s", (*hMessage)->cnt, (*hMessage)->str);
+		else
+			CaLabDbgPrintf("%H", hMessage);
+	}
+	else {
+		CaLabDbgPrintf("unkonow error");
+	}
+}
+
+// internal data object
 class calabItem {
 public:
 	void*					validAddress;							// check number for valid object
@@ -628,6 +661,7 @@ public:
 	}
 
 	~calabItem() {
+		if (!dllStatus) return; // DLL_PROCESS_DETACH
 		MgErr err = noErr;
 		lock();
 		szName[0] = 0x0;
@@ -1381,6 +1415,7 @@ public:
 
 	// post LV user event
 	void postEvent() {
+		if (!reservedCounter || !dllStatus) return; // all VIs unloaded or DLL_PROCESS_DETACH
 		/*if (!initConnect) {
 		initConnect = true;
 		return;
@@ -1390,6 +1425,7 @@ public:
 		tasks.fetch_add(1);
 		std::vector<LVUserEventRef>::iterator itRefNum;
 		std::vector<sResult*>::iterator itEventResultCluster;
+		MemStatRec msrp;
 		try {
 			MgErr err = noErr;
 			int32 size;
@@ -1417,63 +1453,249 @@ public:
 						|| ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr)) {
 						itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
 						itRefNum = RefNum.erase(itRefNum);
+						CaLabDbgPrintf("postEvent(): invalid handles 1");
 						continue;
 					}
 					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
 						if (!(*itEventResultCluster)->StringValueArray || (*(*itEventResultCluster)->StringValueArray)->dimSize != (*stringValueArray)->dimSize) {
-							if ((*itEventResultCluster)->StringValueArray && DSCheckHandle((*itEventResultCluster)->StringValueArray) == noErr) {
+							/*if (pCaLabDbgFile)
+								CaLabDbgPrintf("postEvent(%.*s): DSDisposeHandle", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+							else
+								CaLabDbgPrintf("postEvent(%H): DSDisposeHandle", (*itEventResultCluster)->PVName);
+							if ((*itEventResultCluster)->StringValueArray) {
 								for (uInt32 j = 0; j < (*stringValueArray)->dimSize; j++) {
 									DSDisposeHandle((*stringValueArray)->elt[j]);
 								}
-								err += DSDisposeHandle((*itEventResultCluster)->StringValueArray);
+								err = DSDisposeHandle((*itEventResultCluster)->StringValueArray);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in DSDisposeHandle 1", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in DSDisposeHandle 1", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 							}
 							(*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
+							err = DSCheckHandle((*itEventResultCluster)->StringValueArray);
+							if (err != noErr) {
+								if (pCaLabDbgFile)
+									CaLabDbgPrintf("postEvent(%.*s): Error in StringValueArray", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+								else
+									CaLabDbgPrintf("postEvent(%H): Error in StringValueArray", (*itEventResultCluster)->PVName);
+								CaLabDbgErrorPrintf(err);
+								return;
+							}
 							(*(*itEventResultCluster)->StringValueArray)->dimSize = (*stringValueArray)->dimSize;
 							if ((*itEventResultCluster)->ValueNumberArray) {
-								if (DSCheckHandle((*itEventResultCluster)->ValueNumberArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->ValueNumberArray);
+								err = DSDisposeHandle((*itEventResultCluster)->ValueNumberArray);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in DSDisposeHandle 2", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in DSDisposeHandle 2", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 							}
 							(*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
+							err = DSCheckHandle((*itEventResultCluster)->ValueNumberArray);
+							if (err != noErr) {
+								if (pCaLabDbgFile)
+									CaLabDbgPrintf("postEvent(%.*s): Error in ValueNumberArray", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+								else
+									CaLabDbgPrintf("postEvent(%H): Error in ValueNumberArray", (*itEventResultCluster)->PVName);
+								CaLabDbgErrorPrintf(err);
+								return;
+							}
 							(*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;
+							*/
+							itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+							itRefNum = RefNum.erase(itRefNum);
+							CaLabDbgPrintf("postEvent(): invalid handles 2");
+							continue;
 						}
 						for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
-							if (!(*(*itEventResultCluster)->StringValueArray)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->StringValueArray)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
-								(*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
+							DSMemStats(&msrp);
+							LStrHandle hCurrentString = (*stringValueArray)->elt[j];
+							size_t currentStringHandleSize = hCurrentString ? DSGetHandleSize(hCurrentString) : 0;
+							size_t currentStringLength = hCurrentString && *hCurrentString ? (*hCurrentString)->cnt : 0;
+							LStrHandle hResultString = (*(*itEventResultCluster)->StringValueArray)->elt[j];
+							size_t restltStringHandleSize = hResultString ? DSGetHandleSize(hResultString) : 0;
+							size_t resultStringLength = hResultString && *hResultString ? (*hResultString)->cnt : 0;							
+							if (!hResultString || restltStringHandleSize < currentStringHandleSize) {
+								size_t newSize = 0;
+								size_t oldSize = restltStringHandleSize;
+								if (!hResultString || (err = DSCheckHandle(hResultString)) != noErr) {
+									hResultString = (LStrHandle)DSNewHClr(sizeof(size_t) + currentStringLength * sizeof(uChar));
+									err = DSCheckHandle(hResultString);
+									if (err != noErr) {
+										if (pCaLabDbgFile)
+											CaLabDbgPrintf("postEvent(%.*s): Error in hResultString", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+										else
+											CaLabDbgPrintf("postEvent(%H): Error in hResultString", (*itEventResultCluster)->PVName);
+										CaLabDbgErrorPrintf(err);
+										return;
+									}
+									newSize = hResultString ? DSGetHandleSize(hResultString) : 0;
+									if (pCaLabDbgFile) {
+										if (resultStringLength && currentStringLength)
+											CaLabDbgPrintf("postEvent(%.*s): %.*s => %.*s; new element with size %d (%d bytes) => %d (%d bytes)", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str, (*hResultString)->cnt, (*hResultString)->str, (*hCurrentString)->cnt, (*hCurrentString)->str, resultStringLength, oldSize, currentStringLength, newSize);
+										else
+											CaLabDbgPrintf("postEvent(%.*s): new element with size %d bytes (resultSize = %d; currentSize = %d", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str, newSize, resultStringLength, currentStringLength);
+									}
+									else {
+										if (resultStringLength && currentStringLength)
+											CaLabDbgPrintf("postEvent(%H): %H => %H; new element with size %d (%d bytes) => %d (%d bytes)", (*itEventResultCluster)->PVName, hResultString, hCurrentString, resultStringLength, oldSize, currentStringLength, newSize);
+										else
+											CaLabDbgPrintf("postEvent(%H): new element with size %d bytes", (*itEventResultCluster)->PVName, newSize);
+									}
+								}
+								else {
+									err = NumericArrayResize(uB, 1, (UHandle*)&hResultString, currentStringLength);
+									if (err != noErr) {
+										if (pCaLabDbgFile)
+											CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 1", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+										else
+											CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 1", (*itEventResultCluster)->PVName);
+										CaLabDbgErrorPrintf(err);
+										return;
+									}
+									newSize = hResultString ? DSGetHandleSize(hResultString) : 0;
+									if (pCaLabDbgFile) {
+										if (resultStringLength && currentStringLength)
+											CaLabDbgPrintf("postEvent(%.*s): %.*s => %.*s; resize %d (%d bytes) => %d (%d bytes)", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str, (*hResultString)->cnt, (*hResultString)->str, (*hCurrentString)->cnt, (*hCurrentString)->str, resultStringLength, oldSize, currentStringLength, newSize);
+										else
+											CaLabDbgPrintf("postEvent(%.*s): new size %d bytes (resultSize = %d; currentSize = %d", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str, newSize, resultStringLength, currentStringLength);
+									}
+									else {
+										if (resultStringLength && currentStringLength)
+											CaLabDbgPrintf("postEvent(%H): %H => %H; resize %d (%d bytes) => %d (%d bytes)", (*itEventResultCluster)->PVName, hResultString, hCurrentString, resultStringLength, oldSize, currentStringLength, newSize);
+										else
+											CaLabDbgPrintf("postEvent(%H): new size %d bytes", (*itEventResultCluster)->PVName, newSize);
+									}
+								}
+								if (!resultStringLength) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): hResultString is NULL (%s); alloc size = %d bytes", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str, DSCheckHandle(hResultString) != noErr ? "BAD HANDLE" : "GOOD HANDLE", msrp.totAllocSize);
+									else
+										CaLabDbgPrintf("postEvent(%H): hResultString is NULL (%s); alloc size = %d bytes", (*itEventResultCluster)->PVName, DSCheckHandle(hResultString) != noErr ? "BAD HANDLE" : "GOOD HANDLE", msrp.totAllocSize);
+								}
+								if (!currentStringLength) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): hCurrentString is NULL (%s)", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str, DSCheckHandle(hCurrentString) != noErr ? "BAD HANDLE" : "GOOD HANDLE");
+									else
+										CaLabDbgPrintf("postEvent(%H): hCurrentString is NULL (%s)", (*itEventResultCluster)->PVName, DSCheckHandle(hCurrentString) != noErr ? "BAD HANDLE" : "GOOD HANDLE");
+								}
+								if (hResultString && *hResultString) {
+									(*hResultString)->cnt = (int32)currentStringLength;
+								}
+								else {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): hResultString is NULL", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): hResultString is NULL", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+								}
 							}
-							if ((*stringValueArray)->elt[j])
-								memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->cnt);
+							else if(resultStringLength != currentStringLength) {
+								size_t oldSize = hResultString ? DSGetHandleSize(hResultString) : 0;
+								size_t newSize = hCurrentString ? DSGetHandleSize(hCurrentString) : 0;
+								if (oldSize >= newSize) {
+									if (hResultString && *hResultString) {
+										(*hResultString)->cnt = (int32)currentStringLength;
+									}
+								}
+								else {
+									CaLabDbgPrintf("STOP!!!");
+								}
+							}
+							if (hCurrentString)
+								memcpy((*hResultString)->str, (*hCurrentString)->str, currentStringLength);
 							else
-								memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, "\0", 1);
+								memcpy((*hResultString)->str, "\0", 1);
 							(*(*itEventResultCluster)->ValueNumberArray)->elt[j] = (*doubleValueArray)->elt[j];
 						}
 						(*itEventResultCluster)->valueArraySize = (uInt32)(*stringValueArray)->dimSize;
 						if (FieldNameArray) {
-							if (!(*itEventResultCluster)->FieldNameArray || DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldNameArray || (*(*itEventResultCluster)->FieldNameArray)->dimSize != (*FieldNameArray)->dimSize))) {
-								if ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->FieldNameArray);
-								(*itEventResultCluster)->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-								(*(*itEventResultCluster)->FieldNameArray)->dimSize = (*FieldNameArray)->dimSize;
+							sStringArrayHdl hFieldNames = (*itEventResultCluster)->FieldNameArray;
+							if (!hFieldNames || (err = DSCheckHandle(hFieldNames)) != noErr || (FieldNameArray && (!hFieldNames || (*hFieldNames)->dimSize != (*FieldNameArray)->dimSize))) {
+								if (hFieldNames && err == noErr) {
+									err = DSDisposeHandle(hFieldNames);
+									if (err != noErr) {
+										if (pCaLabDbgFile)
+											CaLabDbgPrintf("postEvent(%.*s): Error in DSDisposeHandle 3", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+										else
+											CaLabDbgPrintf("postEvent(%H): Error in DSDisposeHandle 3", (*itEventResultCluster)->PVName);
+										CaLabDbgErrorPrintf(err);
+										return;
+									}
+								}
+								hFieldNames = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
+								err = DSCheckHandle(hFieldNames);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in hFieldNames", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in hFieldNames", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
+								(*hFieldNames)->dimSize = (*FieldNameArray)->dimSize;
 							}
-							for (uInt32 j = 0; FieldNameArray && j < (*FieldNameArray)->dimSize && j < (*(*itEventResultCluster)->FieldNameArray)->dimSize; j++) {
-								if (!(*(*itEventResultCluster)->FieldNameArray)->elt[j] || ((*FieldNameArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt != (*(*FieldNameArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldNameArray)->elt[j], (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1);
-									(*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt = (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1;
+							for (uInt32 j = 0; FieldNameArray && j < (*FieldNameArray)->dimSize && j < (*hFieldNames)->dimSize; j++) {
+								if (!(*hFieldNames)->elt[j] || ((*FieldNameArray)->elt[j] && ((*(*hFieldNames)->elt[j])->cnt != (*(*FieldNameArray)->elt[j])->cnt))) {
+									err = NumericArrayResize(uB, 1, (UHandle*)&(*hFieldNames)->elt[j], (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1);
+									if (err != noErr) {
+										if (pCaLabDbgFile)
+											CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 2", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+										else
+											CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 2", (*itEventResultCluster)->PVName);
+										CaLabDbgErrorPrintf(err);
+										return;
+									}
+									(*(*hFieldNames)->elt[j])->cnt = (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1;
 								}
 								if ((*FieldNameArray)->elt[j])
-									memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->cnt);
+									memcpy((*(*hFieldNames)->elt[j])->str, (*(*FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->cnt);
 								else
-									memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, "\0", 1);
+									memcpy((*(*hFieldNames)->elt[j])->str, "\0", 1);
 							}
-							if (!(*itEventResultCluster)->FieldValueArray || DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldValueArray || (*(*itEventResultCluster)->FieldValueArray)->dimSize != (*FieldNameArray)->dimSize))) {
-								if ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->FieldValueArray);
+							if (!(*itEventResultCluster)->FieldValueArray || (FieldNameArray && (!(*itEventResultCluster)->FieldValueArray || (*(*itEventResultCluster)->FieldValueArray)->dimSize != (*FieldNameArray)->dimSize))) {
+								if ((*itEventResultCluster)->FieldValueArray) {
+									err = DSDisposeHandle((*itEventResultCluster)->FieldValueArray);
+									if (err != noErr) {
+										if (pCaLabDbgFile)
+											CaLabDbgPrintf("postEvent(%.*s): Error in DSDisposeHandle 4", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+										else
+											CaLabDbgPrintf("postEvent(%H): Error in DSDisposeHandle 4", (*itEventResultCluster)->PVName);
+										CaLabDbgErrorPrintf(err);
+										return;
+									}
+								}
 								(*itEventResultCluster)->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
+								err = DSCheckHandle((*itEventResultCluster)->FieldValueArray);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in FieldValueArray", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in FieldValueArray", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 								(*(*itEventResultCluster)->FieldValueArray)->dimSize = (*FieldNameArray)->dimSize;
 							}
 							for (uInt32 j = 0; FieldValueArray && j < (*FieldValueArray)->dimSize && j < (*(*itEventResultCluster)->FieldValueArray)->dimSize; j++) {
 								if (!(*(*itEventResultCluster)->FieldValueArray)->elt[j] || ((*FieldValueArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt != (*(*FieldValueArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[j], (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1);
+									err = NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[j], (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1);
+									if (err != noErr) {
+										if (pCaLabDbgFile)
+											CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 3", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+										else
+											CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 3", (*itEventResultCluster)->PVName);
+										CaLabDbgErrorPrintf(err);
+										return;
+									}
 									(*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt = (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1;
 								}
 								if ((*FieldValueArray)->elt[j])
@@ -1485,28 +1707,60 @@ public:
 						(*itEventResultCluster)->TimeStampNumber = TimeStampNumber;
 						if (TimeStampString) {
 							if (!(*itEventResultCluster)->TimeStampString || (*(*itEventResultCluster)->TimeStampString)->cnt != (*TimeStampString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->TimeStampString, (*TimeStampString)->cnt);
+								err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->TimeStampString, (*TimeStampString)->cnt);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 4", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 4", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 								(*(*itEventResultCluster)->TimeStampString)->cnt = (*TimeStampString)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->TimeStampString)->str, (*TimeStampString)->str, (*TimeStampString)->cnt);
 						}
 						if (StatusString) {
 							if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != (*StatusString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, (*StatusString)->cnt);
+								err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, (*StatusString)->cnt);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 5", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 5", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 								(*(*itEventResultCluster)->StatusString)->cnt = (*StatusString)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->StatusString)->str, (*StatusString)->str, (*StatusString)->cnt);
 						}
 						if (SeverityString) {
 							if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != (*SeverityString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, (*SeverityString)->cnt);
+								err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, (*SeverityString)->cnt);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 6", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 6", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 								(*(*itEventResultCluster)->SeverityString)->cnt = (*SeverityString)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->SeverityString)->str, (*SeverityString)->str, (*SeverityString)->cnt);
 						}
 						if (ErrorIO.source) {
 							if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+								err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+								if (err != noErr) {
+									if (pCaLabDbgFile)
+										CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 7", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+									else
+										CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 7", (*itEventResultCluster)->PVName);
+									CaLabDbgErrorPrintf(err);
+									return;
+								}
 								(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, (*ErrorIO.source)->str, (*ErrorIO.source)->cnt);
@@ -1523,24 +1777,60 @@ public:
 						}
 					}
 					else {
+						if (pCaLabDbgFile)					
+							CaLabDbgPrintf("postEvent(%.*s): NumericArrayResize", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+						else
+							CaLabDbgPrintf("postEvent(%H): NumericArrayResize", (*itEventResultCluster)->PVName);
 						size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
 						if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
+							err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
+							if (err != noErr) {
+								if (pCaLabDbgFile)
+									CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 8", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+								else
+									CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 8", (*itEventResultCluster)->PVName);
+								CaLabDbgErrorPrintf(err);
+								return;
+							}
 							(*(*itEventResultCluster)->StatusString)->cnt = size;
 						}
 						memcpy((*(*itEventResultCluster)->StatusString)->str, alarmStatusString[epicsAlarmComm], size);
 						size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
 						if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
+							err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
+							if (err != noErr) {
+								if (pCaLabDbgFile)
+									CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 9", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+								else
+									CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 9", (*itEventResultCluster)->PVName);
+								CaLabDbgErrorPrintf(err);
+								return;
+							}
 							(*(*itEventResultCluster)->SeverityString)->cnt = size;
 						}
 						memcpy((*(*itEventResultCluster)->SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
 						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+							err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+							if (err != noErr) {
+								if (pCaLabDbgFile)
+									CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 10", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+								else
+									CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 10", (*itEventResultCluster)->PVName);
+								CaLabDbgErrorPrintf(err);
+								return;
+							}
 							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
 						}
 						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (int32)strlen(ca_message(ECA_DISCONN))) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
+							err = NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
+							if (err != noErr) {
+								if (pCaLabDbgFile)
+									CaLabDbgPrintf("postEvent(%.*s): Error in NumericArrayResize 11", (*(*itEventResultCluster)->PVName)->cnt, (*(*itEventResultCluster)->PVName)->str);
+								else
+									CaLabDbgPrintf("postEvent(%H): Error in NumericArrayResize 11", (*itEventResultCluster)->PVName);
+								CaLabDbgErrorPrintf(err);
+								return;
+							}
 							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (int32)strlen(ca_message(ECA_DISCONN));
 						}
 						memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, ca_message(ECA_DISCONN), strlen(ca_message(ECA_DISCONN)));
@@ -1592,6 +1882,7 @@ public:
 	std::atomic<bool>		locked;			  // indicator of locked list
 
 	calabItemList() {
+		CaLabDbgPrintf("calabItemList()");
 		caLabLoad();
 		myLock = epicsMutexCreate();
 		getLock = epicsMutexCreate();
@@ -1600,6 +1891,8 @@ public:
 	}
 
 	~calabItemList() {
+		if (!dllStatus) return; // DLL_PROCESS_DETACH
+		CaLabDbgPrintf("~calabItemList()");
 		uInt32 timeout = 1000;
 		stopped = true;
 		while (timeout > 0 && tasks.load() > 0) {
@@ -1831,6 +2124,7 @@ MgErr DeleteStringArray(sStringArrayHdl array) {
 //    ...: additional arguments
 MgErr CaLabDbgPrintf(const char *format, ...) {
 	int done = 0;
+	if (!dllStatus) return done; // DLL_PROCESS_DETACH
 	va_list listPointer;
 	va_start(listPointer, format);
 	if (pCaLabDbgFile) {
@@ -1879,12 +2173,17 @@ MgErr CaLabDbgPrintfD(const char *format, ...) {
 // callback of LabVIEW when any caLab-VI is loaded
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr reserved(InstanceDataPtr *instanceState) {
+	CaLabDbgPrintf("reserved %d", ++reservedCounter);
+	*instanceState = (void*)reservedCounter;
 	return 0;
 }
 
 // callback of LV when any caLab-VI is unloaded
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr unreserved(InstanceDataPtr *instanceState) {
+	CaLabDbgPrintf("unreserved %d", (uInt32)*instanceState);
+	if (reservedCounter > 0)
+		reservedCounter--;
 	return 0;
 }
 
@@ -3134,7 +3433,8 @@ void loadFunctions() {
 
 // prepare the library before first using
 void caLabLoad(void) {
-	char *pValue;
+	char *pValue = 0x0;
+	uInt32 iResult;
 	size_t len = 0;
 	if (pcac)
 		return;
@@ -3158,11 +3458,19 @@ void caLabLoad(void) {
 	signal(SIGSEGV, signalHandler);
 	signal(SIGTERM, signalHandler);
 #if defined _WIN32 || defined _WIN64
+	iResult = GetModuleHandleEx(
+		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, // GET_MODULE_HANDLE_EX_FLAG_PIN to prevent unload lib
+		(LPCTSTR)DllMain,
+		&libRef);
+	if (!iResult) {
+		DbgTime(); CaLabDbgPrintf("Error: Could not retrieves a module handle for the myCaLib library.");
+		return;
+	}
 #else
 	loadFunctions();
 #endif
 	stopped = false;
-	uInt32 iResult = ca_context_create(ca_enable_preemptive_callback);
+	iResult = ca_context_create(ca_enable_preemptive_callback);
 	if (iResult != ECA_NORMAL) {
 		DbgTime(); CaLabDbgPrintf("Error: Could not create any instance of Channel Access.");
 		return;
