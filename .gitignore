@@ -8,3 +8,5 @@
 /Release
 /Debug
 *.user
+calab.o
+libcalab.so
