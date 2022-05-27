@@ -1392,7 +1392,6 @@ public:
 		std::vector<sResult*>::iterator itEventResultCluster;
 		try {
 			MgErr err = noErr;
-			int32 size;
 			itRefNum = RefNum.begin();
 			itEventResultCluster = eventResultCluster.begin();
 			while (itRefNum != RefNum.end() && itEventResultCluster != eventResultCluster.end()) {
@@ -1420,12 +1419,13 @@ public:
 						continue;
 					}
 					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
-						if (!(*itEventResultCluster)->StringValueArray || (*(*itEventResultCluster)->StringValueArray)->dimSize != (*stringValueArray)->dimSize) {
-							if ((*itEventResultCluster)->StringValueArray && DSCheckHandle((*itEventResultCluster)->StringValueArray) == noErr) {
-								for (uInt32 j = 0; j < (*stringValueArray)->dimSize; j++) {
-									DSDisposeHandle((*stringValueArray)->elt[j]);
+						sStringArrayHdl sh = (*itEventResultCluster)->StringValueArray;
+						if (!sh || (*sh)->dimSize != (*stringValueArray)->dimSize) {
+							if (sh && DSCheckHandle(sh) == noErr) {
+								for (uInt32 j = 0; j < (*sh)->dimSize; j++) {
+								    DSDisposeHandle((*sh)->elt[j]);
 								}
-								err += DSDisposeHandle((*itEventResultCluster)->StringValueArray);
+								err += DSDisposeHandle(sh);
 							}
 							(*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
 							(*(*itEventResultCluster)->StringValueArray)->dimSize = (*stringValueArray)->dimSize;
@@ -1523,7 +1523,7 @@ public:
 						}
 					}
 					else {
-						size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
+						int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
 						if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
 							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
 							(*(*itEventResultCluster)->StatusString)->cnt = size;
