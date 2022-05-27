@@ -3006,7 +3006,7 @@ static void caTask(void) {
 					iResult = ca_create_channel(currentItem->szName, connectionChanged, (void*)currentItem, 20, &currentItem->caID);
 					currentItem->unlock();
 				}
-				else
+				else {
 					// subscribe channel
 					if (!currentItem->isPassive && currentItem->isConnected && currentItem->caID && !currentItem->caEventID) {
 						currentItem->nativeType = ca_field_type(currentItem->caID);
@@ -3049,16 +3049,17 @@ static void caTask(void) {
 							connectCounter++;
 						}
 					}
-					// unsubscribe channel
-					if (currentItem->isPassive && currentItem->caEventID) {
-						iResult = ca_clear_subscription(currentItem->caEventID);
-						if (iResult == ECA_NORMAL)
-							iResult = ca_pend_io(3);
-						if (iResult == ECA_NORMAL)
-							currentItem->caEventID = 0x0;
-						currentItem->hasValue = false;
-					}
-					currentItem = currentItem->next;
+                }
+				// unsubscribe channel
+				if (currentItem->isPassive && currentItem->caEventID) {
+					iResult = ca_clear_subscription(currentItem->caEventID);
+					if (iResult == ECA_NORMAL)
+						iResult = ca_pend_io(3);
+					if (iResult == ECA_NORMAL)
+						currentItem->caEventID = 0x0;
+					currentItem->hasValue = false;
+				}
+				currentItem = currentItem->next;
 			}
 			//myItems.unlock();
 			ca_flush_io();
@@ -3134,8 +3135,6 @@ void loadFunctions() {
 
 // prepare the library before first using
 void caLabLoad(void) {
-	char *pValue;
-	size_t len = 0;
 	if (pcac)
 		return;
 
