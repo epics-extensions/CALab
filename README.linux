@@ -1,0 +1,81 @@
+################################################
+##  How to build and install CA Lab on Linux  ##
+################################################
+
+## This manual has been updated on 27/May/2022
+
+## Testsystem
+# RHEL 8.5
+# LabVIEW 2020 (64 bit) installed in /usr/local/natinst/
+
+# Install g++ if needed
+
+## Install EPICS Base
+######################
+sudo mkdir /usr/local/epics
+    # Use your userid/groupid in the next command:
+sudo chown owner:group /usr/local/epics/
+cd /usr/local/epics
+    # Note the trailing dot on the next line
+git clone --recursive https://github.com/epics-base/epics-base.git .
+    # The followinc command takes several minutes
+make INSTALL_LOCATION=/usr/local/epics
+
+## Install CA Lab
+##################
+sudo mkdir /usr/local/calab
+    # Use your userid/groupid in the next command:
+sudo chown owner:group /usr/local/calab
+cd /usr/local/calab/
+git clone https://github.com/epics-extensions/CALab
+make
+
+## CONFIG SYSTEM
+#################
+cd /etc/ld.so.conf.d
+
+sudo nano epics.conf => /usr/local/epics/base-3.14.12.7/lib/linux-x86_64/
+sudo nano calab.conf => /usr/local/natinst/LabVIEW-2017-64/cintools/
+                     => /usr/local/calab/
+
+sudo ldconfig
+restart computer
+
+## LAST ADAPTATIONS
+####################
+set enviroment variables EPICS_CA_ADDR_LIST and EPICS_CA_AUTO_ADDR_LIST
+optional set enviroment variables CALAB_NODBG and CALAB_POLLING
+start Soft IOC shell: /usr/local/epics/bin/linux-x86_64/softIoc -D /usr/local/epics/dbd/softIoc.dbd -d /usr/local/calab/demo/db/demo.db
+start labVIEW
+open '/usr/local/calab/VIs/Private/CaLabGet_Main.vi'
+   set VI properties (Strg+I) "Category Protection" to "Unlocked"
+   edit 'Library name or path' of 'Call Library Function Nodes' (double click on it) => change entry to '/usr/local/calab/libcalab.so'
+   optinal set VI properties (Strg+I) "Category Protection" to "Locked"
+repeat these steps with
+'/usr/local/calab/VIs/Private/CaLabGet_Main_Initialized.vi'
+'/usr/local/calab/VIs/Private/CaLabPut_Main.vi'
+'/usr/local/calab/VIs/Private/CaLabPut_Main_Initialized.vi'
+'/usr/local/calab/VIs/CaLabEvent_PV.vi'
+'/usr/local/calab/VIs/CaLabEvent_PV-1D.vi'
+'/usr/local/calab/VIs/CaLabDisconnect_PV.vi'
+'/usr/local/calab/VIs/CaLabDisconnect-1D_PV.vi'
+'/usr/local/calab/VIs/CaLabInit.vi'
+all demo VIs (except SoftIoc*.vi) should be able to run
+
+
+## Start Demo Soft IOC
+#######################
+/usr/local/epics/bin/linux-x86_64/softIoc -D /usr/local/epics/dbd/softIoc.dbd -d /usr/local/calab/demo/db/demo.db
+
+## Troubleshooting
+#######################
+Modern Linuxes often have a firewall running, which might prevent EPICS from working.
+EPICS needs TCP and UDP ports 5064 and 5065 open.
+One solution is to download the "firewall-config" package. Once installed...
+    Add service for "EPICSChannelAccess" (the name doesn't matter)
+    Under this service, add TCP port 5064-5065 and UDP port 5064-5065.
+    Also add "source ports" for TCP port 5064-5065 and UDP port 5064-5065.
+    Reload firewalld.
+    Add EPICSChannelAccess to the zones "Permanent" and "Runtime".
+
+Enjoy CA Lab!
