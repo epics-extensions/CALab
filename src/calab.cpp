@@ -412,6 +412,7 @@ typedef const unsigned short(*dbr_value_offset_t);
 #define dbr_value_ptr(PDBR, DBR_TYPE) ((void *)(((char *)PDBR)+dbr_value_offset[DBR_TYPE]))
 typedef epicsMutexId(*epicsMutexOsiCreate_t)(const char *pFileName, int lineno);
 typedef epicsThreadId(*epicsThreadCreate_t) (const char * name, unsigned int priority, unsigned int stackSize, EPICSTHREADFUNC funptr, void * parm);
+typedef epicsMutexLockStatus(*epicsMutexLock_t)(epicsMutexId id);
 typedef epicsMutexLockStatus(*epicsMutexTryLock_t)(epicsMutexId id);
 typedef void caExceptionHandler(struct exception_handler_args);
 typedef int(*ca_add_exception_event_t) (caExceptionHandler *pfunc, void *pArg);
@@ -441,7 +442,6 @@ typedef void * (*ca_puser_t)(chid chan);
 typedef void(*ca_context_destroy_t) (void);
 typedef void(*ca_detach_context_t) ();
 typedef void(*epicsMutexDestroy_t)(epicsMutexId id);
-typedef void(*epicsMutexLock_t)(epicsMutexId id);
 typedef void(*epicsMutexUnlock_t)(epicsMutexId id);
 typedef void(*epicsThreadSleep_t)(double seconds);
 
@@ -1615,6 +1615,16 @@ public:
 	}
 
 	~globals() {
+		uInt32 timeout = 1000;
+		stopped = true;
+		while (timeout > 0 && tasks.load() > 0) {
+			epicsThreadSleep(.01);
+			timeout--;
+		}
+		if (timeout <= 0)
+			CaLabDbgPrintf("Error: Could not terminate all running tasks of CA Lab.");
+        for (auto& iter: myItems)
+            delete iter.second;
 		epicsMutexDestroy(mapLock);
 		epicsMutexDestroy(getLock);
 		ca_context_destroy();
@@ -1646,18 +1656,12 @@ public:
         return !havelock;
 	}
 
-	// unlock this instance
-	void unlock() {
-		epicsMutexUnlock(mapLock);
-	}
-
     // Insert into global list of pv names
     calabItem* insert(std::string name, calabItem *item) {
-        CaLabDbgPrintf("inserting %s", name.c_str());
         int32 err = lock();
         if (err) CaLabDbgPrintf("lock failed in pvMap insert");
         myItems.insert({name, item});
-		unlock();
+		epicsMutexUnlock(mapLock);
 		return item;
     }
 
@@ -1671,21 +1675,17 @@ public:
         calabItem *currentItem;
 
         LToCStrN(*name, cName, sizeof(cName));
-        CaLabDbgPrintf("adding %s", cName);
         sName = (char *)cName;
         auto search = myItems.find(sName);
         if (search != myItems.end()) {
-            CaLabDbgPrintf("found %s", cName);
             currentItem = search->second;
         } else {
             currentItem = new calabItem(name, FieldNameArray);
-            CaLabDbgPrintf("allocating %s", cName);
             insert(sName, currentItem);
         }
         
 		if (currentItem && FieldNameArray && *FieldNameArray) {
 			if (!currentItem->FieldNameArray || !*currentItem->FieldNameArray) {
-                CaLabDbgPrintf("don't have FieldNameArray");
 				unsigned char szFieldName[MAX_NAME_SIZE];
                 size_t size = sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle);
 				currentItem->FieldNameArray = (sStringArrayHdl)DSNewHClr(size);
@@ -1693,7 +1693,6 @@ public:
 				currentItem->FieldValueArray = (sStringArrayHdl)DSNewHClr(size);
 				(*currentItem->FieldValueArray)->dimSize = (*FieldNameArray)->dimSize;
 				for (uInt32 i = 0; i < (*FieldNameArray)->dimSize; i++) {
-                    CaLabDbgPrintf("inner loop %d", i);
 					NumericArrayResize(uB, 1, (UHandle*)&(*currentItem->FieldNameArray)->elt[i], LStrLen(*((*FieldNameArray)->elt[i])));
 					LStrLen(*((*currentItem->FieldNameArray)->elt[i])) = LStrLen(*((*FieldNameArray)->elt[i]));
 					memcpy(LStrBuf(*((*currentItem->FieldNameArray)->elt[i])), LStrBuf(*((*FieldNameArray)->elt[i])), LStrLen(*((*FieldNameArray)->elt[i])));
@@ -1722,7 +1721,6 @@ public:
 				LStrLen(*fullFieldName) = fullsize;
                 char *cFieldName = new char[fullsize+1];
                 LToCStrN(*fullFieldName, (CStr)cFieldName, fullsize);
-                CaLabDbgPrintf("allocating field name %s", cFieldName);
                 std::string sFieldName = (char *)cFieldName;
                 calabItem *fieldItem;
                 auto search = myItems.find(sFieldName);
