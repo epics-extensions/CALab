@@ -1409,179 +1409,183 @@ public:
 			itRefNum = RefNum.begin();
 			itEventResultCluster = eventResultCluster.begin();
 			while (itRefNum != RefNum.end() && itEventResultCluster != eventResultCluster.end()) {
-				if (*itRefNum) {
-					if (!*itEventResultCluster
-						|| DSCheckPtr(*itEventResultCluster) != noErr
-						|| !(*itEventResultCluster)->PVName
-						|| DSCheckHandle((*itEventResultCluster)->PVName) != noErr
-						|| !(*itEventResultCluster)->ValueNumberArray
-						|| DSCheckHandle((*itEventResultCluster)->ValueNumberArray) != noErr
-						|| !(*itEventResultCluster)->StringValueArray
-						|| DSCheckHandle((*itEventResultCluster)->StringValueArray) != noErr
-						|| !(*itEventResultCluster)->StatusString
-						|| DSCheckHandle((*itEventResultCluster)->StatusString) != noErr
-						|| !(*itEventResultCluster)->SeverityString
-						|| DSCheckHandle((*itEventResultCluster)->SeverityString) != noErr
-						|| !(*itEventResultCluster)->TimeStampString
-						|| DSCheckHandle((*itEventResultCluster)->TimeStampString) != noErr
-						|| !(*itEventResultCluster)->ErrorIO.source
-						|| DSCheckHandle((*itEventResultCluster)->ErrorIO.source) != noErr
-						|| ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr)
-						|| ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr)) {
-						itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+                if (*itRefNum) {
+                    if (!*itEventResultCluster
+                        || DSCheckPtr(*itEventResultCluster) != noErr
+                        || !(*itEventResultCluster)->PVName
+                        || DSCheckHandle((*itEventResultCluster)->PVName) != noErr
+                        || !(*itEventResultCluster)->ValueNumberArray
+                        || DSCheckHandle((*itEventResultCluster)->ValueNumberArray) != noErr
+                        || !(*itEventResultCluster)->StringValueArray
+                        || DSCheckHandle((*itEventResultCluster)->StringValueArray) != noErr
+                        || !(*itEventResultCluster)->StatusString
+                        || DSCheckHandle((*itEventResultCluster)->StatusString) != noErr
+                        || !(*itEventResultCluster)->SeverityString
+                        || DSCheckHandle((*itEventResultCluster)->SeverityString) != noErr
+                        || !(*itEventResultCluster)->TimeStampString
+                        || DSCheckHandle((*itEventResultCluster)->TimeStampString) != noErr
+                        || !(*itEventResultCluster)->ErrorIO.source
+                        || DSCheckHandle((*itEventResultCluster)->ErrorIO.source) != noErr
+                        || ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr)
+                        || ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr)) {
+                        itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
 						itRefNum = RefNum.erase(itRefNum);
-						continue;
-					}
-					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
-						sStringArrayHdl sh = (*itEventResultCluster)->StringValueArray;
-						if (!sh || (*sh)->dimSize != (*stringValueArray)->dimSize) {
+                        continue;
+                    }
+                    if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
+                        sStringArrayHdl sh = (*itEventResultCluster)->StringValueArray;
+                        if (!sh || (*sh)->dimSize != (*stringValueArray)->dimSize) {
                             CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*sh)->dimSize, (*stringValueArray)->dimSize);
-							if (sh && DSCheckHandle(sh) == noErr) {
-								for (uInt32 j = 0; j < (*sh)->dimSize; j++) {
-								    DSDisposeHandle((*sh)->elt[j]);
-								}
-								err += DSDisposeHandle(sh);
-							}
-							(*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
-							(*(*itEventResultCluster)->StringValueArray)->dimSize = (*stringValueArray)->dimSize;
-							if ((*itEventResultCluster)->ValueNumberArray) {
-								if (DSCheckHandle((*itEventResultCluster)->ValueNumberArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->ValueNumberArray);
-							}
-							(*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
-							(*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;
-						}
-						for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
-							if (!(*(*itEventResultCluster)->StringValueArray)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->StringValueArray)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
-								(*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
-							}
-							if ((*stringValueArray)->elt[j])
-								memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->cnt);
-							else
-								memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, "\0", 1);
-							(*(*itEventResultCluster)->ValueNumberArray)->elt[j] = (*doubleValueArray)->elt[j];
-						}
-						(*itEventResultCluster)->valueArraySize = (uInt32)(*stringValueArray)->dimSize;
-						if (FieldNameArray) {
-							if (!(*itEventResultCluster)->FieldNameArray || DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldNameArray || (*(*itEventResultCluster)->FieldNameArray)->dimSize != (*FieldNameArray)->dimSize))) {
-								if ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->FieldNameArray);
-								(*itEventResultCluster)->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-								(*(*itEventResultCluster)->FieldNameArray)->dimSize = (*FieldNameArray)->dimSize;
-							}
-							for (uInt32 j = 0; FieldNameArray && j < (*FieldNameArray)->dimSize && j < (*(*itEventResultCluster)->FieldNameArray)->dimSize; j++) {
-								if (!(*(*itEventResultCluster)->FieldNameArray)->elt[j] || ((*FieldNameArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt != (*(*FieldNameArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldNameArray)->elt[j], (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1);
-									(*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt = (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1;
-								}
-								if ((*FieldNameArray)->elt[j])
-									memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->cnt);
-								else
-									memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, "\0", 1);
-							}
-							if (!(*itEventResultCluster)->FieldValueArray || DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldValueArray || (*(*itEventResultCluster)->FieldValueArray)->dimSize != (*FieldNameArray)->dimSize))) {
-								if ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->FieldValueArray);
-								(*itEventResultCluster)->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-								(*(*itEventResultCluster)->FieldValueArray)->dimSize = (*FieldNameArray)->dimSize;
-							}
-							for (uInt32 j = 0; FieldValueArray && j < (*FieldValueArray)->dimSize && j < (*(*itEventResultCluster)->FieldValueArray)->dimSize; j++) {
-								if (!(*(*itEventResultCluster)->FieldValueArray)->elt[j] || ((*FieldValueArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt != (*(*FieldValueArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[j], (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1);
-									(*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt = (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1;
-								}
-								if ((*FieldValueArray)->elt[j])
-									memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->cnt);
-								else
-									memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, "\0", 1);
-							}
-						}
-						(*itEventResultCluster)->TimeStampNumber = TimeStampNumber;
-						if (TimeStampString) {
-							if (!(*itEventResultCluster)->TimeStampString || (*(*itEventResultCluster)->TimeStampString)->cnt != (*TimeStampString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->TimeStampString, (*TimeStampString)->cnt);
-								(*(*itEventResultCluster)->TimeStampString)->cnt = (*TimeStampString)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->TimeStampString)->str, (*TimeStampString)->str, (*TimeStampString)->cnt);
-						}
-						if (StatusString) {
-							if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != (*StatusString)->cnt) {
+                            if (sh && DSCheckHandle(sh) == noErr) {
+                                for (uInt32 j = 0; j < (*sh)->dimSize; j++) {
+                                    DSDisposeHandle((*sh)->elt[j]);
+                                }
+                                err += DSDisposeHandle(sh);
+                            }
+                            (*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
+                            (*(*itEventResultCluster)->StringValueArray)->dimSize = (*stringValueArray)->dimSize;
+                            if ((*itEventResultCluster)->ValueNumberArray) {
+                                if (DSCheckHandle((*itEventResultCluster)->ValueNumberArray) == noErr)
+                                    err += DSDisposeHandle((*itEventResultCluster)->ValueNumberArray);
+                            }
+                            (*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
+                            (*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;
+                        }
+                        for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
+                            if (!(*(*itEventResultCluster)->StringValueArray)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
+                                err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->StringValueArray)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
+                                (*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
+                            }
+                            if ((*stringValueArray)->elt[j])
+                                memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->cnt);
+                            else
+                                memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, "\0", 1);
+                            (*(*itEventResultCluster)->ValueNumberArray)->elt[j] = (*doubleValueArray)->elt[j];
+                        }
+                        (*itEventResultCluster)->valueArraySize = (uInt32)(*stringValueArray)->dimSize;
+                        if (FieldNameArray) {
+                            if (!(*itEventResultCluster)->FieldNameArray || DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldNameArray || (*(*itEventResultCluster)->FieldNameArray)->dimSize != (*FieldNameArray)->dimSize))) {
+                                if ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) == noErr)
+                                    err += DSDisposeHandle((*itEventResultCluster)->FieldNameArray);
+                                (*itEventResultCluster)->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
+                                (*(*itEventResultCluster)->FieldNameArray)->dimSize = (*FieldNameArray)->dimSize;
+                            }
+                            for (uInt32 j = 0; FieldNameArray && j < (*FieldNameArray)->dimSize && j < (*(*itEventResultCluster)->FieldNameArray)->dimSize; j++) {
+                                if (!(*(*itEventResultCluster)->FieldNameArray)->elt[j] || ((*FieldNameArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt != (*(*FieldNameArray)->elt[j])->cnt))) {
+                                    err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldNameArray)->elt[j], (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1);
+                                    (*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt = (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1;
+                                }
+                                if ((*FieldNameArray)->elt[j])
+                                    memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->cnt);
+                                else
+                                    memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, "\0", 1);
+                            }
+                            if (!(*itEventResultCluster)->FieldValueArray || DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldValueArray || (*(*itEventResultCluster)->FieldValueArray)->dimSize != (*FieldNameArray)->dimSize))) {
+                                if ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) == noErr)
+                                    err += DSDisposeHandle((*itEventResultCluster)->FieldValueArray);
+                                (*itEventResultCluster)->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
+                                (*(*itEventResultCluster)->FieldValueArray)->dimSize = (*FieldNameArray)->dimSize;
+                            }
+                            for (uInt32 j = 0; FieldValueArray && j < (*FieldValueArray)->dimSize && j < (*(*itEventResultCluster)->FieldValueArray)->dimSize; j++) {
+                                if (!(*(*itEventResultCluster)->FieldValueArray)->elt[j] || ((*FieldValueArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt != (*(*FieldValueArray)->elt[j])->cnt))) {
+                                    err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[j], (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1);
+                                    (*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt = (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1;
+                                }
+                                if ((*FieldValueArray)->elt[j])
+                                    memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->cnt);
+                                else
+                                    memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, "\0", 1);
+                            }
+                        }
+                        (*itEventResultCluster)->TimeStampNumber = TimeStampNumber;
+                        if (TimeStampString) {
+                            if (!(*itEventResultCluster)->TimeStampString || (*(*itEventResultCluster)->TimeStampString)->cnt != (*TimeStampString)->cnt) {
+                                NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->TimeStampString, (*TimeStampString)->cnt);
+                                (*(*itEventResultCluster)->TimeStampString)->cnt = (*TimeStampString)->cnt;
+                            }
+                            memcpy((*(*itEventResultCluster)->TimeStampString)->str, (*TimeStampString)->str, (*TimeStampString)->cnt);
+                        }
+                        if (StatusString) {
+                            if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != (*StatusString)->cnt) {
                                 if (!(*itEventResultCluster)->StatusString)
                                     CaLabDbgPrintf("clust->StatusString newcount = %d", (*StatusString)->cnt);
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, (*StatusString)->cnt);
-								(*(*itEventResultCluster)->StatusString)->cnt = (*StatusString)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->StatusString)->str, (*StatusString)->str, (*StatusString)->cnt);
-						}
-						if (SeverityString) {
-							if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != (*SeverityString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, (*SeverityString)->cnt);
-								(*(*itEventResultCluster)->SeverityString)->cnt = (*SeverityString)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->SeverityString)->str, (*SeverityString)->str, (*SeverityString)->cnt);
-						}
-						if (ErrorIO.source) {
-							if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
-								(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, (*ErrorIO.source)->str, (*ErrorIO.source)->cnt);
-						}
-						(*itEventResultCluster)->StatusNumber = StatusNumber;
-						(*itEventResultCluster)->SeverityNumber = SeverityNumber;
-						(*itEventResultCluster)->ErrorIO.code = ErrorIO.code;
-						(*itEventResultCluster)->ErrorIO.status = ErrorIO.status;
-						// Post it!
-						if (PostLVUserEvent(*itRefNum, *itEventResultCluster) != mgNoErr) {
-							itRefNum = RefNum.erase(itRefNum);
-							itEventResultCluster = eventResultCluster.erase((itEventResultCluster));
-							continue;
-						}
-					}
-					else {
-						int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
-						if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
-							(*(*itEventResultCluster)->StatusString)->cnt = size;
-						}
-						memcpy((*(*itEventResultCluster)->StatusString)->str, alarmStatusString[epicsAlarmComm], size);
-						size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
-						if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
-							(*(*itEventResultCluster)->SeverityString)->cnt = size;
-						}
-						memcpy((*(*itEventResultCluster)->SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
-						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
-							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
-						}
-						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (int32)strlen(ca_message(ECA_DISCONN))) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
-							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (int32)strlen(ca_message(ECA_DISCONN));
-						}
-						memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, ca_message(ECA_DISCONN), strlen(ca_message(ECA_DISCONN)));
-						(*itEventResultCluster)->StatusNumber = epicsAlarmComm;
-						(*itEventResultCluster)->SeverityNumber = epicsSevInvalid;
-						(*itEventResultCluster)->ErrorIO.code = ERROR_OFFSET + epicsSevInvalid;
-						(*itEventResultCluster)->ErrorIO.status = 0;
-						// Post it!
-						if (PostLVUserEvent(*itRefNum, *itEventResultCluster) != mgNoErr) {
-							itRefNum = RefNum.erase(itRefNum);
-							itEventResultCluster = eventResultCluster.erase((itEventResultCluster));
-							continue;
-						}
-					}
-					itRefNum++;
-					itEventResultCluster++;
-				}
-				else {
-					itRefNum++;
-					itEventResultCluster++;
-					CaLabDbgPrintf("post event of %s has no reference number", szName);
-				}
-			}
-		}
+                                NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, (*StatusString)->cnt);
+                                (*(*itEventResultCluster)->StatusString)->cnt = (*StatusString)->cnt;
+                            }
+                            memcpy((*(*itEventResultCluster)->StatusString)->str, (*StatusString)->str, (*StatusString)->cnt);
+                        }
+                        if (SeverityString) {
+                            if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != (*SeverityString)->cnt) {
+                                NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, (*SeverityString)->cnt);
+                                (*(*itEventResultCluster)->SeverityString)->cnt = (*SeverityString)->cnt;
+                            }
+                            memcpy((*(*itEventResultCluster)->SeverityString)->str, (*SeverityString)->str, (*SeverityString)->cnt);
+                        }
+                        if (ErrorIO.source) {
+                            if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
+                                NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+                                (*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
+                            }
+                            memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, (*ErrorIO.source)->str, (*ErrorIO.source)->cnt);
+                        }
+                        (*itEventResultCluster)->StatusNumber = StatusNumber;
+                        (*itEventResultCluster)->SeverityNumber = SeverityNumber;
+                        (*itEventResultCluster)->ErrorIO.code = ErrorIO.code;
+                        (*itEventResultCluster)->ErrorIO.status = ErrorIO.status;
+                        // Post it!
+                        MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
+                        if (posterr != mgNoErr) {
+                            itRefNum = RefNum.erase(itRefNum);
+                            CaLabDbgPrintf("PostLVUserEvent failed with error %d", posterr);
+                            itEventResultCluster = eventResultCluster.erase((itEventResultCluster));
+                            continue;
+                        }
+                    }
+                    else {
+                        int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
+                        if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
+                            NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
+                            (*(*itEventResultCluster)->StatusString)->cnt = size;
+                        }
+                        memcpy((*(*itEventResultCluster)->StatusString)->str, alarmStatusString[epicsAlarmComm], size);
+                        size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
+                        if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != size) {
+                            NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
+                            (*(*itEventResultCluster)->SeverityString)->cnt = size;
+                        }
+                        memcpy((*(*itEventResultCluster)->SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
+                        if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
+                            NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+                            (*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
+                        }
+                        if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (int32)strlen(ca_message(ECA_DISCONN))) {
+                            NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
+                            (*(*itEventResultCluster)->ErrorIO.source)->cnt = (int32)strlen(ca_message(ECA_DISCONN));
+                        }
+                        memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, ca_message(ECA_DISCONN), strlen(ca_message(ECA_DISCONN)));
+                        (*itEventResultCluster)->StatusNumber = epicsAlarmComm;
+                        (*itEventResultCluster)->SeverityNumber = epicsSevInvalid;
+                        (*itEventResultCluster)->ErrorIO.code = ERROR_OFFSET + epicsSevInvalid;
+                        (*itEventResultCluster)->ErrorIO.status = 0;
+                        // Post it!
+                        MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
+                        if (posterr != mgNoErr) {
+                            CaLabDbgPrintf("PostLVUserEvent failed with error %d", posterr);
+                            itRefNum = RefNum.erase(itRefNum);
+                            itEventResultCluster = eventResultCluster.erase((itEventResultCluster));
+                            continue;
+                        }
+                    }
+                    itRefNum++;
+                    itEventResultCluster++;
+                }
+                else {
+                    itRefNum++;
+                    itEventResultCluster++;
+                    CaLabDbgPrintf("post event of %s has no reference number", szName);
+                }
+            }
+        }
 		catch (...) {
 			CaLabDbgPrintfD("bad memory access in post event");
 			itRefNum = RefNum.begin();
@@ -2443,6 +2447,27 @@ extern "C" EXPORT void addEvent(LVUserEventRef *RefNum, sResult *ResultPtr) {
 	currentItem->unlock();
 	currentItem->postEvent();
 }
+
+// destroys all eventResultClusters in all PVs associated with an event
+//    RefNum:            reference number of event
+//    ResultArrayHdl:    target item
+extern "C" EXPORT void destroyEvent(LVUserEventRef *RefNum) {
+    for (auto& item: myItems) {
+        calabItem* currentItem = item.second;
+        if (!valid(currentItem)) {
+            CaLabDbgPrintf("destroyevent currentitem invalid");
+            continue;
+        }
+		std::vector<LVUserEventRef>::iterator ref = currentItem->RefNum.begin();
+        while (ref != currentItem->RefNum.end()) {
+            if (*ref == *RefNum)
+                ref = currentItem->RefNum.erase(ref);
+            else
+                ref++;
+        }
+    }
+}
+
 
 // Write EPICS PV
 //    PvNameArray:        array of PV names
