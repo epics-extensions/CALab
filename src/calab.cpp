@@ -838,20 +838,22 @@ public:
 					char* tmp;
 					iSize = (int32)strlen(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = strtod(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], &tmp);
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -862,20 +864,22 @@ public:
 					shortValue = ((dbr_short_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
 					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", (uInt32)shortValue);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = shortValue;
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -884,20 +888,22 @@ public:
 				for (long lCount = 0; lCount < args.count; lCount++) {
 					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_char_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = ((dbr_char_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -906,20 +912,22 @@ public:
 				for (long lCount = 0; lCount < args.count; lCount++) {
 					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_long_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = ((dbr_long_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -928,20 +936,22 @@ public:
 				for (long lCount = 0; lCount < args.count; lCount++) {
 					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -950,20 +960,22 @@ public:
 				for (long lCount = 0; lCount < args.count; lCount++) {
 					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount])!= iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -975,20 +987,22 @@ public:
 					else
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->FieldValueArray && iFieldID < (*parent->FieldValueArray)->dimSize) {
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					else {
 						(*doubleValueArray)->elt[lCount] = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 				}
 				bDbrTime = 1;
@@ -1004,21 +1018,23 @@ public:
 					epicsInt16 enumValue = (epicsInt16)(*doubleValueArray)->elt[lCount];
 					if (parent && iFieldID < (*parent->FieldValueArray)->dimSize) {
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[enumValue]);
-						if ((*(*parent->FieldValueArray)->elt[iFieldID])->cnt != iSize) {
+						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*parent->FieldValueArray)->elt[iFieldID], iSize);
-							(*(*parent->FieldValueArray)->elt[iFieldID])->cnt = iSize;
+							LStrLen(*(*parent->FieldValueArray)->elt[iFieldID]) = iSize;
 						}
-						memcpy((*(*parent->FieldValueArray)->elt[iFieldID])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
 					if (enumValue < sEnum.no_str) {
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[enumValue]);
 						(*doubleValueArray)->elt[lCount] = enumValue;
-						if (!(*stringValueArray)->elt[lCount] || (*(*stringValueArray)->elt[lCount])->cnt != iSize) {
+						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
 							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							(*(*stringValueArray)->elt[lCount])->cnt = iSize;
+							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
 						}
-						memcpy((*(*stringValueArray)->elt[lCount])->str, szTmp, iSize);
+						if (iSize)
+							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
 					}
 					else {
 						hasValue = true;
@@ -1681,13 +1697,13 @@ public:
         LToCStrN(*name, cName, sizeof(cName));
         sName = (char *)cName;
         auto search = myItems.find(sName);
-        if (search != myItems.end()) {
-            currentItem = search->second;
-        } else {
+		if (search != myItems.end()) {
+			currentItem = search->second;
+		} else {
             currentItem = new calabItem(name, FieldNameArray);
             insert(sName, currentItem);
         }
-        
+
 		if (currentItem && FieldNameArray && *FieldNameArray) {
 			if (!currentItem->FieldNameArray || !*currentItem->FieldNameArray) {
 				unsigned char szFieldName[MAX_NAME_SIZE];
@@ -1707,10 +1723,10 @@ public:
 					if (invalidChar) {
                         DbgTime(); CaLabDbgPrintf("white space in field name \"%s\" detected", szFieldName);
                         *invalidChar = '\0'; // truncate szFieldName
-                        int32 newsize = strlen((const char *)szFieldName);
+                        size_t newsize = strlen((const char *)szFieldName);
 						NumericArrayResize(uB, 1, (UHandle*)&(*currentItem->FieldNameArray)->elt[i], newsize);
 						memcpy(LStrBuf(*((*currentItem->FieldNameArray)->elt[i])), szFieldName, newsize);
-						LStrLen(*((*currentItem->FieldNameArray)->elt[i])) = newsize;
+						LStrLen(*((*currentItem->FieldNameArray)->elt[i])) = (int32)newsize;
                     }
                 }
             }
@@ -2862,11 +2878,13 @@ extern "C" EXPORT void info(sStringArray2DHdl *InfoStringArray2D, sResultArrayHd
 				(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
 			}
 			for (uInt32 j = 0; j < currentItem->numberOfValues && currentItem->stringValueArray && j < (*currentItem->stringValueArray)->dimSize; j++) {
-				if (!currentResult->StringValueArray || !(*currentResult->StringValueArray)->elt[j] || (*(*currentItem->stringValueArray)->elt[j])->cnt != (*(*currentResult->StringValueArray)->elt[j])->cnt) {
-					err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], (*(*currentItem->stringValueArray)->elt[j])->cnt);
-					(*(*currentResult->StringValueArray)->elt[j])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
+				int32 sz = LHStrLen((*currentItem->stringValueArray)->elt[j]);
+				if (sz != LHStrLen((*currentResult->StringValueArray)->elt[j])) {
+					err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], sz);
+					LStrLen(*(*currentResult->StringValueArray)->elt[j]) = sz;
 				}
-				memcpy((*(*currentResult->StringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
+				if (sz)
+					memcpy(LStrBuf(*(*currentResult->StringValueArray)->elt[j]), LStrBuf(*(*currentItem->stringValueArray)->elt[j]), sz);
 				(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
 				currentResult->valueArraySize = currentItem->numberOfValues;
 			}
@@ -2876,9 +2894,11 @@ extern "C" EXPORT void info(sStringArray2DHdl *InfoStringArray2D, sResultArrayHd
 				currentResult->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*currentItem->FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
 				(*currentResult->FieldNameArray)->dimSize = (*currentItem->FieldNameArray)->dimSize;
 				for (uInt32 l = 0; l < (*currentItem->FieldNameArray)->dimSize; l++) {
-					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], (*(*currentItem->FieldNameArray)->elt[l])->cnt);
-					(*(*currentResult->FieldNameArray)->elt[l])->cnt = (*(*currentItem->FieldNameArray)->elt[l])->cnt;
-					memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, (*(*currentItem->FieldNameArray)->elt[l])->str, (*(*currentItem->FieldNameArray)->elt[l])->cnt);
+					int32 sz = LHStrLen((*currentItem->FieldNameArray)->elt[l]);;
+					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], sz);
+					LStrLen(*(*currentResult->FieldNameArray)->elt[l]) = sz;
+					if (sz)
+						memcpy(LStrBuf(*(*currentResult->FieldNameArray)->elt[l]), LStrBuf(*(*currentItem->FieldNameArray)->elt[l]), sz);
 				}
 			}
 			if (!currentResult->FieldValueArray && currentItem->FieldValueArray) {
@@ -2887,10 +2907,11 @@ extern "C" EXPORT void info(sStringArray2DHdl *InfoStringArray2D, sResultArrayHd
 				currentResult->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*currentItem->FieldValueArray)->dimSize * sizeof(LStrHandle[1]));
 				(*currentResult->FieldValueArray)->dimSize = (*currentItem->FieldValueArray)->dimSize;
 				for (uInt32 l = 0; l < (*currentItem->FieldValueArray)->dimSize; l++) {
+					int32 sz = LHStrLen((*currentItem->FieldValueArray)->elt[l]);
 					if ((*currentItem->FieldValueArray)->elt[l]) {
-						NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], (*(*currentItem->FieldValueArray)->elt[l])->cnt);
-						(*(*currentResult->FieldValueArray)->elt[l])->cnt = (*(*currentItem->FieldValueArray)->elt[l])->cnt;
-						memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, (*(*currentItem->FieldValueArray)->elt[l])->str, (*(*currentItem->FieldValueArray)->elt[l])->cnt);
+						NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], sz);
+						LStrLen(*(*currentResult->FieldValueArray)->elt[l]) = sz;
+						memcpy(LStrBuf(*(*currentResult->FieldValueArray)->elt[l]), LStrBuf(*(*currentItem->FieldValueArray)->elt[l]), sz);
 					}
 				}
 			}
