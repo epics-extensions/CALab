@@ -736,7 +736,7 @@ public:
 	// disconnect instance from server
 	void disconnect() {
 		int32 err = lock();
-        if (err) CaLabDbgPrintf("lock failed in disconnect");
+		if (err) CaLabDbgPrintf("lock failed in disconnect");
 		isPassive = true;
 		if (RefNum.size() || eventResultCluster.size()) {
 			std::vector<LVUserEventRef>::iterator itRefNum = RefNum.begin();
@@ -775,7 +775,7 @@ public:
 			}
 			else if (args.op == CA_OP_CONN_DOWN) {
                 int32 err = lock();
-                if (err) CaLabDbgPrintf("lock failed in connection down");
+				if (err) CaLabDbgPrintf("lock failed in connection down");
 				isConnected = false;
 				size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
 				if (!StatusString || (*StatusString)->cnt != size) {
@@ -818,7 +818,7 @@ public:
 			if (!szName[0] || args.status != ECA_NORMAL)
 				return;
             int32 lerr = lock();
-            if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
+			if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
 			//CaLabDbgPrintfD("itemValueChanged of %s", szName);
 			numberOfValues = args.count;
 			if (!doubleValueArray || (long)(*doubleValueArray)->dimSize < args.count) {
@@ -1643,7 +1643,7 @@ public:
 		}
 		if (timeout <= 0)
 			CaLabDbgPrintf("Error: Could not terminate all running tasks of CA Lab.");
-        for (auto& iter: myItems)
+		for (auto& iter: myItems)
             delete iter.second;
 		epicsMutexDestroy(mapLock);
 		epicsMutexDestroy(getLock);
@@ -2048,7 +2048,6 @@ void wait4value(uInt32 &maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 							counter++;
                             int32 err = currentItem->lock();
                             if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
-							currentItem->lock();
 							if (currentItem->numberOfValues > maxNumberOfValues)
 								maxNumberOfValues = currentItem->numberOfValues;
 							currentItem->unlock();
