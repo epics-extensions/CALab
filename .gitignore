@@ -12,3 +12,4 @@
 .\#*
 calab.o
 libcalab.so
+*.aps
