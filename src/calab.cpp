@@ -37,6 +37,8 @@
 #include <cadef.h>
 #include <envDefs.h>
 #include <epicsStdio.h>
+#include <windows.h>
+#include <libloaderapi.h>
 #define EXPORT __declspec(dllexport)
 #else
 #include <dlfcn.h>
@@ -158,6 +160,21 @@ typedef sResultArray **sResultArrayHdl;
 #include "lv_epilog.h"
 
 #if defined _WIN32 || defined _WIN64
+HMODULE libRef = 0x0;
+DWORD dllStatus = DLL_PROCESS_DETACH;
+BOOLEAN WINAPI DllMain(HINSTANCE hDllHandle, DWORD nReason, LPVOID Reserved) {
+	dllStatus = nReason;
+	//DbgPrintf("DllMain: reason=%d", nReason);
+	switch (nReason) {
+		case DLL_PROCESS_ATTACH: {
+			break;
+		}
+		case DLL_PROCESS_DETACH: {
+			break;
+		}
+	}
+	return 1;
+}
 #else // Workaround for EPICS library unload issue in Linux
 const short *dbf_text_dim = (const short *)dlsym(caLibHandle, "dbf_text_dim");
 const char * epicsAlarmSeverityStrings[] = {
@@ -503,6 +520,7 @@ void caLabUnload(void);
 ca_client_context* 			pcac = 0x0;            // EPICS context
 bool                        bCaLabPolling = false; // TRUE: Avoids permanent open network ports. (CompactRIO)
 uInt32            			globalCounter = 0;     // simple counter for debugging
+uInt32            			reservedCounter = 0;   // simple counter for debugging
 static bool                 stopped;               // indicator for closing library
 FILE*                       pCaLabDbgFile = 0x0;   // file handle for optional debug file
 std::atomic<int>            allItemsConnected1(0); // indicator for finished connect
@@ -628,6 +646,9 @@ public:
 	}
 
 	~calabItem() {
+		#if defined _WIN32 || defined _WIN64
+		if (!dllStatus) return; // DLL_PROCESS_DETACH
+		#endif
 		MgErr err = noErr;
 		int32 lerr = lock();
         if (lerr) CaLabDbgPrintf("lock failed in ~calabItem");
@@ -1410,6 +1431,10 @@ public:
 
 	// post LV user event
 	void postEvent() {
+		if (!reservedCounter) return; // all VIs unloaded or 
+		#if defined _WIN32 || defined _WIN64
+		if (!reservedCounter || !dllStatus) return; // all VIs unloaded or DLL_PROCESS_DETACH
+		#endif
 		/*if (!initConnect) {
 		initConnect = true;
 		return;
@@ -1635,6 +1660,9 @@ public:
 	}
 
 	~globals() {
+		#if defined _WIN32 || defined _WIN64
+		if (!dllStatus) return; // DLL_PROCESS_DETACH
+		#endif
 		uInt32 timeout = 1000;
 		stopped = true;
 		while (timeout > 0 && tasks.load() > 0) {
@@ -1844,6 +1872,9 @@ MgErr DeleteStringArray(sStringArrayHdl array) {
 //    ...: additional arguments
 MgErr CaLabDbgPrintf(const char *format, ...) {
 	int done = 0;
+	#if defined _WIN32 || defined _WIN64
+	if (!dllStatus) return done; // DLL_PROCESS_DETACH
+	#endif
 	va_list listPointer;
 	va_start(listPointer, format);
 	if (pCaLabDbgFile) {
@@ -1892,12 +1923,26 @@ MgErr CaLabDbgPrintfD(const char *format, ...) {
 // callback of LabVIEW when any caLab-VI is loaded
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr reserved(InstanceDataPtr *instanceState) {
+	#if defined _WIN32 || defined _WIN64
+	reservedCounter++;
+	//CaLabDbgPrintf("reserved %d", reservedCounter);
+	*instanceState = (void*)reservedCounter;
+	#endif
 	return 0;
 }
 
 // callback of LV when any caLab-VI is unloaded
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr unreserved(InstanceDataPtr *instanceState) {
+	#if defined _WIN32 || defined _WIN64
+	if (reservedCounter > 0) {
+	//CaLabDbgPrintf("unreserved %d", (uInt32)*instanceState);
+		reservedCounter--;
+	}
+	else {
+		CaLabDbgPrintf("\"unreserved()\" called too often!");
+	}
+	#endif
 	return 0;
 }
 
@@ -3154,6 +3199,7 @@ void loadFunctions() {
 
 // prepare the library before first using
 void caLabLoad(void) {
+	uInt32 iResult = 0;
 	if (pcac)
 		return;
 
@@ -3176,11 +3222,19 @@ void caLabLoad(void) {
 	signal(SIGSEGV, signalHandler);
 	signal(SIGTERM, signalHandler);
 #if defined _WIN32 || defined _WIN64
+	iResult = GetModuleHandleEx(
+		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, // GET_MODULE_HANDLE_EX_FLAG_PIN to prevent unload lib
+		(LPCTSTR)DllMain,
+		&libRef);
+	if (!iResult) {
+		DbgTime(); CaLabDbgPrintf("Error: Could not retrieves a module handle for the myCaLib library.");
+		return;
+	}
 #else
 	loadFunctions();
 #endif
 	stopped = false;
-	uInt32 iResult = ca_context_create(ca_enable_preemptive_callback);
+	iResult = ca_context_create(ca_enable_preemptive_callback);
 	if (iResult != ECA_NORMAL) {
 		DbgTime(); CaLabDbgPrintf("Error: Could not create any instance of Channel Access.");
 		return;

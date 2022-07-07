@@ -90,26 +90,26 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\compiler\msvc;D:\epics\base-3.14.12.8\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\base-3.14.12.8\lib\win32-x86-debug;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\base-7.0.4.1\include;D:\epics\base-7.0.4.1\include\compiler\msvc;D:\epics\base-7.0.4.1\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-7.0.4.1\lib\win32-x86-debug;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\compiler\msvc;D:\epics\base-3.14.12.8\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\base-3.14.12.8\lib\win32-x86;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\base-7.0.4.1\include;D:\epics\base-7.0.4.1\include\compiler\msvc;D:\epics\base-7.0.4.1\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-7.0.4.1\lib\win32-x86;C:\Program Files %28x86%29\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\os\WIN32;D:\epics\base-3.14.12.8\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\base-3.14.12.8\lib\windows-x64-debug;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\base-7.0.4.1\include;D:\epics\base-7.0.4.1\include\os\WIN32;D:\epics\base-7.0.4.1\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-7.0.4.1\lib\windows-x64-debug;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>D:\epics\base-3.14.12.8\include;D:\epics\base-3.14.12.8\include\os\WIN32;D:\epics\base-3.14.12.8\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\base-3.14.12.8\lib\windows-x64;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\base-7.0.4.1\include;D:\epics\base-7.0.4.1\include\os\WIN32;D:\epics\base-7.0.4.1\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\base-7.0.4.1\lib\windows-x64;C:\Program Files\National Instruments\LabVIEW 2020\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
