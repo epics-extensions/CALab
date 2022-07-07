@@ -1477,7 +1477,10 @@ public:
                         sStringArrayHdl sh = (*itEventResultCluster)->StringValueArray;
                         if (!sh || (*sh)->dimSize != (*stringValueArray)->dimSize) {
                             CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*sh)->dimSize, (*stringValueArray)->dimSize);
-                            if (sh && DSCheckHandle(sh) == noErr) {
+							itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+							itRefNum = RefNum.erase(itRefNum);
+							continue;
+                            /*if (sh && DSCheckHandle(sh) == noErr) {
                                 for (uInt32 j = 0; j < (*sh)->dimSize; j++) {
                                     DSDisposeHandle((*sh)->elt[j]);
                                 }
@@ -1490,7 +1493,7 @@ public:
                                     err += DSDisposeHandle((*itEventResultCluster)->ValueNumberArray);
                             }
                             (*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
-                            (*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;
+                            (*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;*/
                         }
                         for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
                             if (!(*(*itEventResultCluster)->StringValueArray)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
