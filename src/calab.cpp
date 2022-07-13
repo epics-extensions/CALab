@@ -1952,7 +1952,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr *instanceState) {
 // callback of LV when any caLab-VI is aborted
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr aborted(InstanceDataPtr *instanceState) {
-	return unreserved(instanceState);
+	return 0;
 }
 
 // validate pointer
@@ -2021,7 +2021,7 @@ void putState(evargs args) {
 void wait4value(uInt32 &maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t Timeout, bool all = false) {
 	time_t stop = time(nullptr) + Timeout;
 	calabItem* currentItem;
-	calabItem* checkItem;
+	//calabItem* checkItem;
 	time_t timeout;
 	uInt32 counter;
 	bool isFirstRun = true;
@@ -2032,34 +2032,26 @@ void wait4value(uInt32 &maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 		counter = 1;
 		maxNumberOfValues = 0;
 		if (all) {
-            for (auto& iter: myItems) {
-                currentItem = iter.second;
-                if (!valid(currentItem)) {
-					DbgTime(); CaLabDbgPrintf("Error in wait4value all: Index array is corrupted.");
-                    continue;
-                    }
+			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
 				isRequested = false;
-				for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-					checkItem = (calabItem*)(**PvIndexArray)->elt[i];
-					if (!valid(checkItem))
-						continue;
-					if (currentItem == checkItem) {
+				currentItem = (calabItem*)(**PvIndexArray)->elt[i];
+				if (!valid(currentItem)) {
+					DbgTime(); CaLabDbgPrintf("Error in wait4value all: Index array is corrupted.");
+					continue;
+				}
+				if (myItems.find(currentItem->szName) != myItems.end()) {
+					isRequested = true;
+				}
+				if (currentItem->parent) {
+					pIndicator = strchr(currentItem->szName, '.');
+					pos = (int)(strlen(currentItem->szName) - (pIndicator - currentItem->szName));
+					if (myItems.find(std::string((const char*)(*currentItem->name)->str, (*currentItem->name)->cnt - pos)) != myItems.end()) {
 						isRequested = true;
-						break;
-					}
-					if (currentItem->parent) {
-						pIndicator = strchr(currentItem->szName, '.');
-						pos = (int)(strlen(currentItem->szName) - (pIndicator - currentItem->szName));
-						if (strncmp((const char*)(*currentItem->name)->str, (const char*)(*checkItem->name)->str, (*checkItem->name)->cnt - pos) == 0) {
-							isRequested = true;
-							break;
-						}
 					}
 				}
 				if (isFirstRun) {
 					if (isRequested) {
 						currentItem->isPassive = false;
-						//CaLabDbgPrintfD("%s is requested", currentItem->szName);
 					}
 				}
 				else {
@@ -2067,15 +2059,12 @@ void wait4value(uInt32 &maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 						if (!currentItem->parent) {
 							if (isRequested)
 								counter++;
-                            int32 err = currentItem->lock();
-                            if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
+							int32 err = currentItem->lock();
+							if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
 							if (isRequested && currentItem->numberOfValues > maxNumberOfValues)
 								maxNumberOfValues = currentItem->numberOfValues;
 							currentItem->unlock();
 						}
-					}
-					else {
-						//break;
 					}
 				}
 			}
