@@ -1431,9 +1431,9 @@ public:
 
 	// post LV user event
 	void postEvent() {
-		if (!reservedCounter) return; // all VIs unloaded or 
+		if (!reservedCounter) return; // no VIs ready to run
 		#if defined _WIN32 || defined _WIN64
-		if (!reservedCounter || !dllStatus) return; // all VIs unloaded or DLL_PROCESS_DETACH
+		if (!dllStatus) return;		// DLL_PROCESS_DETACH
 		#endif
 		/*if (!initConnect) {
 		initConnect = true;
@@ -1450,8 +1450,8 @@ public:
 			itRefNum = RefNum.begin();
 			itEventResultCluster = eventResultCluster.begin();
 			while (itRefNum != RefNum.end() && itEventResultCluster != eventResultCluster.end()) {
-                if (*itRefNum) {
-                    if (!*itEventResultCluster
+				if (*itRefNum) {
+					if (!*itEventResultCluster
                         || DSCheckPtr(*itEventResultCluster) != noErr
                         || !(*itEventResultCluster)->PVName
                         || DSCheckHandle((*itEventResultCluster)->PVName) != noErr
@@ -1469,11 +1469,11 @@ public:
                         || DSCheckHandle((*itEventResultCluster)->ErrorIO.source) != noErr
                         || ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr)
                         || ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr)) {
-                        itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+						itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
 						itRefNum = RefNum.erase(itRefNum);
                         continue;
                     }
-                    if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
+					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
                         sStringArrayHdl sh = (*itEventResultCluster)->StringValueArray;
                         if (!sh || (*sh)->dimSize != (*stringValueArray)->dimSize) {
                             CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*sh)->dimSize, (*stringValueArray)->dimSize);
@@ -1495,7 +1495,7 @@ public:
                             (*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
                             (*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;*/
                         }
-                        for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
+						for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
                             if (!(*(*itEventResultCluster)->StringValueArray)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
                                 err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->StringValueArray)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
                                 (*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
@@ -1612,7 +1612,7 @@ public:
                         (*itEventResultCluster)->ErrorIO.code = ERROR_OFFSET + epicsSevInvalid;
                         (*itEventResultCluster)->ErrorIO.status = 0;
                         // Post it!
-                        MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
+						MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
                         if (posterr != mgNoErr) {
                             CaLabDbgPrintf("PostLVUserEvent failed with error %d", posterr);
                             itRefNum = RefNum.erase(itRefNum);
@@ -1926,26 +1926,20 @@ MgErr CaLabDbgPrintfD(const char *format, ...) {
 // callback of LabVIEW when any caLab-VI is loaded
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr reserved(InstanceDataPtr *instanceState) {
-	#if defined _WIN32 || defined _WIN64
 	reservedCounter++;
 	//CaLabDbgPrintf("reserved %d", reservedCounter);
-	*instanceState = (void*)reservedCounter;
-	#endif
 	return 0;
 }
 
 // callback of LV when any caLab-VI is unloaded
 //    instanceState: undocumented pointer
 extern "C" EXPORT MgErr unreserved(InstanceDataPtr *instanceState) {
-	#if defined _WIN32 || defined _WIN64
 	if (reservedCounter > 0) {
-	//CaLabDbgPrintf("unreserved %d", (uInt32)*instanceState);
+		//CaLabDbgPrintf("unreserved %d", (uInt32)*instanceState);
 		reservedCounter--;
 	}
-	else {
+	else
 		CaLabDbgPrintf("\"unreserved()\" called too often!");
-	}
-	#endif
 	return 0;
 }
 
@@ -2510,14 +2504,20 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef *RefNum) {
             CaLabDbgPrintf("destroyevent currentitem invalid");
             continue;
         }
+		currentItem->lock();
 		std::vector<LVUserEventRef>::iterator ref = currentItem->RefNum.begin();
-        while (ref != currentItem->RefNum.end()) {
-            if (*ref == *RefNum)
-                ref = currentItem->RefNum.erase(ref);
-            else
-                ref++;
+		std::vector<sResult*>::iterator it = currentItem->eventResultCluster.begin();
+		while (ref != currentItem->RefNum.end()) {
+			if (*ref == *RefNum) {
+				ref = currentItem->RefNum.erase(ref);
+				it = currentItem->eventResultCluster.erase(it);
+			} else {
+				ref++;
+				it++;
+			}
         }
-    }
+		currentItem->unlock();
+	}
 }
 
 
