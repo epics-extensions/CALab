@@ -1727,7 +1727,10 @@ public:
 
         LToCStrN(*name, cName, sizeof(cName));
         sName = (char *)cName;
+		int32 err = lock();
+		if (err) CaLabDbgPrintf("lock failed in pvMap add");
         auto search = myItems.find(sName);
+		epicsMutexUnlock(mapLock);
 		if (search != myItems.end()) {
 			currentItem = search->second;
 		} else {
