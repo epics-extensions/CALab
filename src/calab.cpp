@@ -1683,7 +1683,7 @@ public:
 
 	// Insert into global list of pv names
 	calabItem* insert(std::string name, calabItem* item) {
-		mapLock.lock();
+		mapLock.lock();		// exclusive lock
 		myItems.insert({ name, item });
 		mapLock.unlock();
 		return item;
@@ -1702,11 +1702,12 @@ public:
 		sName = (char*)cName;
 		mapLock.lock_shared();
 		auto search = myItems.find(sName);
-		mapLock.unlock_shared();
 		if (search != myItems.end()) {
 			currentItem = search->second;
+            mapLock.unlock_shared();
 		}
 		else {
+            mapLock.unlock_shared();
 			currentItem = new calabItem(name, FieldNameArray);
 			insert(sName, currentItem);
 		}
@@ -1752,8 +1753,8 @@ public:
 				calabItem* fieldItem;
 				mapLock.lock_shared();
 				auto search = myItems.find(sFieldName);
-				mapLock.unlock_shared();
 				if (search == myItems.end()) {
+                    mapLock.unlock_shared();
 					fieldItem = new calabItem(fullFieldName, 0x0);
 					fieldItem->parent = currentItem;
 					fieldItem->iFieldID = i;
@@ -3026,13 +3027,11 @@ extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
 				std::string sName = cName;
 				globals.mapLock.lock_shared();
 				auto search = myItems.find(sName);
+                currentItem = (search == myItems.end()) ? NULL : search->second;
 				globals.mapLock.unlock_shared();
-				if (search != myItems.end()) {
-					currentItem = search->second;
-					if (!valid(currentItem)) {
-						CaLabDbgPrintf("Error in disconnect: Index array is corrupted.");
-						break;
-					}
+                if (!valid(currentItem)) {
+                    CaLabDbgPrintf("Error in disconnect: Index array is corrupted.");
+                    break;
 				}
 				// disconnect field listeners
 				if (currentItem->parent) {
