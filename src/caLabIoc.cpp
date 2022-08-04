@@ -59,15 +59,16 @@ static bool ProcessByName(const char* procname, bool kill) {
     pe32.dwSize = sizeof(PROCESSENTRY32);
     hResult = Process32First(hProcessSnap, &pe32);
     while (hResult) {
+        printf("%s\n", pe32.szExeFile);
         if (strcmp(procname, pe32.szExeFile) == 0) {
             if (kill) {
                 hProcess = OpenProcess(PROCESS_TERMINATE, 0, pe32.th32ProcessID);
                 if (hProcess != NULL) {
                     TerminateProcess(hProcess, 0);
                     CloseHandle(hProcess);
-                    retVal = true;
                 }
             }
+            retVal = true;
         }
         hResult = Process32Next(hProcessSnap, &pe32);
     };
