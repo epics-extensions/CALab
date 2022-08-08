@@ -1704,10 +1704,10 @@ public:
 		auto search = myItems.find(sName);
 		if (search != myItems.end()) {
 			currentItem = search->second;
-            mapLock.unlock_shared();
+			mapLock.unlock_shared();
 		}
 		else {
-            mapLock.unlock_shared();
+			mapLock.unlock_shared();
 			currentItem = new calabItem(name, FieldNameArray);
 			insert(sName, currentItem);
 		}
@@ -1748,17 +1748,20 @@ public:
 				memcpy(LStrBuf(*fullFieldName) + LStrLen(*name) + 1, LStrBuf(*((*FieldNameArray)->elt[i])), LStrLen(*((*FieldNameArray)->elt[i])));
 				LStrLen(*fullFieldName) = fullsize;
 				char* cFieldName = new char[fullsize + 1];
-				LToCStrN(*fullFieldName, (CStr)cFieldName, fullsize);
+				LToCStrN(*fullFieldName, (CStr)cFieldName, fullsize + 1);
 				std::string sFieldName = (char*)cFieldName;
 				calabItem* fieldItem;
 				mapLock.lock_shared();
 				auto search = myItems.find(sFieldName);
 				if (search == myItems.end()) {
-                    mapLock.unlock_shared();
+					mapLock.unlock_shared();
 					fieldItem = new calabItem(fullFieldName, 0x0);
 					fieldItem->parent = currentItem;
 					fieldItem->iFieldID = i;
 					insert(sFieldName, fieldItem);
+				}
+				else {
+					mapLock.unlock_shared();
 				}
 				delete cFieldName;
 			}
@@ -2508,7 +2511,7 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
 				if (currentItem->stringValueArray) {
 					for (uInt32 i = 0; i < (*currentItem->stringValueArray)->dimSize; i++) {
 						DSDisposeHandle((*currentItem->stringValueArray)->elt[i]);
-						(* currentItem->stringValueArray)->elt[i] = 0x0;
+						(*currentItem->stringValueArray)->elt[i] = 0x0;
 					}
 					(*currentItem->stringValueArray)->dimSize = 0;
 					DSDisposeHandle(currentItem->stringValueArray);
@@ -3027,11 +3030,11 @@ extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
 				std::string sName = cName;
 				globals.mapLock.lock_shared();
 				auto search = myItems.find(sName);
-                currentItem = (search == myItems.end()) ? NULL : search->second;
+				currentItem = (search == myItems.end()) ? NULL : search->second;
 				globals.mapLock.unlock_shared();
-                if (!valid(currentItem)) {
-                    CaLabDbgPrintf("Error in disconnect: Index array is corrupted.");
-                    break;
+				if (!valid(currentItem)) {
+					CaLabDbgPrintf("Error in disconnect: Index array is corrupted.");
+					break;
 				}
 				// disconnect field listeners
 				if (currentItem->parent) {
