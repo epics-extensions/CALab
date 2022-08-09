@@ -26,10 +26,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="C:\Users\ggf\source\repos\calab\src\caLabIoc.cpp" />
+    <ClCompile Include="C:\Users\ggf\source\repos\calab\src\calabioc.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="C:\Users\ggf\source\repos\calab\res\caLabIoc.rc" />
+    <ResourceCompile Include="C:\Users\ggf\source\repos\calab\res\calabioc.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

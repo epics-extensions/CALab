@@ -11,10 +11,11 @@
 
 //==================================================================================================
 // Name        : caLabIoc.cpp
-// Author      : Carsten Winkler
-// Version     : 1.6.0.11
+// Authors     : Carsten Winkler, Brian Powell
+// Version     : 1.6.1.0
 // Copyright   : HZB
 // Description : library to handle softIoc.exe (Windows only)
+// GitHub      : https://github.com/epics-extensions/CALab
 //==================================================================================================
 
 // Definitions
@@ -79,7 +80,7 @@ static bool ProcessByName(const char* procname, bool kill) {
 // Search for "softIoc.exe"
 //    ForceOneIOC: TRUE = terminate if existing
 //    returns TRUE if ForceOneIOC == FALSE AND found any running "softIoc.exe"
-extern "C" EXPORT int softIoc(LVBoolean * ForceOneIOC) {
+extern "C" EXPORT int softIoc(LVBoolean* ForceOneIOC) {
     if (*ForceOneIOC) {
         ProcessByName("softIoc.exe", true);
         return (externalIocInstance = false);
@@ -90,7 +91,7 @@ extern "C" EXPORT int softIoc(LVBoolean * ForceOneIOC) {
 
 // Callback of LabVIEW when any caLab-VI is unloaded
 //		instanceState:	undocumented pointer
-extern "C" EXPORT MgErr unreserved(InstanceDataPtr * instanceState)
+extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState)
 {
     if (iListCount) {
         //removePVs(pszNameList, iListCount);
@@ -110,28 +111,28 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr * instanceState)
 
 // Callback of LabVIEW when any caLab-VI is aborted
 //		instanceState:	undocumented pointer
-extern "C" EXPORT MgErr aborted(InstanceDataPtr * instanceState)
+extern "C" EXPORT MgErr aborted(InstanceDataPtr* instanceState)
 {
     return unreserved(instanceState);
 }
 
 // Callback of LabVIEW when any caLab-VI is loaded
 //		instanceState:	undocumented pointer
-extern "C" EXPORT MgErr reserved(InstanceDataPtr * instanceState) {
+extern "C" EXPORT MgErr reserved(InstanceDataPtr* instanceState) {
     return 0;
 }
 
 // Adds a PV list to internal PV cache
 //    PVList: list of PVs
-extern "C" EXPORT void addPVList(sStringArrayHdl * PVList) {
+extern "C" EXPORT void addPVList(sStringArrayHdl* PVList) {
     if (!((***PVList).elt)[0])
         return;
-    void* tmp = realloc(pszNameList, (**PVList)->dimSize * sizeof(char*));
+    void* tmp = realloc(pszNameList, (**PVList)->dimSize* sizeof(char*));
     if (tmp) {
         iListCount = (**PVList)->dimSize;
         pszNameList = (char**)tmp;
         for (size_t i = 0; i < iListCount; i++) {
-            size_t destSize = PVNAME_STRINGSZ * sizeof(char);
+            size_t destSize = PVNAME_STRINGSZ* sizeof(char);
             tmp = malloc(destSize);
             if (tmp) {
                 memset(tmp, 0, destSize);

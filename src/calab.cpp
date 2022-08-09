@@ -11,10 +11,11 @@
 
 //==================================================================================================
 // Name        : caLab.cpp
-// Author      : Carsten Winkler
-// Version     : 1.6.0.11
+// Authors     : Carsten Winkler, Brian Powell
+// Version     : 1.6.1.0
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
+// GitHub      : https://github.com/epics-extensions/CALab
 //==================================================================================================
 
 #include <extcode.h>

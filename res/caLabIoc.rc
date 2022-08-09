@@ -1,6 +1,6 @@
 1 VERSIONINFO
-FILEVERSION 1, 6, 0, 11
-PRODUCTVERSION 1, 6, 0, 11
+FILEVERSION 1, 6, 1, 0
+PRODUCTVERSION 1, 6, 1, 0
 BEGIN
 BLOCK "StringFileInfo"
 BEGIN
@@ -9,12 +9,12 @@ BEGIN
 VALUE "Comments", "Interface EPICS <-> LabVIEW™\0"
 VALUE "CompanyName", "Helmholtz-Zentrum Berlin für Materialien und Energie GmbH\0"
 VALUE "FileDescription", "Interface EPICS <-> LabVIEW™\0"
-VALUE "FileVersion", "1,6,0,11\0"
+VALUE "FileVersion", "1,6,1,0\0"
 VALUE "InternalName", "CA Lab IOC\0"
 VALUE "LegalCopyright", "© 2010 by HZB\0"
 VALUE "OriginalFilename", "caLabIoc.dll\0"
 VALUE "ProductName", "CA Lab IOC\0"
-VALUE "ProductVersion", "1,6,0,11\0"
+VALUE "ProductVersion", "1,6,1,0\0"
 END
 END
 BLOCK "VarFileInfo"
