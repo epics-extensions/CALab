@@ -1,5 +1,5 @@
-<?xml version='1.0'?>
-<Project Type="Project" LVVersion="8508002">
+﻿<?xml version='1.0' encoding='UTF-8'?>
+<Project Type="Project" LVVersion="20008000">
 	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">false</Property>
 	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.6.1.0
@@ -7,6 +7,7 @@ including all needed libraries
 including basic examples</Property>
 	<Item Name="My Computer" Type="My Computer">
 		<Property Name="CCSymbols" Type="Str"></Property>
+		<Property Name="NI.SortType" Type="Int">3</Property>
 		<Property Name="server.app.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.control.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.tcp.acl" Type="Str">0800000008000000</Property>
@@ -20,47 +21,38 @@ including basic examples</Property>
 		<Property Name="server.viscripting.showScriptingOperationsInContextHelp" Type="Bool">false</Property>
 		<Property Name="server.viscripting.showScriptingOperationsInEditor" Type="Bool">false</Property>
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
-		<Item Name="caLab" Type="Folder">
-			<Item Name="DemoIOC" Type="Folder">
-				<Item Name="db" Type="Folder">
-					<Item Name="demo.db" Type="Document" URL="/&lt;userlib&gt;/caLab/DemoIOC/db/demo.db"/>
-					<Item Name="TestPV_ai100000.db" Type="Document" URL="/&lt;userlib&gt;/caLab/DemoIOC/db/TestPV_ai100000.db"/>
-				</Item>
-				<Item Name="DemoIOC.cmd" Type="Document" URL="/&lt;userlib&gt;/caLab/DemoIOC/DemoIOC.cmd"/>
-				<Item Name="TestPV_ai100000.cmd" Type="Document" URL="/&lt;userlib&gt;/caLab/DemoIOC/TestPV_ai100000.cmd"/>
+		<Item Name="DemoIOC" Type="Folder">
+			<Item Name="db" Type="Folder">
+				<Item Name="TestPV_ai100000.db" Type="Document" URL="../../demo/db/TestPV_ai100000.db"/>
+				<Item Name="demo.db" Type="Document" URL="../../demo/db/demo.db"/>
 			</Item>
-			<Item Name="Examples" Type="Folder">
-				<Item Name="LV2019" Type="Folder">
-					<Item Name="Parallel Event Demo Sub" Type="Folder">
-						<Item Name="Close.vi" Type="VI" URL="Examples/LV2019/Parallel Event Demo Sub/Close.vi"/>
-						<Item Name="Event Struct.vi" Type="VI" URL="Examples/LV2019/Parallel Event Demo Sub/Event Struct.vi"/>
-						<Item Name="Indicator.vi" Type="VI" URL="Examples/LV2019/Parallel Event Demo Sub/Indicator.vi"/>
-						<Item Name="Init.vi" Type="VI" URL="Examples/LV2019/Parallel Event Demo Sub/Init.vi"/>
-						<Item Name="Task.vi" Type="VI" URL="Examples/LV2019/Parallel Event Demo Sub/Task.vi"/>
-					</Item>
-					<Item Name="Parallel Event Demo.vi" Type="VI" URL="Examples/LV2019/Parallel Event Demo.vi"/>
+			<Item Name="DemoIOC.cmd" Type="Document" URL="../../demo/DemoIOC.cmd"/>
+			<Item Name="TestPV_ai100000.cmd" Type="Document" URL="../../demo/TestPV_ai100000.cmd"/>
+		</Item>
+		<Item Name="Examples" Type="Folder">
+			<Item Name="LV2019" Type="Folder">
+				<Item Name="Parallel Event Demo Sub" Type="Folder">
+					<Item Name="Parallel Event Close.vi" Type="VI" URL="../Examples/LV2019/Parallel Event Demo Sub/Parallel Event Close.vi"/>
+					<Item Name="Parallel Event Struct.vi" Type="VI" URL="../Examples/LV2019/Parallel Event Demo Sub/Parallel Event Struct.vi"/>
+					<Item Name="Parallel Event Indicator.vi" Type="VI" URL="../Examples/LV2019/Parallel Event Demo Sub/Parallel Event Indicator.vi"/>
+					<Item Name="Parallel Event Init.vi" Type="VI" URL="../Examples/LV2019/Parallel Event Demo Sub/Parallel Event Init.vi"/>
+					<Item Name="Parallel Event Task.vi" Type="VI" URL="../Examples/LV2019/Parallel Event Demo Sub/Parallel Event Task.vi"/>
 				</Item>
-				<Item Name="caLab.db" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/caLab.db"/>
-				<Item Name="Event Demo.vi" Type="VI" URL="Examples/Event Demo.vi"/>
-				<Item Name="pvList.txt" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/pvList.txt"/>
-				<Item Name="Read Demo 1.vi" Type="VI" URL="Examples/Read Demo 1.vi"/>
-				<Item Name="Read Demo 2.vi" Type="VI" URL="Examples/Read Demo 2.vi"/>
-				<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="Examples/SoftIOC Demo Sub.vi"/>
-				<Item Name="SoftIOC Demo.vi" Type="VI" URL="Examples/SoftIOC Demo.vi"/>
-				<Item Name="Write Demo - Looping.vi" Type="VI" URL="Examples/Write Demo - Looping.vi"/>
-				<Item Name="Write Demo - Timed.vi" Type="VI" URL="Examples/Write Demo - Timed.vi"/>
-				<Item Name="Write Demo.vi" Type="VI" URL="Examples/Write Demo.vi"/>
-				<Item Name="Write Random TestPV_ai.vi" Type="VI" URL="Examples/Write Random TestPV_ai.vi"/>
+				<Item Name="Parallel Event Demo.vi" Type="VI" URL="../Examples/LV2019/Parallel Event Demo.vi"/>
 			</Item>
-			<Item Name="lib" Type="Folder"/>
-			<Item Name="Private" Type="Folder"/>
-			<Item Name="ReadMeFirst.txt" Type="Document" URL="/&lt;userlib&gt;/caLab/ReadMeFirst.txt"/>
-			<Item Name="startDemo.bat" Type="Document" URL="/&lt;userlib&gt;/caLab/startDemo.bat"/>
-			<Item Name="startTestPV_ai100000.bat" Type="Document" URL="/&lt;userlib&gt;/caLab/startTestPV_ai100000.bat"/>
+			<Item Name="Event Demo.vi" Type="VI" URL="../Examples/Event Demo.vi"/>
+			<Item Name="Read Demo 1.vi" Type="VI" URL="../Examples/Read Demo 1.vi"/>
+			<Item Name="Read Demo 2.vi" Type="VI" URL="../Examples/Read Demo 2.vi"/>
+			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="../Examples/SoftIOC Demo Sub.vi"/>
+			<Item Name="SoftIOC Demo.vi" Type="VI" URL="../Examples/SoftIOC Demo.vi"/>
+			<Item Name="Write Demo - Looping.vi" Type="VI" URL="../Examples/Write Demo - Looping.vi"/>
+			<Item Name="Write Demo - Timed.vi" Type="VI" URL="../Examples/Write Demo - Timed.vi"/>
+			<Item Name="Write Demo.vi" Type="VI" URL="../Examples/Write Demo.vi"/>
+			<Item Name="Write Random TestPV_ai.vi" Type="VI" URL="../Examples/Write Random TestPV_ai.vi"/>
+			<Item Name="caLab.db" Type="Document" URL="../Examples/caLab.db"/>
+			<Item Name="pvList.txt" Type="Document" URL="../Examples/pvList.txt"/>
 		</Item>
-		<Item Name="documentation" Type="Hyperlink">
-			<Property Name="NI.Address" Type="Str">http://hz-b.de/calab</Property>
-		</Item>
+		<Item Name="CaLab.lvlib" Type="Library" URL="../CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
 			<Item Name="vi.lib" Type="Folder">
 				<Item Name="Simple Error Handler.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Simple Error Handler.vi"/>
@@ -113,7 +105,13 @@ including basic examples</Property>
 				<Item Name="Random Number (Range) U64.vi" Type="VI" URL="/&lt;vilib&gt;/numeric/Random Number (Range) U64.vi"/>
 			</Item>
 			<Item Name="user.lib" Type="Folder">
-				<Item Name="CaLab.lvlib" Type="Library" URL="CaLab.lvlib"/>
+				<Item Name="calabioc.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/lib/calabioc.dll"/>
+			</Item>
+			<Item Name="calab.dll" Type="Document" URL="calab.dll">
+				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
+			</Item>
+			<Item Name="calab.so" Type="Document" URL="calab.so">
+				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
 			</Item>
 		</Item>
 		<Item Name="Build Specifications" Type="Build"/>
