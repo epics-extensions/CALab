@@ -1,5 +1,5 @@
 ﻿<?xml version='1.0' encoding='UTF-8'?>
-<Project Type="Project" LVVersion="20008000">
+<Project Type="Project" LVVersion="9008000">
 	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">false</Property>
 	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.6.1.0
@@ -7,7 +7,6 @@ including all needed libraries
 including basic examples</Property>
 	<Item Name="My Computer" Type="My Computer">
 		<Property Name="CCSymbols" Type="Str"></Property>
-		<Property Name="NI.SortType" Type="Int">3</Property>
 		<Property Name="server.app.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.control.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.tcp.acl" Type="Str">0800000008000000</Property>
@@ -23,11 +22,11 @@ including basic examples</Property>
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
 		<Item Name="DemoIOC" Type="Folder">
 			<Item Name="db" Type="Folder">
-				<Item Name="TestPV_ai100000.db" Type="Document" URL="../../demo/db/TestPV_ai100000.db"/>
-				<Item Name="demo.db" Type="Document" URL="../../demo/db/demo.db"/>
+				<Item Name="TestPV_ai100000.db" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/db/TestPV_ai100000.db"/>
+				<Item Name="demo.db" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/db/demo.db"/>
 			</Item>
-			<Item Name="DemoIOC.cmd" Type="Document" URL="../../demo/DemoIOC.cmd"/>
-			<Item Name="TestPV_ai100000.cmd" Type="Document" URL="../../demo/TestPV_ai100000.cmd"/>
+			<Item Name="DemoIOC.cmd" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/DemoIOC.cmd"/>
+			<Item Name="TestPV_ai100000.cmd" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/TestPV_ai100000.cmd"/>
 		</Item>
 		<Item Name="Examples" Type="Folder">
 			<Item Name="LV2019" Type="Folder">
@@ -49,8 +48,8 @@ including basic examples</Property>
 			<Item Name="Write Demo - Timed.vi" Type="VI" URL="../Examples/Write Demo - Timed.vi"/>
 			<Item Name="Write Demo.vi" Type="VI" URL="../Examples/Write Demo.vi"/>
 			<Item Name="Write Random TestPV_ai.vi" Type="VI" URL="../Examples/Write Random TestPV_ai.vi"/>
-			<Item Name="caLab.db" Type="Document" URL="../Examples/caLab.db"/>
-			<Item Name="pvList.txt" Type="Document" URL="../Examples/pvList.txt"/>
+			<Item Name="caLab.db" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/caLab.db"/>
+			<Item Name="pvList.txt" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/pvList.txt"/>
 		</Item>
 		<Item Name="CaLab.lvlib" Type="Library" URL="../CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
@@ -108,9 +107,6 @@ including basic examples</Property>
 				<Item Name="calabioc.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/lib/calabioc.dll"/>
 			</Item>
 			<Item Name="calab.dll" Type="Document" URL="calab.dll">
-				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
-			</Item>
-			<Item Name="calab.so" Type="Document" URL="calab.so">
 				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
 			</Item>
 		</Item>
