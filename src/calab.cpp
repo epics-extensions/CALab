@@ -53,7 +53,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.6.0.11"
+#define CALAB_VERSION       "1.6.1.0"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
@@ -518,6 +518,7 @@ void valueChanged(evargs args);
 void putState(evargs args);
 void caLabLoad(void);
 void caLabUnload(void);
+uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize);
 
 ca_client_context*	pcac = 0x0;            // EPICS context
 bool				bCaLabPolling = false; // TRUE: Avoids permanent open network ports. (CompactRIO)
@@ -1699,7 +1700,7 @@ public:
 		std::string sName;
 		calabItem* currentItem;
 
-		LToCStrN(*name, cName, sizeof(cName));
+		_LToCStrN(*name, cName, sizeof(cName));
 		sName = (char*)cName;
 		mapLock.lock_shared();
 		auto search = myItems.find(sName);
@@ -1727,7 +1728,7 @@ public:
 					memcpy(LStrBuf(*((*currentItem->FieldNameArray)->elt[i])), LStrBuf(*((*FieldNameArray)->elt[i])), LStrLen(*((*FieldNameArray)->elt[i])));
 					(*currentItem->FieldValueArray)->elt[i] = nullptr;
 					// White spaces in field names are not allowed
-					LToCStrN(*((*FieldNameArray)->elt[i]), szFieldName, sizeof(szFieldName));
+					_LToCStrN(*((*FieldNameArray)->elt[i]), szFieldName, sizeof(szFieldName));
 					char* invalidChar = strpbrk((char*)szFieldName, " \t");
 					if (invalidChar) {
 						DbgTime(); CaLabDbgPrintf("white space in field name \"%s\" detected", szFieldName);
@@ -1749,7 +1750,7 @@ public:
 				memcpy(LStrBuf(*fullFieldName) + LStrLen(*name) + 1, LStrBuf(*((*FieldNameArray)->elt[i])), LStrLen(*((*FieldNameArray)->elt[i])));
 				LStrLen(*fullFieldName) = fullsize;
 				char* cFieldName = new char[fullsize + 1];
-				LToCStrN(*fullFieldName, (CStr)cFieldName, fullsize + 1);
+				_LToCStrN(*fullFieldName, (CStr)cFieldName, fullsize + 1);
 				std::string sFieldName = (char*)cFieldName;
 				calabItem* fieldItem;
 				mapLock.lock_shared();
@@ -3027,7 +3028,7 @@ extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
 		if (*PvNameArray && **PvNameArray && ((uInt32)(**PvNameArray)->dimSize) > 0) {
 			for (uInt32 i = 0; i < (**PvNameArray)->dimSize; i++) {
 				char cName[MAX_NAME_SIZE];
-				LToCStrN(*((**PvNameArray)->elt[i]), (CStr)cName, sizeof(cName));
+				_LToCStrN(*((**PvNameArray)->elt[i]), (CStr)cName, sizeof(cName));
 				std::string sName = cName;
 				globals.mapLock.lock_shared();
 				auto search = myItems.find(sName);
@@ -3284,6 +3285,19 @@ void caLabUnload(void) {
 #ifdef _DEBUG
 	DbgTime(); CaLabDbgPrintfD("unload CA Lab OK");
 #endif
+}
+
+// LToCStrN is not available in (very) old LabVIEW versions
+uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize) {
+	uInt32 resultingSize = source->cnt + 1;
+	if (resultingSize > destSize) {
+		resultingSize = destSize;
+	}
+	strncpy((char*) dest, (char*)source->str, resultingSize - 1);
+	if (resultingSize > 0) {
+		dest[resultingSize - 1] = '\0';
+	}
+	return resultingSize;
 }
 
 #ifndef __GNUC__

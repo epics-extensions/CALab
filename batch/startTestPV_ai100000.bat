@@ -4,5 +4,6 @@ set EPICS_CA_ADDR_LIST=localhost
 set EPICS_CA_AUTO_ADDR_LIST=NO
 
 :: start ioc shell
-cd DemoIOC
+cd /d %CATOOLS%
+cd ..\demo
 start TestPV_ai100000.cmd
