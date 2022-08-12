@@ -3289,14 +3289,14 @@ void caLabUnload(void) {
 
 // LToCStrN is not available in (very) old LabVIEW versions
 uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize) {
-	uInt32 resultingSize = source->cnt + 1;
-	if (resultingSize > destSize) {
-		resultingSize = destSize;
-	}
-	strncpy((char*) dest, (char*)source->str, resultingSize - 1);
-	if (resultingSize > 0) {
-		dest[resultingSize - 1] = '\0';
-	}
+    uInt32 resultingSize = (source) ? (source->cnt + 1) : 1;
+    if (resultingSize > destSize)
+        resultingSize = destSize;
+    if (resultingSize > 0) {
+        if (source)
+            strncpy((char*) dest, (char*)source->str, resultingSize - 1);
+        dest[resultingSize - 1] = '\0';
+    }
 	return resultingSize;
 }
 
