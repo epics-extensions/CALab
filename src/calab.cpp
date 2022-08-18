@@ -745,8 +745,8 @@ public:
 		MgErr err = noErr;
 		iSize = (int32)strlen(ca_message(iError));
 		if (!ErrorIO.source || (*ErrorIO.source)->cnt != iSize) {
-			err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
-			(*ErrorIO.source)->cnt = iSize;
+err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
+(*ErrorIO.source)->cnt = iSize;
 		}
 		memcpy((*ErrorIO.source)->str, ca_message(iError), iSize);
 		if (iError <= ECA_NORMAL)
@@ -826,8 +826,8 @@ public:
 				}
 			}
 		}
-		catch (...) {
-			CaLabDbgPrintfD("bad memory access in itemConnectionChanged");
+		catch (std::exception& ex) {
+			DbgTime(); CaLabDbgPrintf("%s", ex.what());
 		}
 	}
 
@@ -844,6 +844,10 @@ public:
 			int32 lerr = lock();
 			if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
 			//CaLabDbgPrintfD("itemValueChanged of %s", szName);
+			if (doubleValueArray && DSCheckHandle(doubleValueArray) != noErr || stringValueArray && DSCheckHandle(stringValueArray) != noErr) {
+				unlock();
+				return; // delayed value change during unload library
+			}
 			numberOfValues = args.count;
 			if (!doubleValueArray || (long)(*doubleValueArray)->dimSize < args.count) {
 				err += NumericArrayResize(fD, 1, (UHandle*)&doubleValueArray, args.count);
@@ -1112,8 +1116,8 @@ public:
 				unlock();
 			}
 		}
-		catch (...) {
-			CaLabDbgPrintfD("bad memory access in itemValueChanged");
+		catch (std::exception& ex) {
+			DbgTime(); CaLabDbgPrintf("%s", ex.what());
 			if (locked.load())
 				unlock();
 		}
@@ -1424,8 +1428,8 @@ public:
 				Error->code = 0;
 			Error->status = 0;
 		}
-		catch (...) {
-			CaLabDbgPrintfD("bad memory access in put");
+		catch (std::exception& ex) {
+			DbgTime(); CaLabDbgPrintf("%s", ex.what());
 			if (locked.load())
 				unlock();
 		}
@@ -1633,8 +1637,8 @@ CaLabDbgPrintf("user event of %s", szName);*/
 				}
 			}
 		}
-		catch (...) {
-			CaLabDbgPrintfD("bad memory access in post event");
+		catch (std::exception& ex) {
+			DbgTime(); CaLabDbgPrintf("%s", ex.what());
 			itRefNum = RefNum.begin();
 			while (itRefNum != RefNum.end()) {
 				itRefNum = RefNum.erase(itRefNum);
@@ -1765,7 +1769,7 @@ public:
 				else {
 					mapLock.unlock_shared();
 				}
-				delete cFieldName;
+				delete[] cFieldName;
 			}
 			if (fullFieldName) {
 				DSDisposeHandle(fullFieldName);
@@ -1957,8 +1961,8 @@ void connectionChanged(connection_handler_args args) {
 		if (item)
 			item->itemConnectionChanged(args);
 	}
-	catch (...) {
-		CaLabDbgPrintfD("Exception in connection changed callback");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 }
 
@@ -1974,8 +1978,8 @@ void valueChanged(evargs args) {
 		if (item)
 			item->itemValueChanged(args);
 	}
-	catch (...) {
-		CaLabDbgPrintfD("Exception in value changed callback");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 }
 
@@ -2443,8 +2447,8 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 			}
 		}
 	}
-	catch (...) {
-		CaLabDbgPrintfD("exception in getValue");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 	epicsMutexUnlock(getLock);
 }
@@ -2506,36 +2510,6 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
 			if (*ref == *RefNum) {
 				ref = currentItem->RefNum.erase(ref);
 				it = currentItem->eventResultCluster.erase(it);
-				if (currentItem->doubleValueArray) {
-					DSDisposeHandle(currentItem->doubleValueArray);
-					currentItem->doubleValueArray = 0x0;
-				}
-				if (currentItem->stringValueArray) {
-					for (uInt32 i = 0; i < (*currentItem->stringValueArray)->dimSize; i++) {
-						DSDisposeHandle((*currentItem->stringValueArray)->elt[i]);
-						(*currentItem->stringValueArray)->elt[i] = 0x0;
-					}
-					(*currentItem->stringValueArray)->dimSize = 0;
-					DSDisposeHandle(currentItem->stringValueArray);
-					currentItem->stringValueArray = 0x0;
-				}
-				if (currentItem->StatusString) {
-					DSDisposeHandle(currentItem->StatusString);
-					currentItem->StatusString = 0x0;
-				}
-				if (currentItem->SeverityString) {
-					DSDisposeHandle(currentItem->SeverityString);
-					currentItem->SeverityString = 0x0;
-				}
-				if (currentItem->TimeStampString) {
-					DSDisposeHandle(currentItem->TimeStampString);
-					currentItem->TimeStampString = 0x0;
-				}
-				if (currentItem->ErrorIO.source) {
-					DSDisposeHandle(currentItem->ErrorIO.source);
-					currentItem->ErrorIO.source = 0x0;
-				}
-				currentItem->disconnect();
 			}
 			else {
 				ref++;
@@ -2727,8 +2701,8 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 				*Status = 1;
 		}
 	}
-	catch (...) {
-		CaLabDbgPrintfD("exception in putValue");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 }
 
@@ -2997,8 +2971,8 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 		free(pszValues);
 		pszValues = 0;
 	}
-	catch (...) {
-		CaLabDbgPrintfD("exception in info");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 }
 
@@ -3058,8 +3032,8 @@ extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
 			}
 		}
 	}
-	catch (...) {
-		CaLabDbgPrintfD("exception in disconnectPVs");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 }
 
@@ -3167,8 +3141,8 @@ static void caTask(void) {
 		ca_detach_context();
 		tasks.fetch_sub(1);
 	}
-	catch (...) {
-		CaLabDbgPrintfD("exception in caTask");
+	catch (std::exception& ex) {
+		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
 }
 
