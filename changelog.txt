@@ -1,15 +1,57 @@
 ﻿Changelog of CA Lab
 
-V1.6.1.0
-# EPICS base 7.0.4.1
-# User Events revised
-# Internal search algorithm reworked
-# Improved performance for large number of variables (>1.000)
-# Added Parallel Event Demo.vi (LabVIEW 2019 and later)
-# Updated instructions for Linux users
-# Published Code at GitHub https://github.com/epics-extensions/CALab
-# Additional software developer Brian Powell - A warm welcome!
+V1.7.1.0 (Released: August 2022)
+  # EPICS base 7.0.6.1
+  # solved the conflict when unloading libraries
+    (this was the reason for the withdrawal of versions V1.7.0.x)
+  # User Events revised
+  # Internal search algorithm reworked
+  # Improved performance for large number of variables (>1.000)
+  # Added Parallel Event Demo.vi (LabVIEW 2019 and later)
+  # Updated instructions for Linux users
+  # Published Code at GitHub https://github.com/epics-extensions/CALab
+  # Additional software developer Brian Powell - A warm welcome!
 
+----------------------------------------------------------------------
+December 2020
+  versions V1.7.0.x were withdrawn because they did not run
+  sufficiently stable
+  fall back to stable version V1.6.0.11
+
+----------------------------------------------------------------------
+V1.7.0.6 (Released: September 2020)
+  # EPICS base 7.0.4.1
+  # BUGFIX caLabPut.vi: fixed memory leak in mode "variable PV names"
+  # BUGFIX: CaLabGet "Value array (number)" (2D arrays only)
+  # BUGFIX: Put_DBL-1D_PV.vi and Put_I64-1D_PV-1D.vi
+            input "Synchronous (F)" is recommend
+  # BUGFIX: CaLabEvent_PV.vi and CaLabPut_Main_Initialized.vi
+            input "PV name(s)" is required
+  + Improved performance for caLabPut and caLabGet (large byte arrays)
+
+----------------------------------------------------------------------
+V1.7.0.3 (Released: August 2020)
+  # BUGFIX caLabGet.vi: sometimes 0 elements in result when Timeout=1s
+
+----------------------------------------------------------------------
+V1.7.0.2 (Released: July 2020)
+  + Added warning for duplicate PV names
+
+----------------------------------------------------------------------
+V1.7.0.1 (Released: June 2020)
+  # EPICS base 7.0.4
+  ! CA Lab is now running as a service and will only be terminated
+    when LabVIEW is fully terminated.
+  ! CHANGED default value of the input connector "variable PV names"
+    to TRUE (the previous default value was confusing)
+    More info: https://hz-b.de/calab => caLabGet.vi / caLabPut.vi
+  ! CHANGED data type of the input connector "Timeout" to integer
+  # BUGFIX in CaLabSoftIoc.vi: input field "Data Type" had a blank
+    space for "bo" (Thanks to Lee)
+  # BUGFIX in CaLabSoftIOC.vi @64bit: detecting of the softIoc.exe
+  + ADDED value range (1-255) for the input connector "Timeout"
+
+----------------------------------------------------------------------
 V1.6.0.11 (Released: March 2020)
 # BUGFIX 60 characters support for CaLabSoftIOC.vi
 # EPICS base 3.14.12.8

@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.6.1.0
+// Version     : 1.7.1.0
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -53,7 +53,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.6.1.0"
+#define CALAB_VERSION       "1.7.1.0"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
