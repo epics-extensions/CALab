@@ -844,7 +844,8 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 			int32 lerr = lock();
 			if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
 			//CaLabDbgPrintfD("itemValueChanged of %s", szName);
-			if (doubleValueArray && DSCheckHandle(doubleValueArray) != noErr || stringValueArray && DSCheckHandle(stringValueArray) != noErr) {
+			if ((doubleValueArray && (DSCheckHandle(doubleValueArray) != noErr))
+                || (stringValueArray && (DSCheckHandle(stringValueArray) != noErr))) {
 				unlock();
 				return; // delayed value change during unload library
 			}
