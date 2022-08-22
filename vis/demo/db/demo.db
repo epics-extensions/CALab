@@ -1,0 +1,7317 @@
+record(ai, "caLab:aiExample")
+{
+    field(DESC, "Analog input")
+    field(INP, "caLab:calcExample.VAL  NPP NNS")
+    field(EGU, "Counts")
+    field(HOPR, "100")
+    field(LOPR, "0")
+    field(HIHI, "90")
+    field(HIGH, "85")
+    field(LOW, "15")
+    field(LOLO, "10")
+    field(HHSV, "MAJOR")
+    field(HSV, "MINOR")
+    field(LSV, "MINOR")
+    field(LLSV, "MAJOR")
+    field(PINI, "YES")
+}
+record(calc, "caLab:calcExample")
+{
+    field(DESC, "Counter")
+    field(SCAN, "1 second")
+    field(FLNK, "caLab:aiExample")
+    field(CALC, "(A<B)?(A+C):D")
+    field(INPA, "caLab:calcExample.VAL  NPP NNS")
+    field(INPB, "100")
+    field(INPC, "1")
+    field(INPD, "0")
+    field(EGU, "Counts")
+    field(HOPR, "100")
+    field(LOPR, "0")
+    field(HIHI, "90")
+    field(HIGH, "85")
+    field(LOW, "15")
+    field(LOLO, "10")
+    field(HHSV, "MAJOR")
+    field(HSV, "MINOR")
+    field(LSV, "MINOR")
+    field(LLSV, "MAJOR")
+}
+record(ai, "caLab:aiExample1")
+{
+    field(DESC, "Analog input")
+    field(INP, "caLab:calcExample1.VAL  NPP NNS")
+    field(EGU, "Counts")
+    field(HOPR, "100")
+    field(LOPR, "0")
+    field(HIHI, "90")
+    field(HIGH, "85")
+    field(LOW, "15")
+    field(LOLO, "10")
+    field(HHSV, "MAJOR")
+    field(HSV, "MINOR")
+    field(LSV, "MINOR")
+    field(LLSV, "MAJOR")
+    field(PINI, "YES")
+}
+record(calc, "caLab:calcExample1")
+{
+    field(DESC, "Counter")
+    field(SCAN, ".1 second")
+    field(FLNK, "caLab:aiExample1")
+    field(CALC, "(A<B)?(A+C):D")
+    field(INPA, "caLab:calcExample1.VAL  NPP NNS")
+    field(INPB, "100")
+    field(INPC, "1")
+    field(INPD, "0")
+    field(EGU, "Counts")
+    field(HOPR, "100")
+    field(LOPR, "0")
+    field(HIHI, "90")
+    field(HIGH, "85")
+    field(LOW, "15")
+    field(LOLO, "10")
+    field(HHSV, "MAJOR")
+    field(HSV, "MINOR")
+    field(LSV, "MINOR")
+    field(LLSV, "MAJOR")
+}
+record(bi,"caLab:bi") {
+    field(DESC,"bi - bool input")
+    field(ZNAM,"ok")
+    field(ONAM,"warning")
+    field(ZSV,"NO_ALARM")
+    field(OSV,"MINOR")
+    field(PINI, "YES")
+}
+record(stringin,"caLab:stringin") {
+    field(DESC,"stringin")
+    field(PINI, "YES")
+}
+record(mbbi,"caLab:mbbi") {	
+    field(DESC,"mbbi")
+    field(ZRST,"0")
+    field(ONST,"bit 0")
+    field(TWST,"bit 1")
+    field(THST,"bit 0+1")
+    field(FRST,"bit 2")
+    field(FVST,"bit 2+0")
+    field(SXST,"bit 2+1")
+    field(SVST,"bit 2+1+0")
+    field(ZRSV,"NO_ALARM")
+    field(ONSV,"NO_ALARM")
+    field(TWSV,"NO_ALARM")
+    field(THSV,"MAJOR")
+    field(FRSV,"NO_ALARM")
+    field(FVSV,"MAJOR")
+    field(SXSV,"MAJOR")
+    field(SVSV,"MAJOR")
+    field(PINI, "YES")
+}
+record(ao, "caLab:double1")
+{
+    field(DESC, "Double output with range infos")
+    field(EGU, "mm")
+    field(HOPR, "100")
+    field(LOPR, "0")
+    field(HIHI, "90")
+    field(HIGH, "85")
+    field(LOW, "15")
+    field(LOLO, "10")
+    field(HHSV, "MAJOR")
+    field(HSV, "MINOR")
+    field(LSV, "MINOR")
+    field(LLSV, "MAJOR")
+    field (PINI, "YES")
+}
+record(ao, "caLab:double2")
+{
+    field(DESC, "Double output without range infos")
+    field(EGU, "nm")
+    field (PINI, "YES")
+}
+record(longout, "caLab:long")
+{
+    field(DESC, "Long output without range infos")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(stringout, "caLab:string")
+{
+    field(DESC, "String output without range infos")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveDouble")
+{
+    field(DESC, "Double waveform record")
+    field(NELM, 200)
+    field(FTVL, "DOUBLE")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveDouble1")
+{
+    field(DESC, "Double waveform record")
+    field(NELM, 200)
+    field(FTVL, "DOUBLE")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveDouble2")
+{
+    field(DESC, "Double waveform record")
+    field(NELM, 200)
+    field(FTVL, "DOUBLE")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveDouble3")
+{
+    field(DESC, "Double waveform record")
+    field(NELM, 200)
+    field(FTVL, "DOUBLE")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveDouble4")
+{
+    field(DESC, "Double waveform record")
+    field(NELM, 200)
+    field(FTVL, "DOUBLE")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveLong")
+{
+    field(DESC, "Long waveform record")
+    field(NELM, 2048)
+    field(FTVL, "LONG")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveLong1")
+{
+    field(DESC, "Long waveform record")
+    field(NELM, 2048)
+    field(FTVL, "LONG")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveLong2")
+{
+    field(DESC, "Long waveform record")
+    field(NELM, 2048)
+    field(FTVL, "LONG")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveLong3")
+{
+    field(DESC, "Long waveform record")
+    field(NELM, 2048)
+    field(FTVL, "LONG")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveLong4")
+{
+    field(DESC, "Long waveform record")
+    field(NELM, 2048)
+    field(FTVL, "LONG")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveShort")
+{
+    field(DESC, "Short waveform record")
+    field(NELM, 2048)
+    field(FTVL, "SHORT")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveShort1")
+{
+    field(DESC, "Short waveform record")
+    field(NELM, 2048)
+    field(FTVL, "SHORT")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveShort2")
+{
+    field(DESC, "Short waveform record")
+    field(NELM, 2048)
+    field(FTVL, "SHORT")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveShort3")
+{
+    field(DESC, "Short waveform record")
+    field(NELM, 2048)
+    field(FTVL, "SHORT")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveShort4")
+{
+    field(DESC, "Short waveform record")
+    field(NELM, 2048)
+    field(FTVL, "SHORT")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveChar")
+{
+    field(DESC, "Char waveform record")
+    field(NELM, 2048)
+    field(FTVL, "CHAR")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveChar1")
+{
+    field(DESC, "Char waveform record")
+    field(NELM, 2048)
+    field(FTVL, "CHAR")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveChar2")
+{
+    field(DESC, "Char waveform record")
+    field(NELM, 2048)
+    field(FTVL, "CHAR")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveChar3")
+{
+    field(DESC, "Char waveform record")
+    field(NELM, 2048)
+    field(FTVL, "CHAR")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveChar4")
+{
+    field(DESC, "Char waveform record")
+    field(NELM, 2048)
+    field(FTVL, "CHAR")
+    field(EGU, "m")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveString")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString1")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString2")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString3")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString4")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString5")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString6")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString7")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString8")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString9")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString10")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString11")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString12")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString13")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString14")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString15")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString16")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString17")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString18")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString19")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString20")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString21")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString22")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString23")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString24")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString25")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString26")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString27")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString28")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString29")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString30")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString31")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString32")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString33")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString34")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString35")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString36")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString37")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString38")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString39")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString40")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString41")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString42")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString43")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString44")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString45")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString46")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString47")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString48")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString49")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString50")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString51")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString52")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString53")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString54")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString55")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString56")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString57")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString58")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString59")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString60")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString61")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString62")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString63")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString64")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString65")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString66")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString67")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString68")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString69")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString70")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString71")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString72")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString73")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString74")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString75")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString76")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString77")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString78")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString79")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString80")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString81")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString82")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString83")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString84")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString85")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString86")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString87")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString88")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString89")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString90")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString91")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString92")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString93")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString94")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString95")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString96")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString97")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString98")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString99")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString100")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString101")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString102")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString103")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString104")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString105")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString106")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString107")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString108")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString109")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString110")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString111")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString112")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString113")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString114")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString115")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString116")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString117")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString118")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString119")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString120")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString121")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString122")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString123")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString124")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString125")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString126")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString127")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString128")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString129")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString130")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString131")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString132")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString133")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString134")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString135")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString136")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString137")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString138")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString139")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString140")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString141")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString142")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString143")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString144")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString145")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString146")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString147")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString148")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString149")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString150")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString151")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString152")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString153")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString154")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString155")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString156")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString157")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString158")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString159")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString160")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString161")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString162")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString163")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString164")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString165")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString166")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString167")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString168")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString169")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString170")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString171")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString172")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString173")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString174")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString175")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString176")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString177")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString178")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString179")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString180")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString181")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString182")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString183")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString184")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString185")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString186")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString187")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString188")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString189")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString190")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString191")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString192")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString193")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString194")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString195")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString196")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString197")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString198")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString199")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString200")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString200")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString201")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString202")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString203")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString204")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString205")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString206")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString207")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString208")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString209")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString210")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString211")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString212")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString213")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString214")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString215")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString216")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString217")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString218")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString219")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString220")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString221")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString222")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString223")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString224")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString225")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString226")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString227")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString228")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString229")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString230")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString231")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString232")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString233")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString234")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString235")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString236")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString237")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString238")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString239")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString240")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString241")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString242")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString243")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString244")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString245")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString246")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString247")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString248")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString249")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString250")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString251")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString252")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString253")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString254")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString255")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString256")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString257")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString258")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString259")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString260")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString261")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString262")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString263")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString264")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString265")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString266")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString267")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString268")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString269")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString270")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString271")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString272")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString273")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString274")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString275")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString276")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString277")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString278")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString279")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString280")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString281")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString282")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString283")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString284")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString285")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString286")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString287")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString288")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString289")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString290")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString291")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString292")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString293")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString294")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString295")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString296")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString297")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString298")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString299")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString300")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString301")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString302")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString303")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString304")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString305")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString306")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString307")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString308")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString309")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString310")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString311")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString312")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString313")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString314")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString315")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString316")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString317")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString318")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString319")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString320")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString321")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString322")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString323")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString324")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString325")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString326")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString327")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString328")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString329")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString330")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString331")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString332")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString333")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString334")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString335")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString336")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString337")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString338")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString339")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString340")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString341")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString342")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString343")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString344")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString345")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString346")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString347")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString348")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString349")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString350")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString351")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString352")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString353")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString354")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString355")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString356")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString357")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString358")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString359")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString360")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString361")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString362")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString363")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString364")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString365")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString366")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString367")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString368")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString369")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString370")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString371")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString372")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString373")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString374")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString375")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString376")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString377")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString378")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString379")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString380")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString381")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString382")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString383")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString384")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString385")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString386")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString387")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString388")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString389")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString390")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString391")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString392")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString393")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString394")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString395")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString396")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString397")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString398")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString399")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString400")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString401")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString402")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString403")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString404")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString405")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString406")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString407")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString408")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString409")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString410")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString411")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString412")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString413")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString414")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString415")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString416")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString417")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString418")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString419")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString420")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString421")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString422")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString423")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString424")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString425")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString426")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString427")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString428")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString429")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString430")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString431")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString432")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString433")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString434")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString435")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString436")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString437")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString438")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString439")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString440")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString441")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString442")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString443")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString444")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString445")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString446")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString447")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString448")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString449")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString450")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString451")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString452")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString453")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString454")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString455")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString456")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString457")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString458")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString459")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString460")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString461")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString462")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString463")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString464")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString465")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString466")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString467")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString468")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString469")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString470")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString471")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString472")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString473")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString474")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString475")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString476")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString477")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString478")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString479")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString480")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString481")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString482")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString483")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString484")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString485")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString486")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString487")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString488")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString489")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString490")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString491")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString492")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString493")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString494")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString495")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString496")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString497")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString498")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString499")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString500")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString501")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString502")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString503")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString504")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString505")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString506")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString507")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString508")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString509")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString510")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString511")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString512")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString513")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString514")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString515")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString516")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString517")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString518")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString519")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString520")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString521")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString522")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString523")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString524")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString525")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString526")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString527")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString528")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString529")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString530")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString531")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString532")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString533")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString534")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString535")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString536")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString537")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString538")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString539")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString540")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString541")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString542")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString543")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString544")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString545")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString546")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString547")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString548")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString549")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString550")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString551")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString552")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString553")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString554")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString555")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString556")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString557")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString558")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString559")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString560")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString561")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString562")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString563")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString564")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString565")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString566")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString567")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString568")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString569")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString570")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString571")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString572")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString573")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString574")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString575")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString576")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString577")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString578")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString579")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString580")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString581")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString582")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString583")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString584")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString585")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString586")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString587")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString588")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString589")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString590")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString591")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString592")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString593")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString594")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString595")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString596")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString597")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString598")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString599")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString600")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString601")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString602")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString603")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString604")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString605")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString606")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString607")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString608")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString609")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString610")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString611")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString612")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString613")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString614")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString615")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString616")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString617")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString618")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString619")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString620")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString621")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString622")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString623")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString624")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString625")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString626")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString627")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString628")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString629")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString630")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString631")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString632")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString633")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString634")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString635")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString636")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString637")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString638")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString639")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString640")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString641")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString642")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString643")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString644")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString645")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString646")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString647")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString648")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString649")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString650")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString651")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString652")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString653")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString654")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString655")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString656")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString657")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString658")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString659")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString660")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString661")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString662")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString663")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString664")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString665")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString666")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString667")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString668")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString669")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString670")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString671")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString672")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString673")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString674")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString675")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString676")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString677")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString678")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString679")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString680")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString681")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString682")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString683")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString684")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString685")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString686")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString687")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString688")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString689")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString690")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString691")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString692")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString693")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString694")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString695")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString696")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString697")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString698")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString699")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString700")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString701")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString702")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString703")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString704")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString705")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString706")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString707")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString708")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString709")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString710")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString711")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString712")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString713")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString714")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString715")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString716")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString717")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString718")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString719")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString720")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString721")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString722")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString723")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString724")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString725")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString726")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString727")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString728")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString729")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString730")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString731")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString732")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString733")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString734")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString735")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString736")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString737")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString738")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString739")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString740")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString741")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString742")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString743")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString744")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString745")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString746")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString747")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString748")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString749")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString750")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString751")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString752")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString753")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString754")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString755")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString756")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString757")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString758")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString759")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString760")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString761")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString762")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString763")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString764")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString765")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString766")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString767")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString768")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString769")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString770")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString771")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString772")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString773")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString774")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString775")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString776")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString777")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString778")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString779")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString780")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString781")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString782")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString783")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString784")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString785")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString786")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString787")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString788")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString789")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString790")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString791")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString792")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString793")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString794")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString795")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString796")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString797")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString798")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString799")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString800")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString801")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString802")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString803")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString804")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString805")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString806")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString807")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString808")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString809")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString810")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString811")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString812")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString813")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString814")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString815")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString816")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString817")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString818")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString819")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString820")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString821")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString822")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString823")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString824")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString825")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString826")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString827")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString828")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString829")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString830")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString831")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString832")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString833")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString834")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString835")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString836")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString837")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString838")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString839")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString840")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString841")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString842")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString843")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString844")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString845")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString846")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString847")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString848")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString849")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString850")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString851")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString852")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString853")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString854")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString855")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString856")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString857")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString858")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString859")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString860")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString861")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString862")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString863")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString864")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString865")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString866")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString867")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString868")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString869")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString870")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString871")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString872")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString873")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString874")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString875")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString876")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString877")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString878")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString879")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString880")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString881")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString882")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString883")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString884")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString885")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString886")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString887")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString888")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString889")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString890")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString891")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString892")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString893")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString894")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString895")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString896")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString897")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString898")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString899")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString900")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString901")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString902")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString903")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString904")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString905")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString906")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString907")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString908")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString909")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString910")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString911")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString912")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString913")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString914")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString915")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString916")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString917")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString918")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString919")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString920")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString921")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString922")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString923")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString924")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString925")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString926")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString927")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString928")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString929")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString930")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString931")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString932")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString933")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString934")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString935")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString936")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString937")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString938")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString939")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString940")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString941")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString942")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString943")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString944")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString945")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString946")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString947")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString948")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString949")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString950")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString951")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString952")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString953")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString954")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString955")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString956")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString957")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString958")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString959")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString960")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString961")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString962")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString963")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString964")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString965")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString966")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString967")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString968")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString969")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString970")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString971")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString972")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString973")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString974")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString975")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString976")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString977")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString978")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString979")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString980")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString981")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString982")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString983")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString984")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString985")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString986")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString987")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString988")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString989")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString990")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString991")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString992")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString993")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString994")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString995")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString996")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString997")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString998")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString999")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
+record(waveform, "caLab:waveString1000")
+{
+    field(DESC, "String waveform record")
+    field(NELM, 200)
+    field(FTVL, "STRING")
+    field(PINI, "YES")
+}
