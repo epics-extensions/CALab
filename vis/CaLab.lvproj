@@ -2,7 +2,7 @@
 <Project Type="Project" LVVersion="8508002">
 	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">false</Property>
-	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.6.1.0
+	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.7.1.1
 including all needed libraries
 including basic examples</Property>
 	<Item Name="My Computer" Type="My Computer">
@@ -81,6 +81,11 @@ including basic examples</Property>
 				<Item Name="System Exec.vi" Type="VI" URL="/&lt;vilib&gt;/Platform/system.llb/System Exec.vi"/>
 				<Item Name="General Error Handler CORE.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/General Error Handler CORE.vi"/>
 				<Item Name="Merge Errors.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Merge Errors.vi"/>
+				<Item Name="List Directory and LLBs.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/libraryn.llb/List Directory and LLBs.vi"/>
+				<Item Name="Recursive File List.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/libraryn.llb/Recursive File List.vi"/>
+			</Item>
+			<Item Name="user.lib" Type="Folder">
+				<Item Name="Protect VIs.vi" Type="VI" URL="/&lt;userlib&gt;/caLab/development/Protect VIs.vi"/>
 			</Item>
 			<Item Name="calab.dll" Type="Document" URL="calab.dll">
 				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>

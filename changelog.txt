@@ -1,5 +1,10 @@
 ﻿Changelog of CA Lab
 
+V1.7.1.1 (Released: August 2022)
+  # restoring some insignificant VI input defaults
+    from previous versions v1.7.0.1 to v1.7.0.6
+
+----------------------------------------------------------------------
 V1.7.1.0 (Released: August 2022)
   # EPICS base 7.0.6.1
   # solved the conflict when unloading libraries

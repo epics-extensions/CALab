@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLabIoc.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.1.0
+// Version     : 1.7.1.1
 // Copyright   : HZB
 // Description : library to handle softIoc.exe (Windows only)
 // GitHub      : https://github.com/epics-extensions/CALab
