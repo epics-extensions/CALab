@@ -3,6 +3,7 @@
 V1.7.1.1 (Released: August 2022)
   # restoring some insignificant VI input defaults
     from previous versions v1.7.0.1 to v1.7.0.6
+  # adaptations of the examples
 
 ----------------------------------------------------------------------
 V1.7.1.0 (Released: August 2022)

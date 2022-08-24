@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<nidocument>
+<nicomment>
+CA Lab error codes - 7000 = EPICS error codes
+</nicomment>
+<nierror code="7008">
+Maximum simultaneous IOC connections exceeded
+</nierror>
+<nierror code="7016">
+Unknown internet host
+</nierror>
+<nierror code="7024">
+Unknown internet service
+</nierror>
+<nierror code="7032">
+Unable to allocate a new socket
+</nierror>
+<nierror code="7040">
+Unable to connect to internet host or service
+</nierror>
+<nierror code="7048">
+Unable to allocate additional dynamic memory
+</nierror>
+<nierror code="7056">
+Unknown IO channel
+</nierror>
+<nierror code="7064">
+Record field specified inappropriate for channel specified
+</nierror>
+<nierror code="7072">
+The requested data transfer is greater than available memory or EPICS_CA_MAX_ARRAY_BYTES
+</nierror>
+<nierror code="7080">
+User specified timeout on IO operation expired
+</nierror>
+<nierror code="7088">
+Sorry, that feature is planned but not supported at this time
+</nierror>
+<nierror code="7096">
+The supplied string is unusually large
+</nierror>
+<nierror code="7104">
+The request was ignored because the specified channel is disconnected
+</nierror>
+<nierror code="7112">
+The data type specifed is invalid
+</nierror>
+<nierror code="7120">
+Remote Channel not found
+</nierror>
+<nierror code="7128">
+Unable to locate all user specified channels
+</nierror>
+<nierror code="7136">
+Channel Access Internal Failure
+</nierror>
+<nierror code="7144">
+The requested local DB operation failed
+</nierror>
+<nierror code="7152">
+Channel read request failed
+</nierror>
+<nierror code="7160">
+Channel write request failed
+</nierror>
+<nierror code="7168">
+Channel subscription request failed
+</nierror>
+<nierror code="7176">
+Invalid element count requested
+</nierror>
+<nierror code="7184">
+Invalid string
+</nierror>
+<nierror code="7192">
+Virtual circuit disconnect
+</nierror>
+<nierror code="7200">
+Identical process variable names on multiple servers
+</nierror>
+<nierror code="7208">
+Request inappropriate within subscription (monitor) update callback
+</nierror>
+<nierror code="7216">
+Database value get for that channel failed during channel search
+</nierror>
+<nierror code="7224">
+Unable to initialize without the vxWorks VX_FP_TASK task option set
+</nierror>
+<nierror code="7232">
+Event queue overflow has prevented first pass event after event add
+</nierror>
+<nierror code="7240">
+Bad event subscription (monitor) identifier
+</nierror>
+<nierror code="7248">
+Remote channel has new network address
+</nierror>
+<nierror code="7256">
+New or resumed network connection
+</nierror>
+<nierror code="7264">
+Specified task isnt a member of a CA context
+</nierror>
+<nierror code="7272">
+Attempt to use defunct CA feature failed
+</nierror>
+<nierror code="7280">
+The supplied string is empty
+</nierror>
+<nierror code="7288">
+Unable to spawn the CA repeater thread- auto reconnect will fail
+</nierror>
+<nierror code="7296">
+No channel id match for search reply- search reply ignored
+</nierror>
+<nierror code="7304">
+Reseting dead connection- will try to reconnect
+</nierror>
+<nierror code="7312">
+Server (IOC) has fallen behind or is not responding- still waiting
+</nierror>
+<nierror code="7320">
+No internet interface with broadcast available
+</nierror>
+<nierror code="7328">
+Invalid event selection mask
+</nierror>
+<nierror code="7336">
+IO operations have completed
+</nierror>
+<nierror code="7344">
+IO operations are in progress
+</nierror>
+<nierror code="7352">
+Invalid synchronous group identifier
+</nierror>
+<nierror code="7360">
+Put callback timed out
+</nierror>
+<nierror code="7368">
+Read access denied
+</nierror>
+<nierror code="7376">
+Write access denied
+</nierror>
+<nierror code="7384">
+Requested feature is no longer supported
+</nierror>
+<nierror code="7392">
+Empty PV search address list
+</nierror>
+<nierror code="7400">
+No reasonable data conversion between client and server types
+</nierror>
+<nierror code="7408">
+Invalid channel identifier
+</nierror>
+<nierror code="7416">
+Invalid function pointer
+</nierror>
+<nierror code="7424">
+Thread is already attached to a client context
+</nierror>
+<nierror code="7432">
+Not supported by attached service
+</nierror>
+<nierror code="7440">
+User destroyed channel
+</nierror>
+<nierror code="7448">
+Invalid channel priority
+</nierror>
+<nierror code="7456">
+Preemptive callback not enabled - additional threads may not join context
+</nierror>
+<nierror code="7464">
+Client's protocol revision does not support transfers exceeding 16k bytes
+</nierror>
+<nierror code="7472">
+Virtual circuit connection sequence aborted
+</nierror>
+<nierror code="7480">
+Soft IOC is already running
+</nierror>
+<nierror code="7488">
+errors in Soft IOC
+</nierror>
+<nierror code="7496">
+This VI is for Windows only!
+</nierror>
+</nidocument>

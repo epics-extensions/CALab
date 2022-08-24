@@ -6,8 +6,8 @@ record(longin, "caLab:longin") { field(DESC, "demo longin PV") field(PINI, "YES"
 record(longout, "caLab:longout") { field(DESC, "demo longout PV") field(PINI, "YES") field(EGU, "m")}
 record(stringin, "caLab:stringin") { field(DESC, "demo stringin PV") field(PINI, "YES")}
 record(stringout, "caLab:stringout") { field(DESC, "demo stringout PV") field(PINI, "YES")}
-record(waveform, "caLab:waveChar") { field(DESC, "demo char array PV") field(PINI, "YES") field(NELM, "1") field(FTVL, "CHAR")}
-record(waveform, "caLab:waveShort") { field(DESC, "demo short array PV") field(PINI, "YES") field(NELM, "10") field(FTVL, "SHORT")}
-record(waveform, "caLab:waveLong") { field(DESC, "demo ai PV") field(PINI, "YES") field(NELM, "10") field(FTVL, "LONG")}
-record(waveform, "caLab:waveDouble") { field(DESC, "demo double array PV") field(PINI, "YES") field(NELM, "10") field(FTVL, "DOUBLE")}
-record(waveform, "caLab:waveString") { field(DESC, "demo string array PV") field(PINI, "YES") field(NELM, "10") field(FTVL, "STRING")}
+record(waveform, "caLab:waveChar") { field(DESC, "demo char array PV") field(PINI, "YES") field(NELM, "2048") field(FTVL, "CHAR")}
+record(waveform, "caLab:waveShort") { field(DESC, "demo short array PV") field(PINI, "YES") field(NELM, "2048") field(FTVL, "SHORT")}
+record(waveform, "caLab:waveLong") { field(DESC, "demo ai PV") field(PINI, "YES") field(NELM, "2048") field(FTVL, "LONG")}
+record(waveform, "caLab:waveDouble") { field(DESC, "demo double array PV") field(PINI, "YES") field(NELM, "200") field(FTVL, "DOUBLE")}
+record(waveform, "caLab:waveString") { field(DESC, "demo string array PV") field(PINI, "YES") field(NELM, "200") field(FTVL, "STRING")}
