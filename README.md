@@ -1,6 +1,6 @@
 ﻿# CA Lab (LabVIEW + EPICS)
 
-<img src="https://www.helmholtz-berlin.de/media/media/angebote/it/experimentsteuerung/ca-lab/channelaccesspluslabview-hb-logo.jpg"
+<img src="https://www.helmholtz-berlin.de/media/media/angebote/it/ca-lab/channelaccesspluslabview-hb-logo.jpg"
      alt="CA Lab Logo"
      style="float: left; margin-right: 10px;" />
 ## Overview
@@ -26,10 +26,10 @@ This interface requires only LabVIEW™.
 
 To use this interface, it's **not** necessary to create any LabVIEW™ project nor to use external services. CA Lab can be used directly.
 
-CA Lab is **open source** and works with all LabVIEW™ versions from 7.0 up to the current version (32bit/64bit).<br/>
-It has been tested under Windows 7®, Windows 10® (Build 18363.836), RedHat® Enterprise Linux® 8.5.0, and Ubuntu® 20.04.
+CA Lab is **open source** and works with all LabVIEW™ versions from 8.5 up to the current version (32bit/64bit).<br/>
+It has been tested under Windows 7®, Windows 10® (Build 19044.1889), and Linux (RHEL 8.5).
 
-<img src="https://www.helmholtz-berlin.de/media/media/angebote/it/experimentsteuerung/ca-lab/calabinterface.png"
+<img src="https://www.helmholtz-berlin.de/media/media/angebote/it/ca-lab/calabinterface.png"
     alt="schema of CA Lab interface"><br/>
 <sup>schema of CA Lab interface</sup>
 
