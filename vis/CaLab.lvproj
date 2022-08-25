@@ -2,7 +2,7 @@
 <Project Type="Project" LVVersion="8508002">
 	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">false</Property>
-	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.6.1.0
+	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.7.1.1
 including all needed libraries
 including basic examples</Property>
 	<Item Name="My Computer" Type="My Computer">
