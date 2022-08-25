@@ -1,6 +1,6 @@
 ﻿# CA Lab (LabVIEW + EPICS)
 
-<img src="https://www.helmholtz-berlin.de/media/media/angebote/it/ca-lab/channelaccesspluslabview-hb-logo.jpg"
+<img src="https://www.helmholtz-berlin.de/media/media/angebote/it/ca-lab/channelaccesspluslabview-hb-logo.png" 
      alt="CA Lab Logo"
      style="float: left; margin-right: 10px;" />
 ## Overview
