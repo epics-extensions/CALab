@@ -42,4 +42,4 @@ These CA Lab VIs call the interface library 'caLab', which uses EPICS base libra
 
 CA Lab library builds an internal PV cache and monitors PVs to improve the read and write access and reduce network traffic. Optional, you can disable caching.
 
-<a href="https://www.helmholtz-berlin.de/zentrum/locations/it/software/exsteuer/calab/index_en.html">🔗more info and examples</a>
+<a href="https://www.helmholtz-berlin.de/zentrum/locations/it/calab">🔗more info and examples</a>
