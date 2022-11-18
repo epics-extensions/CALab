@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.1.1
+// Version     : 1.7.2.0
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -507,6 +507,25 @@ dbr_size_t dbr_size = 0x0;
 ((unsigned)((COUNT)<=0?dbr_size[TYPE]:dbr_size[TYPE]+((COUNT)-1)*dbr_value_size[TYPE]))
 
 #endif
+
+typedef enum {
+	firstValueAsString = 1,
+	firstValueAsNumber = 2,
+	valueArrayAsNumber = 4,
+	errorOut = 8,
+	pviElements = 16,
+	pviValuesAsString = 32,
+	pviValuesAsNumber = 64,
+	pviStatusAsString = 128,
+	pviStatusAsNumber = 256,
+	pviSeverityAsString = 512,
+	pviSeverityAsNumber = 1024,
+	pviTimestampAsString = 2048,
+	pviTimestampAsNumber = 4096,
+	pviFieldNames = 8192,
+	pviFieldValues = 16384,
+	pviError = 32768
+} out_filter;
 #define MAX_NAME_SIZE 61
 
 MgErr DeleteStringArray(sStringArrayHdl array);
@@ -530,8 +549,9 @@ std::atomic<int>	allItemsConnected1(0); // indicator for finished connect
 std::atomic<int>	allItemsConnected2(0); // indicator for first call after finished connect
 std::atomic<int>	tasks(0);			   // number of parallel tasks
 static bool			err200 = false;        // send one error 200 message only
-uInt32				currentlyConnectedPos = 6 * sizeof(void*) + sizeof(unsigned int); // direct access to connect indicator in channell access object
+uInt32				currentlyConnectedPos = 6 * sizeof(void*) + sizeof(unsigned int); // direct access to connect indicator in channel access object
 epicsMutexId		getLock;				// used to protect the getValue() entry point
+epicsMutexId		putLock;				// used to protect the putValue() entry point
 
 // internal data object
 class calabItem {
@@ -1011,7 +1031,7 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				break;
 			case DBR_TIME_ENUM:
 				for (long lCount = 0; lCount < args.count; lCount++) {
-					if ((*doubleValueArray)->elt[lCount] < sEnum.no_str)
+					if ((*doubleValueArray)->elt[lCount] >= 0 && (*doubleValueArray)->elt[lCount] < sEnum.no_str)
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]]);
 					else
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
@@ -1055,7 +1075,7 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 							memcpy(LStrBuf(*(*parent->FieldValueArray)->elt[iFieldID]), szTmp, iSize);
 						parent->fieldModified = true;
 					}
-					if (enumValue < sEnum.no_str) {
+					if (enumValue >= 0 && enumValue < sEnum.no_str) {
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[enumValue]);
 						(*doubleValueArray)->elt[lCount] = enumValue;
 						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
@@ -1140,12 +1160,12 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 	//    Error:              resulting error
 	//    Timeout:            EPICS event timeout in seconds
 	//    Synchronous:        true = callback will be used (no interrupt of motor records)
-	void put(void* ValueArray2D, uInt32 DataType, uInt32 row, uInt32 ValuesPerSet, sError* Error, double Timeout, bool synchronious) {
+	void put(void* ValueArray2D, uInt32 DataType, uInt32 row, uInt32 ValuesPerSet, sError* Error, double Timeout, bool synchronous) {
 		LStrHandle currentStringValue;
 		char szTmp[MAX_ERROR_SIZE];
 		uInt32 iResult = ECA_NORMAL;
 		uInt32 iPos = 0;
-		uInt32 ValuesPerSetMax;
+		uInt32 valuesPerSetMax;
 		int32 stringSize;
 		uInt32 size = 0;
 		try {
@@ -1166,11 +1186,11 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				}
 				return;
 			}
-			ValuesPerSetMax = numberOfValues;//ca_element_count(caID);
+			valuesPerSetMax = numberOfValues;//ca_element_count(caID);
 			tasks.fetch_add(1);
 			putReadBack = false;
-			if (ValuesPerSet > ValuesPerSetMax)
-				stringSize = ValuesPerSetMax;
+			if (ValuesPerSet > valuesPerSetMax)
+				stringSize = valuesPerSetMax;
 			else
 				stringSize = ValuesPerSet;
 			// Create new transfer object (writeValueArray)
@@ -1369,13 +1389,13 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				break;
 			case 1:
 				if (nativeType == DBF_STRING) {
-					if (synchronious)
+					if (synchronous)
 						iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
 				}
 				else {
-					if (synchronious)
+					if (synchronous)
 						iResult = ca_array_put_callback(DBR_FLOAT, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_FLOAT, stringSize, caID, writeValueArray);
@@ -1383,33 +1403,33 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				break;
 			case 2:
 				if (nativeType == DBF_STRING) {
-					if (synchronious)
+					if (synchronous)
 						iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
 				}
 				else {
-					if (synchronious)
+					if (synchronous)
 						iResult = ca_array_put_callback(DBR_DOUBLE, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_DOUBLE, stringSize, caID, writeValueArray);
 				}
 				break;
 			case 3:
-				if (synchronious)
+				if (synchronous)
 					iResult = ca_array_put_callback(DBR_CHAR, stringSize, caID, writeValueArray, putState, this);
 				else
 					iResult = ca_array_put(DBR_CHAR, stringSize, caID, writeValueArray);
 				break;
 			case 4:
-				if (synchronious)
+				if (synchronous)
 					iResult = ca_array_put_callback(DBR_SHORT, stringSize, caID, writeValueArray, putState, this);
 				else
 					iResult = ca_array_put(DBR_SHORT, stringSize, caID, writeValueArray);
 				break;
 			case 5:
 			case 6:
-				if (synchronious)
+				if (synchronous)
 					iResult = ca_array_put_callback(DBR_LONG, stringSize, caID, writeValueArray, putState, this);
 				else
 					iResult = ca_array_put(DBR_LONG, stringSize, caID, writeValueArray);
@@ -1667,6 +1687,7 @@ public:
 	globals() {
 		caLabLoad();
 		getLock = epicsMutexCreate();
+		putLock = epicsMutexCreate();
 	}
 
 	~globals() {
@@ -1683,6 +1704,7 @@ public:
 			CaLabDbgPrintf("Error: Could not terminate all running tasks of CA Lab.");
 		for (auto& iter : myItems)
 			delete iter.second;
+		epicsMutexDestroy(putLock);
 		epicsMutexDestroy(getLock);
 		ca_context_destroy();
 		caLabUnload();
@@ -1691,7 +1713,17 @@ public:
 	// Insert into global list of pv names
 	calabItem* insert(std::string name, calabItem* item) {
 		mapLock.lock();		// exclusive lock
-		myItems.insert({ name, item });
+		auto search = myItems.find(name);
+		if (search != myItems.end()) {
+#ifdef _DEBUG
+			CaLabDbgPrintf("%s is already in the map myItems", name.c_str());
+#endif
+			delete item;
+			item = search->second;
+		}
+		else {
+			myItems.insert({ name, item });
+		}
 		mapLock.unlock();
 		return item;
 	}
@@ -1716,7 +1748,7 @@ public:
 		else {
 			mapLock.unlock_shared();
 			currentItem = new calabItem(name, FieldNameArray);
-			insert(sName, currentItem);
+			currentItem = insert(sName, currentItem);
 		}
 
 		if (currentItem && FieldNameArray && *FieldNameArray) {
@@ -1765,7 +1797,7 @@ public:
 					fieldItem = new calabItem(fullFieldName, 0x0);
 					fieldItem->parent = currentItem;
 					fieldItem->iFieldID = i;
-					insert(sFieldName, fieldItem);
+					fieldItem = insert(sFieldName, fieldItem);
 				}
 				else {
 					mapLock.unlock_shared();
@@ -1993,6 +2025,8 @@ void putState(evargs args) {
 	calabItem* item = (calabItem*)ca_puser(args.chid);
 	if (item)
 		item->putReadBack = true;
+	else
+		CaLabDbgPrintf("putState got corrupt evargs");
 
 }
 
@@ -2008,49 +2042,31 @@ void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 	time_t timeout;
 	uInt32 counter;
 	bool isFirstRun = true;
-	bool isRequested = false;
-	char* pIndicator = 0x0;
-	int pos = 0;
 	while ((timeout = time(nullptr)) < stop) {
 		counter = 1;
 		maxNumberOfValues = 0;
 		if (all) {
 			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-				isRequested = false;
 				currentItem = (calabItem*)(**PvIndexArray)->elt[i];
 				if (!valid(currentItem)) {
 					DbgTime(); CaLabDbgPrintf("Error in wait4value all: Index array is corrupted.");
 					continue;
-				}
-				globals.mapLock.lock_shared();
-				if (myItems.find(currentItem->szName) != myItems.end()) {
-					isRequested = true;
-				}
-				if (currentItem->parent) {
-					pIndicator = strchr(currentItem->szName, '.');
-					pos = (int)(strlen(currentItem->szName) - (pIndicator - currentItem->szName));
-					if (myItems.find(std::string((const char*)(*currentItem->name)->str, (*currentItem->name)->cnt - pos)) != myItems.end()) {
-						isRequested = true;
-					}
-				}
-				globals.mapLock.unlock_shared();
+				}				
 				if (isFirstRun) {
-					if (isRequested) {
-						currentItem->isPassive = false;
+					currentItem->isPassive = false;
+				}
+				if (currentItem->hasValue) {
+					if (!currentItem->parent) {
+						counter++;
+						int32 err = currentItem->lock();
+						if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
+						if (currentItem->numberOfValues > maxNumberOfValues)
+							maxNumberOfValues = currentItem->numberOfValues;
+						currentItem->unlock();
 					}
 				}
 				else {
-					if (currentItem->hasValue) {
-						if (!currentItem->parent) {
-							if (isRequested)
-								counter++;
-							int32 err = currentItem->lock();
-							if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
-							if (isRequested && currentItem->numberOfValues > maxNumberOfValues)
-								maxNumberOfValues = currentItem->numberOfValues;
-							currentItem->unlock();
-						}
-					}
+					break;
 				}
 			}
 		}
@@ -2064,19 +2080,14 @@ void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 				if (isFirstRun) {
 					currentItem->isPassive = false;
 				}
-				else {
-					if (currentItem->hasValue) {
-						if (!currentItem->parent) {
-							counter++;
-							int32 err = currentItem->lock();
-							if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
-							if (currentItem->numberOfValues > maxNumberOfValues)
-								maxNumberOfValues = currentItem->numberOfValues;
-							currentItem->unlock();
-						}
-					}
-					else {
-						//break;
+				if (currentItem->hasValue) {
+					if (!currentItem->parent) {
+						counter++;
+						int32 err = currentItem->lock();
+						if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
+						if (currentItem->numberOfValues > maxNumberOfValues)
+							maxNumberOfValues = currentItem->numberOfValues;
+						currentItem->unlock();
 					}
 				}
 			}
@@ -2134,8 +2145,11 @@ void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 //    CommunicationStatus:    status of Channel Access communication; 0 = no problem; 1 = any problem occurred
 //    FirstCall:              indicator for first call
 //    NoMDEL:                 indicator for ignoring monitor dead band (TRUE: use caget instead of camonitor)
-extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* FieldNameArray, sLongArrayHdl* PvIndexArray, double Timeout, sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, LVBoolean* CommunicationStatus, LVBoolean* FirstCall, LVBoolean* NoMDEL = 0, LVBoolean* IsInitialized = 0) {
+extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* FieldNameArray, sLongArrayHdl* PvIndexArray, double Timeout, sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, LVBoolean* CommunicationStatus, LVBoolean* FirstCall, LVBoolean* NoMDEL = 0, LVBoolean* IsInitialized = 0, int filter = 0) {
 	epicsMutexLock(getLock);
+	if (filter <= 0) {
+		filter = 0xffff;
+	}
 	if (!*FirstCall && *ResultArray) {
 		//CaLabDbgPrintf("*ResultArray=%p", *ResultArray);
 		if (!(**ResultArray)->result[0].ValueNumberArray) {
@@ -2165,7 +2179,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 			*FirstCall = true;
 			*IsInitialized = false;
 		}
-		if (allItemsConnected1 && !allItemsConnected2) {
+		if (allItemsConnected1.load() && !allItemsConnected2.load()) {
 			*FirstCall = true;
 			*IsInitialized = false;
 			allItemsConnected2 = true;
@@ -2334,31 +2348,38 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 			int32 err = currentItem->lock();
 			if (err) CaLabDbgPrintf("lock failed on timout in getvalue 2");
 			currentResult = &(**ResultArray)->result[i];
-			if (currentItem->StatusString) {
+			if (filter & out_filter::pviStatusAsString && currentItem->StatusString) {
 				if (!currentResult->StatusString || (*currentResult->StatusString)->cnt != (*currentItem->StatusString)->cnt) {
 					NumericArrayResize(uB, 1, (UHandle*)&currentResult->StatusString, (*currentItem->StatusString)->cnt);
 					(*currentResult->StatusString)->cnt = (*currentItem->StatusString)->cnt;
 				}
 				memcpy((*currentResult->StatusString)->str, (*currentItem->StatusString)->str, (*currentItem->StatusString)->cnt);
+		
+			}
+			if (filter & out_filter::pviStatusAsNumber) {
 				currentResult->StatusNumber = currentItem->StatusNumber;
 			}
-			if (currentItem->SeverityString) {
+			if (filter & out_filter::pviSeverityAsString && currentItem->SeverityString) {
 				if (!currentResult->SeverityString || (*currentResult->SeverityString)->cnt != (*currentItem->SeverityString)->cnt) {
 					NumericArrayResize(uB, 1, (UHandle*)&currentResult->SeverityString, (*currentItem->SeverityString)->cnt);
 					(*currentResult->SeverityString)->cnt = (*currentItem->SeverityString)->cnt;
 				}
 				memcpy((*currentResult->SeverityString)->str, (*currentItem->SeverityString)->str, (*currentItem->SeverityString)->cnt);
+			}
+			if (filter & out_filter::pviSeverityAsNumber) {
 				currentResult->SeverityNumber = currentItem->SeverityNumber;
 			}
-			if (currentItem->TimeStampString) {
+			if (filter & out_filter::pviTimestampAsString && currentItem->TimeStampString) {
 				if (!currentResult->TimeStampString || (*currentResult->TimeStampString)->cnt != (*currentItem->TimeStampString)->cnt) {
 					NumericArrayResize(uB, 1, (UHandle*)&currentResult->TimeStampString, (*currentItem->TimeStampString)->cnt);
 					(*currentResult->TimeStampString)->cnt = (*currentItem->TimeStampString)->cnt;
 				}
 				memcpy((*currentResult->TimeStampString)->str, (*currentItem->TimeStampString)->str, (*currentItem->TimeStampString)->cnt);
+			}
+			if (filter & out_filter::pviTimestampAsNumber) {
 				currentResult->TimeStampNumber = currentItem->TimeStampNumber;
 			}
-			if (currentItem->ErrorIO.source) {
+			if (filter & out_filter::pviError && currentItem->ErrorIO.source) {
 				if (!currentResult->ErrorIO.source || (*currentResult->ErrorIO.source)->cnt != (*currentItem->ErrorIO.source)->cnt) {
 					NumericArrayResize(uB, 1, (UHandle*)&currentResult->ErrorIO.source, (*currentItem->ErrorIO.source)->cnt);
 					(*currentResult->ErrorIO.source)->cnt = (*currentItem->ErrorIO.source)->cnt;
@@ -2373,48 +2394,62 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 				currentItem->unlock();
 				continue;
 			}
-			if (!currentResult->StringValueArray || (*currentResult->StringValueArray)->dimSize != currentItem->numberOfValues) {
-				if (currentResult->StringValueArray) {
-					DeleteStringArray(currentResult->StringValueArray);
+			if (filter & out_filter::pviValuesAsString || filter & out_filter::pviValuesAsNumber) {
+				if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || (*currentResult->StringValueArray)->dimSize != currentItem->numberOfValues)) {
+					if (currentResult->StringValueArray) {
+						DeleteStringArray(currentResult->StringValueArray);
+					}
+					currentResult->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + currentItem->numberOfValues * sizeof(LStrHandle[1]));
+					(*currentResult->StringValueArray)->dimSize = currentItem->numberOfValues;					
 				}
-				currentResult->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + currentItem->numberOfValues * sizeof(LStrHandle[1]));
-				(*currentResult->StringValueArray)->dimSize = currentItem->numberOfValues;
-				err += NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, currentItem->numberOfValues);
-				(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
+				if (filter & out_filter::pviValuesAsNumber && (!currentResult->ValueNumberArray || (*currentResult->ValueNumberArray)->dimSize != currentItem->numberOfValues)) {
+					err += NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, currentItem->numberOfValues);
+					(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
+				}
+				for (uInt32 j = 0; maxNumberOfValues > 0 && j < currentItem->numberOfValues; j++) {
+					if (filter & out_filter::pviValuesAsString && !currentItem->stringValueArray) {
+						// was connected (user event) and is waiting for reconnect
+						epicsMutexUnlock(getLock);
+						return;
+					} else if (filter & out_filter::pviValuesAsNumber && !currentItem->doubleValueArray) {
+						// was connected (user event) and is waiting for reconnect
+						epicsMutexUnlock(getLock);
+						return;
+					}
+					if (filter & out_filter::pviValuesAsNumber && !(*currentItem->stringValueArray)->elt[j]) {
+						if (maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
+							doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
+						continue;
+					}
+					if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || !(*currentResult->StringValueArray)->elt[j] || (*(*currentItem->stringValueArray)->elt[j])->cnt != (*(*currentResult->StringValueArray)->elt[j])->cnt)) {
+						err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], (*(*currentItem->stringValueArray)->elt[j])->cnt);
+						(*(*currentResult->StringValueArray)->elt[j])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
+					}
+					if (filter & out_filter::pviValuesAsString) {
+						memcpy((*(*currentResult->StringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
+					}
+					if (filter & out_filter::pviValuesAsNumber) {
+						(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
+					}
+					if (filter & out_filter::firstValueAsNumber && j == 0) {
+						err += DSCopyHandle(&(**FirstStringValue)->elt[i], (*currentResult->StringValueArray)->elt[j]);
+						(**FirstDoubleValue)->elt[i] = (*currentItem->doubleValueArray)->elt[j];
+					}
+					if (filter & out_filter::valueArrayAsNumber) {
+						if (doubleValueArrayIndex < (**DoubleValueArray)->dimSizes[0] * (**DoubleValueArray)->dimSizes[1]) {
+							(**DoubleValueArray)->elt[doubleValueArrayIndex++] = (*currentItem->doubleValueArray)->elt[j];
+						}
+						else {
+							// array with mixed data types must be padded
+							doubleValueArrayIndex++;
+						}
+					}
+				}
+				currentResult->valueArraySize = currentItem->numberOfValues;
 			}
-			for (uInt32 j = 0; maxNumberOfValues > 0 && j < (*currentResult->StringValueArray)->dimSize; j++) {
-				if (!currentItem->stringValueArray) {
-					// was connected (user event) and is waiting for reconnect
-					epicsMutexUnlock(getLock);
-					return;
-				}
-				if (!(*currentItem->stringValueArray)->elt[j]) {
-					if (maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
-						doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
-					continue;
-				}
-				if (!currentResult->StringValueArray || !(*currentResult->StringValueArray)->elt[j] || (*(*currentItem->stringValueArray)->elt[j])->cnt != (*(*currentResult->StringValueArray)->elt[j])->cnt) {
-					err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], (*(*currentItem->stringValueArray)->elt[j])->cnt);
-					(*(*currentResult->StringValueArray)->elt[j])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
-				}
-				memcpy((*(*currentResult->StringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
-				(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
-				if (j == 0) {
-					err += DSCopyHandle(&(**FirstStringValue)->elt[i], (*currentResult->StringValueArray)->elt[j]);
-					(**FirstDoubleValue)->elt[i] = (*currentItem->doubleValueArray)->elt[j];
-				}
-				if (doubleValueArrayIndex < (**DoubleValueArray)->dimSizes[0] * (**DoubleValueArray)->dimSizes[1]) {
-					(**DoubleValueArray)->elt[doubleValueArrayIndex++] = (*currentItem->doubleValueArray)->elt[j];
-				}
-				else {
-					// array with mixed data types must be padded
-					doubleValueArrayIndex++;
-				}
-			}
-			currentResult->valueArraySize = currentItem->numberOfValues;
-			if (maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
+			if (filter & out_filter::valueArrayAsNumber && maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
 				doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
-			if (!currentResult->FieldNameArray && FieldNameArray && *FieldNameArray) {
+			if (filter & out_filter::pviFieldNames && !currentResult->FieldNameArray && FieldNameArray && *FieldNameArray) {
 				if (currentResult->FieldNameArray)
 					err += DeleteStringArray(currentResult->FieldNameArray);
 				currentResult->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (**FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
@@ -2425,7 +2460,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 					memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, (*(**FieldNameArray)->elt[l])->str, (*(**FieldNameArray)->elt[l])->cnt);
 				}
 			}
-			if (currentItem->fieldModified || (!currentResult->FieldValueArray && currentItem->FieldValueArray)) {
+			if (filter & out_filter::pviFieldValues && (currentItem->fieldModified || (!currentResult->FieldValueArray && currentItem->FieldValueArray))) {
 				currentItem->fieldModified = false;
 				if (currentResult->FieldValueArray)
 					err += DeleteStringArray(currentResult->FieldValueArray);
@@ -2547,10 +2582,11 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
 //        5 => Long signed integer              => long      => dbr_long_t
 //        6 => Quad signed integer              => long      => dbr_long_t
 extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvIndexArray, sStringArray2DHdl* StringValueArray2D, sDoubleArray2DHdl* DoubleValueArray2D, sLongArray2DHdl* LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean* Synchronous, sErrorArrayHdl* ErrorArray, LVBoolean* Status, LVBoolean* FirstCall) {
+	// Don't enter if library terminates
+	if (stopped)
+		return;
+	epicsMutexLock(putLock);
 	try {
-		// Don't enter if library terminates
-		if (stopped)
-			return;
 		calabItem* currentItem = 0x0;
 		uInt32 iNumberOfValueSets = 0;
 		uInt32 iValuesPerSet = 0;
@@ -2560,6 +2596,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 		if (!*PvNameArray || !**PvNameArray || ((uInt32)(**PvNameArray)->dimSize) <= 0) {
 			*Status = 1;
 			DbgTime(); CaLabDbgPrintf("Missing or corrupt PV name array in caLabPut.");
+			epicsMutexUnlock(putLock);
 			return;
 		}
 		if ((*PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize))
@@ -2570,6 +2607,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			if (!*StringValueArray2D) {
 				*Status = 1;
 				DbgTime(); CaLabDbgPrintf("Missing values to write.");
+				epicsMutexUnlock(putLock);
 				return;
 			}
 			if (((*(*(*StringValueArray2D))).dimSizes)[0] == 1 && (**PvNameArray)->dimSize > 1) {
@@ -2586,6 +2624,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			if (!*DoubleValueArray2D) {
 				*Status = 1;
 				DbgTime(); CaLabDbgPrintf("Missing values to write.");
+				epicsMutexUnlock(putLock);
 				return;
 			}
 			if (((*(*(*DoubleValueArray2D))).dimSizes)[0] == 1 && (**PvNameArray)->dimSize > 1) {
@@ -2604,6 +2643,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			if (!*LongValueArray2D) {
 				*Status = 1;
 				DbgTime(); CaLabDbgPrintf("Missing values to write.");
+				epicsMutexUnlock(putLock);
 				return;
 			}
 			if (((*(*(*LongValueArray2D))).dimSizes)[0] == 1 && (**PvNameArray)->dimSize > 1) {
@@ -2618,6 +2658,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 		default:
 			*Status = 1;
 			DbgTime(); CaLabDbgPrintf("Unknown data type in value array of caLabPut.");
+			epicsMutexUnlock(putLock);
 			return;
 		}
 		if (iNumberOfValueSets > 0) {
@@ -2634,6 +2675,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 		else {
 			*Status = 1;
 			DbgTime(); CaLabDbgPrintf("Missing values to write.");
+			epicsMutexUnlock(putLock);
 			return;
 		}
 		*Status = 0;
@@ -2653,6 +2695,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			if (!valid(currentItem)) {
 				*Status = 1;
 				DbgTime(); CaLabDbgPrintf("Error in putValue: Index array is corrupted.");
+				epicsMutexUnlock(putLock);
 				return;
 			}
 			switch (DataType) {
@@ -2677,7 +2720,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 		if (*Synchronous) {
 			time_t stop = time(nullptr) + (time_t)Timeout;
 			uInt32 row;
-			double wait = (**PvNameArray)->dimSize * .00005F;
+			double wait = .01;// (**PvNameArray)->dimSize * .00005F;
 			do {
 				epicsThreadSleep(wait);
 				for (row = 0; *PvIndexArray && row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
@@ -2685,6 +2728,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 					if (!valid(currentItem)) {
 						*Status = 1;
 						DbgTime(); CaLabDbgPrintf("Error in putValue->sync: Index array is corrupted.");
+						epicsMutexUnlock(putLock);
 						return;
 					}
 					if (!currentItem->putReadBack) {
@@ -2693,8 +2737,8 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 					}
 				}
 			} while (row < iNumberOfValueSets && row < (**PvNameArray)->dimSize && time(nullptr) < stop);
-			if (time(nullptr) > stop) {
-				DbgTime(); CaLabDbgPrintfD("Write values run into timeout.");
+			if (time(nullptr) >= stop) {
+				DbgTime(); CaLabDbgPrintf("Write values run into timeout.");
 			}
 		}
 		for (uInt32 row = 0; row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
@@ -2705,6 +2749,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 	catch (std::exception& ex) {
 		DbgTime(); CaLabDbgPrintf("%s", ex.what());
 	}
+	epicsMutexUnlock(putLock);
 }
 
 // get context info for EPICS

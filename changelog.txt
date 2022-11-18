@@ -1,5 +1,37 @@
 ﻿Changelog of CA Lab
 
+V1.7.2.0 (Released: November 2022)
+  + Compatible with NI Linux Real-Time x86
+  + CaLabSoftIoc is now native LabVIEW code (calabioc.dll is no longer needed)
+  + CaLabSoftIoc now also works under Linux
+  + CaLabInit and CaLabGet has an optional output filter now
+    (this can save ressources and increase performance)
+    Following values can be combined with OR:
+        PV indicators:
+            firstValueAsString = 1
+	        firstValueAsNumber = 2
+	        valueArrayAsNumber = 4
+	        errorOut = 8
+        PV Info cluster:
+	        pviElements = 16
+	        pviValuesAsString = 32
+	        pviValuesAsNumber = 64
+	        pviStatusAsString = 128
+	        pviStatusAsNumber = 256
+	        pviSeverityAsString = 512
+	        pviSeverityAsNumber = 1024
+	        pviTimestampAsString = 2048
+	        pviTimestampAsNumber = 4096
+	        pviFieldNames = 8192
+	        pviFieldValues = 16384
+	        pviError = 32768
+  # Fixed multiple instances of PVs in "myItems" map
+  # Fixed crash of negative enums
+  # Added mutex for writing PVs
+  # EPICS base 7.0.7
+  # Some clean up in VIs
+
+----------------------------------------------------------------------
 V1.7.1.1 (Released: August 2022)
   # restoring some insignificant VI input defaults
     from previous versions v1.7.0.1 to v1.7.0.6

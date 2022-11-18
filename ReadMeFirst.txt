@@ -76,9 +76,9 @@ This file contains the needed path for "CaLabGet.vi", "CaLabPut.vi", ...
 
 If you have problems to create a working executable with the Application Builder
 change target folder from user.lib to another target (sometimes only root works).
-Following libraries and services are needed by CA Lab: caLab.dll, caLabIoc.dll, ca.dll, Com.dll,
-caRepeater.exe, msvcp100.dll (windows\system32), msvcr100.dll (windows\system32),
-vcruntime140.dll (windows\system32), msvcp140.dll (windows\system32).
+Following libraries and services are needed by CA Lab: caLab.dll, ca.dll, Com.dll,
+caRepeater.exe and https://aka.ms/vs/17/release/vc_redist.x86.exe (32bit)
+OR https://aka.ms/vs/17/release/vc_redist.x64.exe (64bit).
 Environment variable PATH needs to be set to this files.
 If you have problems with dependencies you should install CA Lab at target computer.
 

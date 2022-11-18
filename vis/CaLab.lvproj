@@ -20,13 +20,13 @@ including basic examples</Property>
 		<Property Name="server.viscripting.showScriptingOperationsInContextHelp" Type="Bool">false</Property>
 		<Property Name="server.viscripting.showScriptingOperationsInEditor" Type="Bool">false</Property>
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
-		<Item Name="DemoIOC" Type="Folder">
+		<Item Name="demo" Type="Folder">
 			<Item Name="db" Type="Folder">
-				<Item Name="TestPV_ai100000.db" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/db/TestPV_ai100000.db"/>
-				<Item Name="demo.db" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/db/demo.db"/>
+				<Item Name="demo.db" Type="Document" URL="/&lt;userlib&gt;/calab/demo/db/demo.db"/>
+				<Item Name="TestPV_ai100000.db" Type="Document" URL="/&lt;userlib&gt;/calab/demo/db/TestPV_ai100000.db"/>
 			</Item>
-			<Item Name="DemoIOC.cmd" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/DemoIOC.cmd"/>
-			<Item Name="TestPV_ai100000.cmd" Type="Document" URL="/&lt;userlib&gt;/caLab/demo/TestPV_ai100000.cmd"/>
+			<Item Name="DemoIOC.cmd" Type="Document" URL="/&lt;userlib&gt;/calab/demo/DemoIOC.cmd"/>
+			<Item Name="TestPV_ai100000.cmd" Type="Document" URL="/&lt;userlib&gt;/calab/demo/TestPV_ai100000.cmd"/>
 		</Item>
 		<Item Name="Examples" Type="Folder">
 			<Item Name="Event Demo.vi" Type="VI" URL="Examples/Event Demo.vi"/>
@@ -37,9 +37,6 @@ including basic examples</Property>
 			<Item Name="Write Demo - Looping.vi" Type="VI" URL="Examples/Write Demo - Looping.vi"/>
 			<Item Name="Write Demo - Timed.vi" Type="VI" URL="Examples/Write Demo - Timed.vi"/>
 			<Item Name="Write Demo.vi" Type="VI" URL="Examples/Write Demo.vi"/>
-			<Item Name="Write Random TestPV_ai.vi" Type="VI" URL="Examples/Write Random TestPV_ai.vi"/>
-			<Item Name="caLab.db" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/caLab.db"/>
-			<Item Name="pvList.txt" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/pvList.txt"/>
 		</Item>
 		<Item Name="CaLab.lvlib" Type="Library" URL="CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
@@ -82,11 +79,8 @@ including basic examples</Property>
 				<Item Name="General Error Handler CORE.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/General Error Handler CORE.vi"/>
 				<Item Name="Merge Errors.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Merge Errors.vi"/>
 			</Item>
-			<Item Name="calab.dll" Type="Document" URL="calab.dll">
-				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
-			</Item>
-			<Item Name="calabioc.dll" Type="Document" URL="calabioc.dll">
-				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
+			<Item Name="user.lib" Type="Folder">
+				<Item Name="calab.dll" Type="Document" URL="/&lt;userlib&gt;/calab/Lib/calab.dll"/>
 			</Item>
 		</Item>
 		<Item Name="Build Specifications" Type="Build"/>
