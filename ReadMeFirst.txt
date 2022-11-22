@@ -1,5 +1,5 @@
 ######################################################################
-### CA Lab ReadMe for Windows® OS
+### CA Lab ReadMe for WindowsÂ® OS
 ######################################################################
 
 ----------------------------------------------------------------------
@@ -12,13 +12,13 @@ Please read chapter 3.1 if there are any warnings for environment variables.
 
 Please check whether the specific user has full access to folder and files
 of CA Lab before first run. You find the CA Lab folder in user.lib of
-your LabVIEW™ installation.
+your LabVIEWâ„¢ installation.
 
 At first run of any caLab-VI some warnings will appear because there is a 
 new context. Please save changes therewith warnings won't appear again.
 A better way is described in chapter 2 (mass compiling VIs).
 
-Errors will occur if CA Lab has not been installed to standard path of LabVIEW™.
+Errors will occur if CA Lab has not been installed to standard path of LabVIEWâ„¢.
 The reason is the wrong path for installed libraries.
 Read chapter 3.2 to solve the problem with needed libraries for several VIs.
 
@@ -84,9 +84,6 @@ If you have problems with dependencies you should install CA Lab at target compu
 
 --- 3.4 Problems after installing new CA Lab version
 
-If you upgrade existing VIs with CA Lab please exchange:
-    caLabGetxx.vi -> caLabGet.vi
-    caLabPutxx.vi -> caLabPut.vi
-and click right on greyed out CA Lab VIs and use "Relink to SubVI"
-to update type of Polymorphic VI.
-Watch out! LabVIEW™ may result in a misalignment of connectors!!
+If you upgrade existing VIs with CA Lab please check for greyed out CA Lab VIs.
+Click right on greyed out CA Lab VIs and use "Relink to SubVI".
+Watch out! LabVIEWâ„¢ may result in a misalignment of connectors!!
