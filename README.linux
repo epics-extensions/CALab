@@ -31,7 +31,8 @@ sudo mkdir /usr/local/calab
     # Use your userid/groupid in the next command:
 sudo chown owner:group /usr/local/calab
 cd /usr/local/calab/
-git clone https://github.com/epics-extensions/CALab
+    # Note the trailing dot on the next line
+git clone https://github.com/epics-extensions/CALab .
     # First check the correct path to your current LabVIEW application (LVDIR points to cintools)
 nano Makefile
 make
