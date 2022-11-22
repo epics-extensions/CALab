@@ -54,23 +54,14 @@ set enviroment variables EPICS_CA_ADDR_LIST and EPICS_CA_AUTO_ADDR_LIST
 optional set enviroment variables CALAB_NODBG and CALAB_POLLING
 start Soft IOC shell: /usr/local/epics/bin/linux-x86_64/softIoc -d /usr/local/calab/vis/demo/db/demo.db
 start labVIEW
-open '/usr/local/calab/vis/Private/CaLabGet_Main.vi'
-   set VI properties (Strg+I) "Category Protection" to "Unlocked"
-   edit 'Library name or path' of 'Call Library Function Nodes' (double click on it) => change entry to '/usr/local/calab/libcalab.so'
-   optinal set VI properties (Strg+I) "Category Protection" to "Locked"
-repeat these steps with
-'/usr/local/calab/vis/Private/CaLabGet_Main_Initialized.vi'
-'/usr/local/calab/vis/Private/CaLabPut_Main.vi'
-'/usr/local/calab/vis/Private/CaLabPut_Main_Initialized.vi'
-'/usr/local/calab/vis/Private/CaLabEvent_PV.vi'
-'/usr/local/calab/vis/Private/CaLabEvent_PV-1D.vi'
-'/usr/local/calab/vis/Private/CaLabDisconnect_PV.vi'
-'/usr/local/calab/vis/Private/CaLabDisconnect-1D_PV.vi'
-'/usr/local/calab/vis/Private/CaLabInit_PV.vi'
-'/usr/local/calab/vis/Private/CaLabInit_PV-1D.vi'
-'/usr/local/calab/vis/CaLabEventUregister.vi'
+   go to menu
+   set 'Directory to compile' to '/usr/local/calab/vis'
+   press button 'Mass Compile'
+   the result view shows some trubles but no error => all is fine => press the button 'Done'
 all demo VIs (except SoftIoc*.vi) should be able to run
 they are located at '/usr/local/calab/vis/Examples/'
+if you want to run the 'SoftIoc Demo.vi', 'screen' must be installed first
+   sudo apt update && sudo apt install screen -y
 
 ## Start Demo Soft IOC
 #######################
