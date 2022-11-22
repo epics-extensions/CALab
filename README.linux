@@ -54,7 +54,7 @@ set enviroment variables EPICS_CA_ADDR_LIST and EPICS_CA_AUTO_ADDR_LIST
 optional set enviroment variables CALAB_NODBG and CALAB_POLLING
 start Soft IOC shell: /usr/local/epics/bin/linux-x86_64/softIoc -d /usr/local/calab/vis/demo/db/demo.db
 start labVIEW
-   go to menu
+   go to menu Tools->Advanced->Mass Compile
    set 'Directory to compile' to '/usr/local/calab/vis'
    press button 'Mass Compile'
    the result view shows some trubles but no error => all is fine => press the button 'Done'
