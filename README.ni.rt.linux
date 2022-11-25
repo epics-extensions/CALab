@@ -1,0 +1,66 @@
+# install compiler and editor
+opkg update
+opkg install gcc
+opkg install g++
+ln -s /usr/bin/x86_64-nilrt-linux-g++ /usr/bin/g++
+opkg install nano
+
+# install perl
+wget http://www.cpan.org/src/5.0/perl-5.20.1.tar.gz
+tar -xzf perl-5.20.1.tar.gz
+cd perl-5.20.1
+./Configure -des -Dprefix=$HOME/localperl
+make
+make test
+make install
+
+# install epics base
+opkg update
+opkg install git
+mkdir /usr/local/epics
+cd /usr/local/epics
+    # Note the trailing dot on the next line
+git clone --recursive https://github.com/epics-base/epics-base.git .
+export PATH=$HOME/localperl/bin:$PATH
+make INSTALL_LOCATION=/usr/local/epics
+cd /etc/ld.so.conf.d
+nano epics.conf => /usr/local/epics/lib/linux-x86_64/
+# ldconfig
+# restart computer
+
+# install CINTOOLS via Windows PC
+1. Download "lv2021SP1_f2Patch_pro-linux-mac.iso" from ni.com
+2. Install 7zip from https://www.7-zip.org/
+3. Execute the following in the command line
+          mkdir lv2021-linux
+          mkdir lv2021-linux\cintools
+          mkdir my_tmp
+          cd my_tmp
+          "C:\Program Files\7-Zip\7z.exe" x "G:\iso\lv2021SP1_f2Patch_pro-linux-mac.iso"
+          "C:\Program Files\7-Zip\7z.exe" x LabVIEW\Linux\lv2021SP1pro-linux.iso -y
+          "C:\Program Files\7-Zip\7z.exe" x rpm\ni-labview-2021-core-21.1.2.49154-0+f2.x86_64.rpm
+          "C:\Program Files\7-Zip\7z.exe" x ni-labview-2021-core-21.1.2.49154-0+f2.x86_64.cpio
+          copy usr\local\natinst\LabVIEW-2021-64\cintools ..\lv2021-linux\cintools\
+          cd ..
+          rd /s /q my_tmp
+          dir lv2021-linux\cintools
+4. Copy directory cintools with all files to RT Linux except liblv.so.21 and liblv.so
+   (you can use ssh or the tool NI Max)
+   target: /usr/local/natinst/labview/cintools/
+5. Create symbolic links in cintools: ln -s liblv.so.21.0.1 liblv.so.21 and ln -s liblv.so.21 liblv.so
+6. Set *.so to be executable
+
+# install CA Lab
+mkdir /usr/local/calab
+cd /usr/local/calab
+    # Note the trailing dot on the next line
+git clone https://github.com/epics-extensions/CALab .
+# edit Makefile (check the LVDIR and the EPICSDIR)
+make
+cd /etc/ld.so.conf.d
+nano calab.conf => /usr/local/natinst/labview/cintools/
+                     => /usr/local/calab/
+ldconfig
+cd /etc/profile.d/
+nano calab.sh => export PATH=/usr/local/epics/bin/linux-x86_64/:$PATH
+restart computer
