@@ -1,5 +1,8 @@
 ﻿Changelog of CA Lab
+V1.7.2.1 (Released: ???)
+  # Fixed misleading warning "Missing values to write"
 
+----------------------------------------------------------------------
 V1.7.2.0 (Released: November 2022)
   + Compatible with NI Linux Real-Time x86
   + CaLabSoftIoc is now native LabVIEW code (calabioc.dll is no longer needed)
