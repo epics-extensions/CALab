@@ -13,3 +13,6 @@
 calab.o
 libcalab.so
 *.aps
+*.obj
+*.lib
+*.exp
