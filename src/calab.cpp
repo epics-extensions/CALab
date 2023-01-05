@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.2.1
+// Version     : 1.7.2.2
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -39,6 +39,7 @@
 #include <cadef.h>
 #include <envDefs.h>
 #include <epicsStdio.h>
+#include "epicsVersion.h"
 #include <windows.h>
 #include <libloaderapi.h>
 #define EXPORT __declspec(dllexport)
@@ -53,7 +54,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.7.2.1"
+#define CALAB_VERSION       "1.7.2.2"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
@@ -1685,7 +1686,11 @@ public:
 	mutable std::shared_mutex mapLock;	// map mutex
 
 	globals() {
-		caLabLoad();
+		// caLabLoad(); // since EPICS 7.0.7 we have to create THE EPICS context in a separate thread
+		epicsThreadCreate("createCaContext",
+			epicsThreadPriorityBaseMax,
+			epicsThreadGetStackSize(epicsThreadStackBig),
+			(EPICSTHREADFUNC)caLabLoad, 0x0);
 		getLock = epicsMutexCreate();
 		putLock = epicsMutexCreate();
 	}
@@ -2776,7 +2781,7 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 			lStringArraySets++;
 			ppParam++;
 		}
-		lStringArraySets += 3; // version of library + CALAB_POLLING + CALAB_NODBG
+		lStringArraySets += 5; // version of library + CALAB_POLLING + CALAB_NODBG + EPICS_VERSION_STRING + ca_version
 		pszNames = (char**)malloc(lStringArraySets * sizeof(char*));
 		for (uInt32 i = 0; i < lStringArraySets; i++) {
 			pszNames[i] = (char*)malloc(255 * sizeof(char));
@@ -2789,7 +2794,7 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 		}
 		ppParam = env_param_list;
 		count = 0;
-		memcpy(pszNames[count], "CA Lab version", strlen("CA Lab version"));
+		memcpy(pszNames[count], "CA LAB VERSION", strlen("CA LAB VERSION"));
 #if  IsOpSystem64Bit
 #ifdef _DEBUG
 		epicsSnprintf(pszValues[count], 255, "%s DEBUG 64-bit", CALAB_VERSION);
@@ -2803,6 +2808,12 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 		epicsSnprintf(pszValues[count], 255, "%s", CALAB_VERSION);
 #endif
 #endif
+		count++;
+		memcpy(pszNames[count], "COMPILED FOR EPICS BASE", strlen("COMPILED FOR EPICS BASE"));
+		memcpy(pszValues[count], EPICS_VERSION_STRING, strlen(EPICS_VERSION_STRING));
+		count++;
+		memcpy(pszNames[count], "CA PROTOCOL VERSION", strlen("CA PROTOCOL VERSION"));
+		memcpy(pszValues[count], ca_version(), strlen(ca_version()));
 		count++;
 		while (*ppParam != NULL) {
 			pVal = envGetConfigParamPtr(*ppParam);
