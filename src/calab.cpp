@@ -487,6 +487,7 @@ ca_name_t ca_name = 0x0;
 ca_pend_io_t ca_pend_io = 0x0;
 ca_puser_t ca_puser = 0x0;
 ca_state_t ca_state = 0x0;
+ca_version_t ca_version = 0x0;
 dbr_value_offset_t dbr_value_offset = 0x0;
 envGetConfigParamPtr_t envGetConfigParamPtr = 0x0;
 env_param_list_t env_param_list = 0x0;
