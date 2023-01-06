@@ -16,4 +16,4 @@ libcalab.so
 *.obj
 *.lib
 *.exp
-/copy2Nubes.bat
+/*.bat
