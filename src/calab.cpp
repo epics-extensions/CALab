@@ -32,6 +32,7 @@
 #include <vector>
 #include <unordered_map>
 #include <shared_mutex>
+#include <epicsVersion.h>
 
 #if defined _WIN32 || defined _WIN64
 #include <alarm.h>
@@ -39,7 +40,6 @@
 #include <cadef.h>
 #include <envDefs.h>
 #include <epicsStdio.h>
-#include "epicsVersion.h"
 #include <windows.h>
 #include <libloaderapi.h>
 #define EXPORT __declspec(dllexport)
@@ -464,6 +464,7 @@ typedef void(*ca_detach_context_t) ();
 typedef void(*epicsMutexDestroy_t)(epicsMutexId id);
 typedef void(*epicsMutexUnlock_t)(epicsMutexId id);
 typedef void(*epicsThreadSleep_t)(double seconds);
+typedef const char* (*ca_version_t)(void);
 
 ca_add_exception_event_t ca_add_exception_event = 0x0;
 ca_attach_context_t ca_attach_context = 0x0;
@@ -3235,6 +3236,7 @@ void loadFunctions() {
 	ca_pend_io = (ca_pend_io_t)dlsym(caLibHandle, "ca_pend_io");
 	ca_puser = (ca_puser_t)dlsym(caLibHandle, "ca_puser");
 	ca_state = (ca_state_t)dlsym(caLibHandle, "ca_state");
+	ca_version = (ca_version_t)dlsym(caLibHandle, "ca_version");
 	dbr_value_offset = (dbr_value_offset_t)dlsym(caLibHandle, "dbr_value_offset");
 	envGetConfigParamPtr = (envGetConfigParamPtr_t)dlsym(comLibHandle, "envGetConfigParamPtr");
 	env_param_list = (env_param_list_t)dlsym(comLibHandle, "env_param_list");
