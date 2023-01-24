@@ -2564,7 +2564,6 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
 	globals.mapLock.unlock_shared();
 }
 
-
 // Write EPICS PV
 //    PvNameArray:        array of PV names
 //    PvIndexArray:       handle of a array of indexes
@@ -2669,14 +2668,16 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			return;
 		}
 		if (iNumberOfValueSets > 0) {
-			if (*FirstCall || !*ErrorArray) {
-				*ErrorArray = (sErrorArrayHdl)DSNewHClr(sizeof(size_t) + iNumberOfValueSets * sizeof(sError[1]));
-				(**ErrorArray)->dimSize = iNumberOfValueSets;
-			}
-			if (iNumberOfValueSets != (**ErrorArray)->dimSize) {
-				DSDisposeHandle(*ErrorArray);
-				*ErrorArray = (sErrorArrayHdl)DSNewHClr(sizeof(size_t) + iNumberOfValueSets * sizeof(sError[1]));
-				(**ErrorArray)->dimSize = iNumberOfValueSets;
+			if (!*ErrorArray || iNumberOfValueSets != (**ErrorArray)->dimSize) {
+				if (!*ErrorArray) {
+					*ErrorArray = (sErrorArrayHdl)DSNewHClr(sizeof(size_t) + iNumberOfValueSets * sizeof(sError[1]));
+					(**ErrorArray)->dimSize = iNumberOfValueSets;
+				}
+				else {
+					DSDisposeHandle(*ErrorArray);
+					*ErrorArray = (sErrorArrayHdl)DSNewHClr(sizeof(size_t) + iNumberOfValueSets * sizeof(sError[1]));
+					(**ErrorArray)->dimSize = iNumberOfValueSets;
+				}
 			}
 		}
 		else {
@@ -2688,8 +2689,15 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 		*Status = 0;
 		if (bCaLabPolling) *Synchronous = false;
 		if (*FirstCall) {
-			NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, (**PvNameArray)->dimSize);
-			(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
+			//NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, (**PvNameArray)->dimSize);
+			if (*PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize) {
+				DSDisposeHandle(*PvIndexArray);
+				*PvIndexArray = (sLongArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(uint64_t[1]));
+				(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
+			} else if (!*PvIndexArray) {
+				*PvIndexArray = (sLongArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(uint64_t[1]));
+				(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
+			}
 			for (uInt32 i = 0; i < iNumberOfValueSets && i < (**PvNameArray)->dimSize; i++) {
 				currentItem = globals.add((**PvNameArray)->elt[i], 0x0);
 				(**PvIndexArray)->elt[i] = (uint64_t)currentItem;
