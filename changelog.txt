@@ -1,6 +1,7 @@
 ﻿Changelog of CA Lab
-V1.7.2.2 (Released:  February2023)
+V1.7.2.2 (Released: February 2023)
   # Fixed misleading warning "Missing values to write"
+  # Memory leak on write fixed (mode: "variable PV names" = TRUE) 
   # Support for EPICS base 7.0.7 is back
 
 ----------------------------------------------------------------------
