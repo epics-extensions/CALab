@@ -1,8 +1,8 @@
 # CA Lab - LabVIEW (Realtime) + EPICS
 
-<img src="https://github.com/epics-extensions/CALab/assets/17197773/ddda9486-4d74-4e74-b729-1843c2a9ea0d" 
+<a href="https://github.com/epics-extensions/CALab/releases"><img src="https://github.com/epics-extensions/CALab/assets/17197773/ddda9486-4d74-4e74-b729-1843c2a9ea0d" 
      alt="CA Lab Logo"
-     style="float: left; margin-right: 10px;" />
+     style="float: left; margin-right: 10px;" /></a>
 ## Overview
 
 What is CA Lab?<br/>
@@ -44,5 +44,5 @@ CA Lab library builds an internal PV cache and monitors PVs to improve the read 
 
 CA Lab includes a EPICS Base package (caget, caput, camonitor, softIOC and more).
 
-<a href="https://github.com/epics-extensions/CALab/releases">🔗download Release</a></br>
+<a href="https://github.com/epics-extensions/CALab/releases">🔗download Windows® setups and source code releases</a></br>
 <a href="https://www.helmholtz-berlin.de/zentrum/locations/it/calab">🔗more info and examples</a>
