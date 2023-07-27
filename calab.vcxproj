@@ -90,27 +90,27 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\compiler\msvc;D:\epics\epics-base-R7.0.7\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2021\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\win32-x86-debug;C:\Program Files %28x86%29\National Instruments\LabVIEW 2021\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\compiler\msvc;D:\epics\epics-base-R7.0.7\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2023\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\win32-x86-debug;C:\Program Files %28x86%29\National Instruments\LabVIEW 2023\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\compiler\msvc;D:\epics\epics-base-R7.0.7\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2021\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\win32-x86;C:\Program Files %28x86%29\National Instruments\LabVIEW 2021\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\compiler\msvc;D:\epics\epics-base-R7.0.7\include\os\WIN32;C:\Program Files %28x86%29\National Instruments\LabVIEW 2023\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\win32-x86;C:\Program Files %28x86%29\National Instruments\LabVIEW 2023\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\os\WIN32;D:\epics\epics-base-R7.0.7\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2021\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\windows-x64-debug;C:\Program Files\National Instruments\LabVIEW 2021\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\os\WIN32;D:\epics\epics-base-R7.0.7\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2023\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\windows-x64-debug;C:\Program Files\National Instruments\LabVIEW 2023\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>
     </LinkIncremental>
-    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\os\WIN32;D:\epics\epics-base-R7.0.7\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2021\cintools;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\windows-x64;C:\Program Files\National Instruments\LabVIEW 2021\cintools;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\epics\epics-base-R7.0.7\include;D:\epics\epics-base-R7.0.7\include\os\WIN32;D:\epics\epics-base-R7.0.7\include\compiler\msvc;C:\Program Files\National Instruments\LabVIEW 2023\cintools;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\epics\epics-base-R7.0.7\lib\windows-x64;C:\Program Files\National Instruments\LabVIEW 2023\cintools;$(LibraryPath)</LibraryPath>
     <SourcePath>$(VC_SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -128,7 +128,7 @@
       <AdditionalDependencies>ca.lib;Com.lib;labview.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy "D:\Profile\ggf\source\repos\calab\Debug\*.dll" "C:\Program Files (x86)\National Instruments\LabVIEW 2021\user.lib\calab\lib" /Y</Command>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\Debug\*.dll" "C:\Program Files %28x86%29\National Instruments\LabVIEW 8.6\user.lib\calab\lib" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -151,7 +151,7 @@
       <ImageHasSafeExceptionHandlers />
     </Link>
     <PostBuildEvent>
-      <Command>copy "D:\Profile\ggf\source\repos\calab\Release\*.dll" "C:\Program Files (x86)\National Instruments\LabVIEW 2021\user.lib\calab\lib" /Y</Command>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\Release\*.dll" "C:\Program Files (x86)\National Instruments\LabVIEW 2023\user.lib\calab\lib" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -169,7 +169,7 @@
       <AdditionalDependencies>ca.lib;Com.lib;labview.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy "D:\Profile\ggf\source\repos\calab\x64\Debug\*.dll" "C:\Program Files\National Instruments\LabVIEW 2021\user.lib\calab\lib" /Y</Command>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\x64\Debug\*.dll" "C:\Program Files\National Instruments\LabVIEW 2023\user.lib\calab\lib" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -189,7 +189,7 @@
       <SubSystem>Windows</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>copy "D:\Profile\ggf\source\repos\calab\x64\Release\*.dll" "C:\Program Files\National Instruments\LabVIEW 2021\user.lib\calab\lib" /Y</Command>
+      <Command>copy "D:\Profile\ggf\source\repos\calab\x64\Release\*.dll" "C:\Program Files\National Instruments\LabVIEW 2023\user.lib\calab\lib" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

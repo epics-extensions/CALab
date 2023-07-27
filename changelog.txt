@@ -1,4 +1,14 @@
 ﻿Changelog of CA Lab
+V1.7.3.0 (Released)
+  # Fixed some output filter issues
+  # Improved "SoftIOC Demo.vi"
+  - Support discontinued for LabVIEW versions older than 2019
+  - Support discontinued for the 32-bit version of CA Lab
+
+----------------------------------------------------------------------
+Last version with 32-bit support of CA Lab and 
+backward compatibility up to LabVIEW 8.5
+
 V1.7.2.2 (Released: February 2023)
   # Fixed misleading warning "Missing values to write"
   # Memory leak on write fixed (mode: "variable PV names" = TRUE) 

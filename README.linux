@@ -2,17 +2,15 @@
 ##  How to build and install CA Lab on Linux  ##
 ################################################
 
-## This manual has been updated on 11/Nov/2022
+## This manual has been updated on 27/Jul/2023
 
 ## Testsystem
 # RHEL 8.5 and Ubuntu 22.04 LTS
-# LabVIEW 2020/2021 (64 bit) installed in /usr/local/natinst/
+# LabVIEW 2020/2021/2023 (64 bit) installed in /usr/local/natinst/
 
 ## Install tools and libraries
 ##############################
-sudo apt install g++
-sudo apt install git
-sudo apt install make
+sudo apt install build-essential git
 
 ## Install EPICS Base
 ######################
@@ -39,12 +37,8 @@ make
 
 ## CONFIG SYSTEM
 #################
-cd /etc/ld.so.conf.d
-
-sudo nano epics.conf => /usr/local/epics/lib/linux-x86_64/
-sudo nano calab.conf => /usr/local/natinst/LabVIEW-EDIT_THIS_TO_CURRENT_VERSION/cintools/
-                     => /usr/local/calab/
-
+echo "/usr/local/epics/lib/linux-x86_64/" | sudo tee /etc/ld.so.conf.d/epics.conf
+(echo "/usr/local/natinst/LabVIEW-EDIT_THIS_TO_CURRENT_VERSION/cintools/" ; echo "/usr/local/calab/") | sudo tee /etc/ld.so.conf.d/calab.conf
 sudo ldconfig
 restart computer
 
@@ -58,7 +52,7 @@ start labVIEW
    set 'Directory to compile' to '/usr/local/calab/vis'
    press button 'Mass Compile'
    the result view shows some trubles but no error => all is fine => press the button 'Done'
-all demo VIs (except SoftIoc*.vi) should be able to run
+all demo VIs (except SoftIoc*.vi => see next lines) should be able to run
 they are located at '/usr/local/calab/vis/Examples/'
 if you want to run the 'SoftIoc Demo.vi', 'screen' must be installed first
    sudo apt update && sudo apt install screen -y

@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.2.2
+// Version     : 1.7.3.0
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -34,7 +34,7 @@
 #include <shared_mutex>
 #include <epicsVersion.h>
 
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 #include <alarm.h>
 #include <alarmString.h>
 #include <cadef.h>
@@ -54,9 +54,13 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.7.2.2"
+#define CALAB_VERSION       "1.7.3.0"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
+
+#if UINTPTR_MAX == 0xffffffff
+#error "unsupported ProcessorType (32-bit)"
+#endif
 
 #ifndef __GNUC__
 #pragma warning(push)
@@ -162,7 +166,7 @@ typedef struct {
 typedef sResultArray** sResultArrayHdl;
 #include "lv_epilog.h"
 
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 HMODULE libRef = 0x0;
 DWORD dllStatus = DLL_PROCESS_DETACH;
 BOOLEAN WINAPI DllMain(HINSTANCE hDllHandle, DWORD nReason, LPVOID Reserved) {
@@ -447,7 +451,7 @@ typedef int(*ca_context_create_t) (ca_preemptive_callback_select select);
 typedef int(*ca_create_channel_t) (const char* pChanName, caCh* pConnStateCallback, void* pUserPrivate, capri priority, chid* pChanID);
 typedef int(*ca_create_subscription_t) (chtype type, unsigned long count, chid chanId, long mask, caEventCallBackFunc* pFunc, void* pArg, evid* pEventID);
 typedef int(*ca_pend_io_t) (ca_real timeOut);
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 #define EPICS_PRINTF_STYLE(f,a)
 typedef int(__stdcall* epicsSnprintf_t)(char* str, size_t size, const char* format, ...) EPICS_PRINTF_STYLE(3, 4);
 #else
@@ -596,8 +600,9 @@ public:
 	std::atomic<bool>			locked;									// indicator of locked object
 	std::chrono::high_resolution_clock::time_point timer;				// watch dog timer
 	bool						initConnect;
+	uInt32						filter;
 
-	calabItem(LStrHandle name, sStringArrayHdl fieldNames = 0x0) {
+	calabItem(LStrHandle name, sStringArrayHdl fieldNames = 0x0, uInt32 filter = 0) {
 		initConnect = false;
 		hasValue = false;
 		isConnected = false;
@@ -605,6 +610,7 @@ public:
 		fieldModified = false;
 		validAddress = this;
 		locked = false;
+		this->filter = filter;
 		myLock = epicsMutexCreate();
 		if ((*name)->cnt < MAX_NAME_SIZE - 1) {
 			NumericArrayResize(uB, 1, (UHandle*)&this->name, (*name)->cnt);
@@ -672,7 +678,7 @@ public:
 	}
 
 	~calabItem() {
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 		if (!dllStatus) return; // DLL_PROCESS_DETACH
 #endif
 		MgErr err = noErr;
@@ -733,7 +739,7 @@ public:
 #ifdef _DEBUG
 		int32 loopcount = 0;
 #endif
-		int32 havelock = 1;
+		bool havelock = true;
 		locked = true;
 		std::chrono::duration<double> diff;
 		std::chrono::high_resolution_clock::time_point lockTimer = std::chrono::high_resolution_clock::now();
@@ -744,7 +750,7 @@ public:
 #endif
 			diff = std::chrono::high_resolution_clock::now() - lockTimer;
 			if (diff.count() > 10) {
-				havelock = 0;
+				havelock = false;
 				break;
 			}
 		}
@@ -858,6 +864,8 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 	void itemValueChanged(evargs args) {
 		try {
 			bool bDbrTime = false;
+			bool validDoubleArray = false;
+			bool validStringArray = false;
 			dbr_ctrl_enum* tmpEnum;
 			int32 iSize;
 			MgErr err = noErr;
@@ -866,24 +874,37 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				return;
 			int32 lerr = lock();
 			if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
-			//CaLabDbgPrintfD("itemValueChanged of %s", szName);
-			if ((doubleValueArray && (DSCheckHandle(doubleValueArray) != noErr))
-                || (stringValueArray && (DSCheckHandle(stringValueArray) != noErr))) {
-				unlock();
-				return; // delayed value change during unload library
-			}
+			//CaLabDbgPrintfD("itemValueChanged of %s", szName);			
 			numberOfValues = args.count;
-			if (!doubleValueArray || (long)(*doubleValueArray)->dimSize < args.count) {
+			if (!doubleValueArray) {
 				err += NumericArrayResize(fD, 1, (UHandle*)&doubleValueArray, args.count);
-				(*doubleValueArray)->dimSize = args.count;
-			}
-			if (!stringValueArray || (long)(*stringValueArray)->dimSize < args.count) {
-				if (stringValueArray && (long)(*stringValueArray)->dimSize != args.count) {
-					err += DeleteStringArray(stringValueArray);
+				if (err == noErr) {
+					(*doubleValueArray)->dimSize = args.count;
 				}
+			}
+			if (doubleValueArray && (DSCheckHandle(doubleValueArray) == noErr)) {
+				if (!doubleValueArray || (long)(*doubleValueArray)->dimSize < args.count) {
+					err += NumericArrayResize(fD, 1, (UHandle*)&doubleValueArray, args.count);
+					if (err == noErr) {
+						(*doubleValueArray)->dimSize = args.count;
+					}
+				}
+				validDoubleArray = true;
+			} 
+			if (!stringValueArray) {
 				stringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + args.count * sizeof(LStrHandle[1]));
 				(*stringValueArray)->dimSize = args.count;
 			}
+			if (stringValueArray && (err = (DSCheckHandle(stringValueArray)) == noErr)) {
+				if (!stringValueArray || (long)(*stringValueArray)->dimSize < args.count) {
+					if (stringValueArray && (long)(*stringValueArray)->dimSize != args.count) {
+						err += DeleteStringArray(stringValueArray);
+					}
+					stringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + args.count * sizeof(LStrHandle[1]));
+					(*stringValueArray)->dimSize = args.count;
+				}
+				validStringArray = true;
+			}			
 			switch (args.type) {
 			case DBR_TIME_STRING:
 				for (long lCount = 0; lCount < args.count; lCount++) {
@@ -899,13 +920,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = strtod(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], &tmp);
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = strtod(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], &tmp);
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
+						if(validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
@@ -925,13 +950,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = shortValue;
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = shortValue;
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
@@ -949,13 +978,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = ((dbr_char_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = ((dbr_char_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
@@ -973,13 +1006,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = ((dbr_long_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = ((dbr_long_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
@@ -997,13 +1034,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
@@ -1021,20 +1062,24 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
 				break;
 			case DBR_TIME_ENUM:
 				for (long lCount = 0; lCount < args.count; lCount++) {
-					if ((*doubleValueArray)->elt[lCount] >= 0 && (*doubleValueArray)->elt[lCount] < sEnum.no_str)
+					if (validDoubleArray && (*doubleValueArray)->elt[lCount] >= 0 && (*doubleValueArray)->elt[lCount] < sEnum.no_str)
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]]);
 					else
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
@@ -1048,13 +1093,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 						parent->fieldModified = true;
 					}
 					else {
-						(*doubleValueArray)->elt[lCount] = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 				}
 				bDbrTime = 1;
@@ -1067,7 +1116,10 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 					epicsSnprintf(sEnum.strs[i], MAX_ENUM_STRING_SIZE, "%s", tmpEnum->strs[i]);
 				}
 				for (long lCount = 0; lCount < args.count; lCount++) {
-					epicsInt16 enumValue = (epicsInt16)(*doubleValueArray)->elt[lCount];
+					epicsInt16 enumValue = -1;
+					if (validDoubleArray) {
+						enumValue = (epicsInt16)(*doubleValueArray)->elt[lCount];
+					}
 					if (parent && iFieldID < (*parent->FieldValueArray)->dimSize) {
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[enumValue]);
 						if (LHStrLen((*parent->FieldValueArray)->elt[iFieldID]) != iSize) {
@@ -1080,13 +1132,17 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 					}
 					if (enumValue >= 0 && enumValue < sEnum.no_str) {
 						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[enumValue]);
-						(*doubleValueArray)->elt[lCount] = enumValue;
-						if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-							LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+						if (validDoubleArray) {
+							(*doubleValueArray)->elt[lCount] = enumValue;
 						}
-						if (iSize)
-							memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						if (validStringArray) {
+							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
+								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
+								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
+							}
+							if (iSize)
+								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
+						}
 					}
 					else {
 						hasValue = true;
@@ -1199,7 +1255,7 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 			// Create new transfer object (writeValueArray)
 			switch (DataType) {
 			case 0:
-				size = stringSize * MAX_STRING_SIZE * sizeof(char);
+				size = static_cast<unsigned long long>(stringSize) * MAX_STRING_SIZE * sizeof(char);
 				if (writeValueArraySize != size) {
 					void* tmp = realloc(writeValueArray, size);
 					if (tmp) {
@@ -1211,7 +1267,7 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				break;
 			case 1:
 				if (nativeType == DBF_STRING) {
-					size = stringSize * MAX_STRING_SIZE * sizeof(char);
+					size = static_cast<unsigned long long>(stringSize) * MAX_STRING_SIZE * sizeof(char);
 					if (writeValueArraySize != size) {
 						void* tmp = realloc(writeValueArray, size);
 						if (tmp) {
@@ -1234,7 +1290,7 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 				break;
 			case 2:
 				if (nativeType == DBF_STRING) {
-					size = stringSize * MAX_STRING_SIZE * sizeof(char);
+					size = static_cast<unsigned long long>(stringSize) * MAX_STRING_SIZE * sizeof(char);
 					if (writeValueArraySize != size) {
 						void* tmp = realloc(writeValueArray, size);
 						if (tmp) {
@@ -1463,7 +1519,7 @@ err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
 	// post LV user event
 	void postEvent() {
 		if (!reservedCounter) return; // no VIs ready to run
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 		if (!dllStatus) return;		// DLL_PROCESS_DETACH
 #endif
 /*if (!initConnect) {
@@ -1478,6 +1534,9 @@ CaLabDbgPrintf("user event of %s", szName);*/
 		std::vector<sResult*>::iterator itEventResultCluster;
 		try {
 			MgErr err = noErr;
+			if (filter <= 0) {
+				filter = 0xffff;
+			}
 			itRefNum = RefNum.begin();
 			itEventResultCluster = eventResultCluster.begin();
 			while (itRefNum != RefNum.end() && itEventResultCluster != eventResultCluster.end()) {
@@ -1485,7 +1544,7 @@ CaLabDbgPrintf("user event of %s", szName);*/
 					if (!*itEventResultCluster
 						|| DSCheckPtr(*itEventResultCluster) != noErr
 						|| !(*itEventResultCluster)->PVName
-						|| DSCheckHandle((*itEventResultCluster)->PVName) != noErr
+						/* || DSCheckHandle((*itEventResultCluster)->PVName) != noErr
 						|| !(*itEventResultCluster)->ValueNumberArray
 						|| DSCheckHandle((*itEventResultCluster)->ValueNumberArray) != noErr
 						|| !(*itEventResultCluster)->StringValueArray
@@ -1499,88 +1558,96 @@ CaLabDbgPrintf("user event of %s", szName);*/
 						|| !(*itEventResultCluster)->ErrorIO.source
 						|| DSCheckHandle((*itEventResultCluster)->ErrorIO.source) != noErr
 						|| ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr)
-						|| ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr)) {
+						|| ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr)*/) {
 						itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
 						itRefNum = RefNum.erase(itRefNum);
 						continue;
 					}
 					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
-						sStringArrayHdl sh = (*itEventResultCluster)->StringValueArray;
-						if (!sh || (*sh)->dimSize != (*stringValueArray)->dimSize) {
-							CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*sh)->dimSize, (*stringValueArray)->dimSize);
-							itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
-							itRefNum = RefNum.erase(itRefNum);
-							continue;
-							/*if (sh && DSCheckHandle(sh) == noErr) {
-								for (uInt32 j = 0; j < (*sh)->dimSize; j++) {
-									DSDisposeHandle((*sh)->elt[j]);
+						sStringArrayHdl resultStringArrayHdl = (*itEventResultCluster)->StringValueArray;
+						sDoubleArrayHdl resultNumberArrayHdl = (*itEventResultCluster)->ValueNumberArray;
+						if (filter & out_filter::pviValuesAsString && resultStringArrayHdl) {
+							if ((*resultStringArrayHdl)->dimSize != (*stringValueArray)->dimSize) {
+								CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*resultStringArrayHdl)->dimSize, (*stringValueArray)->dimSize);
+								itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+								itRefNum = RefNum.erase(itRefNum);
+								continue;
+							}
+							for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*resultStringArrayHdl)->dimSize; j++) {
+								if (!(*resultStringArrayHdl)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*resultStringArrayHdl)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
+									err += NumericArrayResize(uB, 1, (UHandle*)&(*resultStringArrayHdl)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
+									(*(*resultStringArrayHdl)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
 								}
-								err += DSDisposeHandle(sh);
+								if ((*stringValueArray)->elt[j])
+									memcpy((*(*resultStringArrayHdl)->elt[j])->str, (*(*stringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->cnt);
+								else
+									memcpy((*(*resultStringArrayHdl)->elt[j])->str, "\0", 1);
+								if (filter & out_filter::pviValuesAsNumber && resultNumberArrayHdl) {
+									(*resultNumberArrayHdl)->elt[j] = (*doubleValueArray)->elt[j];
+								}
 							}
-							(*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
-							(*(*itEventResultCluster)->StringValueArray)->dimSize = (*stringValueArray)->dimSize;
-							if ((*itEventResultCluster)->ValueNumberArray) {
-								if (DSCheckHandle((*itEventResultCluster)->ValueNumberArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->ValueNumberArray);
-							}
-							(*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
-							(*(*itEventResultCluster)->ValueNumberArray)->dimSize = (*stringValueArray)->dimSize;*/
+							(*itEventResultCluster)->valueArraySize = (uInt32)(*stringValueArray)->dimSize;
 						}
-						for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*(*itEventResultCluster)->StringValueArray)->dimSize; j++) {
-							if (!(*(*itEventResultCluster)->StringValueArray)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->StringValueArray)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
-								(*(*(*itEventResultCluster)->StringValueArray)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
+						else if (filter & out_filter::pviValuesAsNumber && resultNumberArrayHdl) {
+							if ((*resultNumberArrayHdl)->dimSize != (*doubleValueArray)->dimSize) {
+								CaLabDbgPrintf("numberValueArray size mismatch %d vs. %d", (*resultNumberArrayHdl)->dimSize, (*doubleValueArray)->dimSize);
+								itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+								itRefNum = RefNum.erase(itRefNum);
+								continue;
 							}
-							if ((*stringValueArray)->elt[j])
-								memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->cnt);
-							else
-								memcpy((*(*(*itEventResultCluster)->StringValueArray)->elt[j])->str, "\0", 1);
-							(*(*itEventResultCluster)->ValueNumberArray)->elt[j] = (*doubleValueArray)->elt[j];
+							for (uInt32 j = 0; j < (*resultNumberArrayHdl)->dimSize; j++) {
+								(*resultNumberArrayHdl)->elt[j] = (*doubleValueArray)->elt[j];
+							}
 						}
-						(*itEventResultCluster)->valueArraySize = (uInt32)(*stringValueArray)->dimSize;
 						if (FieldNameArray) {
-							if (!(*itEventResultCluster)->FieldNameArray || DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldNameArray || (*(*itEventResultCluster)->FieldNameArray)->dimSize != (*FieldNameArray)->dimSize))) {
-								if ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->FieldNameArray);
-								(*itEventResultCluster)->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-								(*(*itEventResultCluster)->FieldNameArray)->dimSize = (*FieldNameArray)->dimSize;
-							}
-							for (uInt32 j = 0; FieldNameArray && j < (*FieldNameArray)->dimSize && j < (*(*itEventResultCluster)->FieldNameArray)->dimSize; j++) {
-								if (!(*(*itEventResultCluster)->FieldNameArray)->elt[j] || ((*FieldNameArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt != (*(*FieldNameArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldNameArray)->elt[j], (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1);
-									(*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt = (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1;
+							if (filter & out_filter::pviFieldNames) {
+								if (!(*itEventResultCluster)->FieldNameArray || DSCheckHandle((*itEventResultCluster)->FieldNameArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldNameArray || (*(*itEventResultCluster)->FieldNameArray)->dimSize != (*FieldNameArray)->dimSize))) {
+									if ((*itEventResultCluster)->FieldNameArray && DSCheckHandle((*itEventResultCluster)->FieldNameArray) == noErr)
+										err += DSDisposeHandle((*itEventResultCluster)->FieldNameArray);
+									(*itEventResultCluster)->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
+									(*(*itEventResultCluster)->FieldNameArray)->dimSize = (*FieldNameArray)->dimSize;
 								}
-								if ((*FieldNameArray)->elt[j])
-									memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->cnt);
-								else
-									memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, "\0", 1);
-							}
-							if (!(*itEventResultCluster)->FieldValueArray || DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldValueArray || (*(*itEventResultCluster)->FieldValueArray)->dimSize != (*FieldNameArray)->dimSize))) {
-								if ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) == noErr)
-									err += DSDisposeHandle((*itEventResultCluster)->FieldValueArray);
-								(*itEventResultCluster)->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-								(*(*itEventResultCluster)->FieldValueArray)->dimSize = (*FieldNameArray)->dimSize;
-							}
-							for (uInt32 j = 0; FieldValueArray && j < (*FieldValueArray)->dimSize && j < (*(*itEventResultCluster)->FieldValueArray)->dimSize; j++) {
-								if (!(*(*itEventResultCluster)->FieldValueArray)->elt[j] || ((*FieldValueArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt != (*(*FieldValueArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[j], (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1);
-									(*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt = (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1;
+								for (uInt32 j = 0; FieldNameArray && j < (*FieldNameArray)->dimSize && j < (*(*itEventResultCluster)->FieldNameArray)->dimSize; j++) {
+									if (!(*(*itEventResultCluster)->FieldNameArray)->elt[j] || ((*FieldNameArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt != (*(*FieldNameArray)->elt[j])->cnt))) {
+										err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldNameArray)->elt[j], (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1);
+										(*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->cnt = (*FieldNameArray)->elt[j] ? (*(*FieldNameArray)->elt[j])->cnt : 1;
+									}
+									if ((*FieldNameArray)->elt[j])
+										memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->str, (*(*FieldNameArray)->elt[j])->cnt);
+									else
+										memcpy((*(*(*itEventResultCluster)->FieldNameArray)->elt[j])->str, "\0", 1);
 								}
-								if ((*FieldValueArray)->elt[j])
-									memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->cnt);
-								else
-									memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, "\0", 1);
+							}
+							if (filter & out_filter::pviFieldValues) {
+								if (!(*itEventResultCluster)->FieldValueArray || DSCheckHandle((*itEventResultCluster)->FieldValueArray) != noErr || (FieldNameArray && (!(*itEventResultCluster)->FieldValueArray || (*(*itEventResultCluster)->FieldValueArray)->dimSize != (*FieldNameArray)->dimSize))) {
+									if ((*itEventResultCluster)->FieldValueArray && DSCheckHandle((*itEventResultCluster)->FieldValueArray) == noErr)
+										err += DSDisposeHandle((*itEventResultCluster)->FieldValueArray);
+									(*itEventResultCluster)->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
+									(*(*itEventResultCluster)->FieldValueArray)->dimSize = (*FieldNameArray)->dimSize;
+								}
+								for (uInt32 j = 0; FieldValueArray && j < (*FieldValueArray)->dimSize && j < (*(*itEventResultCluster)->FieldValueArray)->dimSize; j++) {
+									if (!(*(*itEventResultCluster)->FieldValueArray)->elt[j] || ((*FieldValueArray)->elt[j] && ((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt != (*(*FieldValueArray)->elt[j])->cnt))) {
+										err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[j], (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1);
+										(*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->cnt = (*FieldValueArray)->elt[j] ? (*(*FieldValueArray)->elt[j])->cnt : 1;
+									}
+									if ((*FieldValueArray)->elt[j])
+										memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->str, (*(*FieldValueArray)->elt[j])->cnt);
+									else
+										memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[j])->str, "\0", 1);
+								}
 							}
 						}
-						(*itEventResultCluster)->TimeStampNumber = TimeStampNumber;
-						if (TimeStampString) {
+						if (filter & out_filter::pviTimestampAsNumber) {
+							(*itEventResultCluster)->TimeStampNumber = TimeStampNumber;
+						}
+						if (filter & out_filter::pviTimestampAsString && TimeStampString) {
 							if (!(*itEventResultCluster)->TimeStampString || (*(*itEventResultCluster)->TimeStampString)->cnt != (*TimeStampString)->cnt) {
 								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->TimeStampString, (*TimeStampString)->cnt);
 								(*(*itEventResultCluster)->TimeStampString)->cnt = (*TimeStampString)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->TimeStampString)->str, (*TimeStampString)->str, (*TimeStampString)->cnt);
 						}
-						if (StatusString) {
+						if (filter & out_filter::pviStatusAsString && StatusString) {
 							if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != (*StatusString)->cnt) {
 								if (!(*itEventResultCluster)->StatusString)
 									CaLabDbgPrintf("clust->StatusString newcount = %d", (*StatusString)->cnt);
@@ -1589,24 +1656,28 @@ CaLabDbgPrintf("user event of %s", szName);*/
 							}
 							memcpy((*(*itEventResultCluster)->StatusString)->str, (*StatusString)->str, (*StatusString)->cnt);
 						}
-						if (SeverityString) {
+						if (filter & out_filter::pviSeverityAsString && SeverityString) {
 							if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != (*SeverityString)->cnt) {
 								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, (*SeverityString)->cnt);
 								(*(*itEventResultCluster)->SeverityString)->cnt = (*SeverityString)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->SeverityString)->str, (*SeverityString)->str, (*SeverityString)->cnt);
 						}
-						if (ErrorIO.source) {
+						if (filter & out_filter::pviError && ErrorIO.source) {
 							if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
 								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
 								(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
 							}
 							memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, (*ErrorIO.source)->str, (*ErrorIO.source)->cnt);
 						}
-						(*itEventResultCluster)->StatusNumber = StatusNumber;
-						(*itEventResultCluster)->SeverityNumber = SeverityNumber;
-						(*itEventResultCluster)->ErrorIO.code = ErrorIO.code;
-						(*itEventResultCluster)->ErrorIO.status = ErrorIO.status;
+						if (filter & out_filter::pviStatusAsNumber)
+							(*itEventResultCluster)->StatusNumber = StatusNumber;
+						if (filter & out_filter::pviSeverityAsNumber)
+							(*itEventResultCluster)->SeverityNumber = SeverityNumber;
+						if (filter & out_filter::pviError) {
+							(*itEventResultCluster)->ErrorIO.code = ErrorIO.code;
+							(*itEventResultCluster)->ErrorIO.status = ErrorIO.status;
+						}
 						// Post it!
 						MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
 						if (posterr != mgNoErr) {
@@ -1617,31 +1688,41 @@ CaLabDbgPrintf("user event of %s", szName);*/
 						}
 					}
 					else {
-						int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
-						if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
-							(*(*itEventResultCluster)->StatusString)->cnt = size;
+						if (filter & out_filter::pviStatusAsString) {
+							int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
+							if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
+								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
+								(*(*itEventResultCluster)->StatusString)->cnt = size;
+							}
+							memcpy((*(*itEventResultCluster)->StatusString)->str, alarmStatusString[epicsAlarmComm], size);
 						}
-						memcpy((*(*itEventResultCluster)->StatusString)->str, alarmStatusString[epicsAlarmComm], size);
-						size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
-						if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
-							(*(*itEventResultCluster)->SeverityString)->cnt = size;
+						if (filter & out_filter::pviSeverityAsString) {
+							int32 size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
+							if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != size) {
+								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
+								(*(*itEventResultCluster)->SeverityString)->cnt = size;
+							}
+							memcpy((*(*itEventResultCluster)->SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
 						}
-						memcpy((*(*itEventResultCluster)->SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
-						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
-							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
+						if (filter & out_filter::pviError) {
+							if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
+								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
+								(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
+							}
+							if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (int32)strlen(ca_message(ECA_DISCONN))) {
+								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
+								(*(*itEventResultCluster)->ErrorIO.source)->cnt = (int32)strlen(ca_message(ECA_DISCONN));
+							}
+							memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, ca_message(ECA_DISCONN), strlen(ca_message(ECA_DISCONN)));
 						}
-						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (int32)strlen(ca_message(ECA_DISCONN))) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
-							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (int32)strlen(ca_message(ECA_DISCONN));
+						if (filter & out_filter::pviStatusAsNumber)
+							(*itEventResultCluster)->StatusNumber = epicsAlarmComm;
+						if (filter & out_filter::pviSeverityAsNumber)
+							(*itEventResultCluster)->SeverityNumber = epicsSevInvalid;
+						if (filter & out_filter::pviError) {
+							(*itEventResultCluster)->ErrorIO.code = ERROR_OFFSET + epicsSevInvalid;
+							(*itEventResultCluster)->ErrorIO.status = 0;
 						}
-						memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, ca_message(ECA_DISCONN), strlen(ca_message(ECA_DISCONN)));
-						(*itEventResultCluster)->StatusNumber = epicsAlarmComm;
-						(*itEventResultCluster)->SeverityNumber = epicsSevInvalid;
-						(*itEventResultCluster)->ErrorIO.code = ERROR_OFFSET + epicsSevInvalid;
-						(*itEventResultCluster)->ErrorIO.status = 0;
 						// Post it!
 						MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
 						if (posterr != mgNoErr) {
@@ -1698,7 +1779,7 @@ public:
 	}
 
 	~globals() {
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 		if (!dllStatus) return; // DLL_PROCESS_DETACH
 #endif
 		uInt32 timeout = 1000;
@@ -1739,7 +1820,7 @@ public:
 	//    name: EPICS variable name
 	//    FieldNameArray: field names of interest of current EPICS variable
 	//    return: pointer to added / 'found in list' data object
-	calabItem* add(LStrHandle name, sStringArrayHdl FieldNameArray = 0x0) {
+	calabItem* add(LStrHandle name, sStringArrayHdl FieldNameArray = 0x0, uInt32 filter = 0) {
 		unsigned char cName[MAX_NAME_SIZE];
 		std::string sName;
 		calabItem* currentItem;
@@ -1754,7 +1835,7 @@ public:
 		}
 		else {
 			mapLock.unlock_shared();
-			currentItem = new calabItem(name, FieldNameArray);
+			currentItem = new calabItem(name, FieldNameArray, filter);
 			currentItem = insert(sName, currentItem);
 		}
 
@@ -1801,7 +1882,7 @@ public:
 				auto search = myItems.find(sFieldName);
 				if (search == myItems.end()) {
 					mapLock.unlock_shared();
-					fieldItem = new calabItem(fullFieldName, 0x0);
+					fieldItem = new calabItem(fullFieldName, 0x0, 0);
 					fieldItem->parent = currentItem;
 					fieldItem->iFieldID = i;
 					fieldItem = insert(sFieldName, fieldItem);
@@ -1903,7 +1984,7 @@ MgErr DeleteStringArray(sStringArrayHdl array) {
 //    ...: additional arguments
 MgErr CaLabDbgPrintf(const char* format, ...) {
 	int done = 0;
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 	if (!dllStatus) return done; // DLL_PROCESS_DETACH
 #endif
 	va_list listPointer;
@@ -2261,7 +2342,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 					DbgTime(); CaLabDbgPrintfD("Error: Bad memory clean up. (%d)", err);
 				}
 				for (uInt32 i = 0; i < (**PvNameArray)->dimSize; i++) {
-					currentItem = globals.add((**PvNameArray)->elt[i], *FieldNameArray);
+					currentItem = globals.add((**PvNameArray)->elt[i], *FieldNameArray, filter);
 					if (!currentItem) {
 						CaLabDbgPrintf("Error in creating PV %.*s", (*(**PvNameArray)->elt[i])->cnt, (*(**PvNameArray)->elt[i])->str);
 						epicsMutexUnlock(getLock);
@@ -2291,7 +2372,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 						int32 err = currentItem->lock();
 						if (err) CaLabDbgPrintf("lock failed on timout in getvalue");
 						currentResult = &(**ResultArray)->result[i];
-						if (currentItem->ErrorIO.source) {
+						if (filter & out_filter::pviError && currentItem->ErrorIO.source) {
 							if (!currentResult->ErrorIO.source || (*currentResult->ErrorIO.source)->cnt != (*currentItem->ErrorIO.source)->cnt) {
 								NumericArrayResize(uB, 1, (UHandle*)&currentResult->ErrorIO.source, (*currentItem->ErrorIO.source)->cnt);
 								(*currentResult->ErrorIO.source)->cnt = (*currentItem->ErrorIO.source)->cnt;
@@ -2401,57 +2482,79 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 				currentItem->unlock();
 				continue;
 			}
-			if (filter & out_filter::pviValuesAsString || filter & out_filter::pviValuesAsNumber) {
-				if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || (*currentResult->StringValueArray)->dimSize != currentItem->numberOfValues)) {
-					if (currentResult->StringValueArray) {
-						DeleteStringArray(currentResult->StringValueArray);
-					}
-					currentResult->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + currentItem->numberOfValues * sizeof(LStrHandle[1]));
-					(*currentResult->StringValueArray)->dimSize = currentItem->numberOfValues;					
+			if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || (*currentResult->StringValueArray)->dimSize != currentItem->numberOfValues)) {
+				if (currentResult->StringValueArray) {
+					DeleteStringArray(currentResult->StringValueArray);
 				}
-				if (filter & out_filter::pviValuesAsNumber && (!currentResult->ValueNumberArray || (*currentResult->ValueNumberArray)->dimSize != currentItem->numberOfValues)) {
-					err += NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, currentItem->numberOfValues);
-					(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
+				currentResult->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + currentItem->numberOfValues * sizeof(LStrHandle[1]));
+				(*currentResult->StringValueArray)->dimSize = currentItem->numberOfValues;					
+			}
+			if (filter & out_filter::pviValuesAsNumber && (!currentResult->ValueNumberArray || (*currentResult->ValueNumberArray)->dimSize != currentItem->numberOfValues)) {
+				err += NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, currentItem->numberOfValues);
+				(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
+			}
+			for (uInt32 j = 0; maxNumberOfValues > 0 && j < currentItem->numberOfValues; j++) {
+				if (filter & out_filter::pviValuesAsString && !currentItem->stringValueArray) {
+					// was connected (user event) and is waiting for reconnect
+					epicsMutexUnlock(getLock);
+					return;
+				} else if (filter & out_filter::pviValuesAsNumber && !currentItem->doubleValueArray) {
+					// was connected (user event) and is waiting for reconnect
+					epicsMutexUnlock(getLock);
+					return;
 				}
-				for (uInt32 j = 0; maxNumberOfValues > 0 && j < currentItem->numberOfValues; j++) {
-					if (filter & out_filter::pviValuesAsString && !currentItem->stringValueArray) {
-						// was connected (user event) and is waiting for reconnect
-						epicsMutexUnlock(getLock);
-						return;
-					} else if (filter & out_filter::pviValuesAsNumber && !currentItem->doubleValueArray) {
-						// was connected (user event) and is waiting for reconnect
-						epicsMutexUnlock(getLock);
-						return;
-					}
-					if (filter & out_filter::pviValuesAsNumber && !(*currentItem->stringValueArray)->elt[j]) {
-						if (maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
-							doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
-						continue;
-					}
-					if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || !(*currentResult->StringValueArray)->elt[j] || (*(*currentItem->stringValueArray)->elt[j])->cnt != (*(*currentResult->StringValueArray)->elt[j])->cnt)) {
+				if (filter & out_filter::pviValuesAsNumber && !(*currentItem->stringValueArray)->elt[j]) {
+					if (maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
+						doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
+					continue;
+				}
+				if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || !(*currentResult->StringValueArray)->elt[j] || !(*currentItem->stringValueArray)->elt[j] || (*(*currentItem->stringValueArray)->elt[j])->cnt != (*(*currentResult->StringValueArray)->elt[j])->cnt)) {
+					if ((*currentItem->stringValueArray)->elt[j]) {
 						err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], (*(*currentItem->stringValueArray)->elt[j])->cnt);
 						(*(*currentResult->StringValueArray)->elt[j])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
 					}
-					if (filter & out_filter::pviValuesAsString) {
+					else {
+						err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], 1);
+						(*(*currentResult->StringValueArray)->elt[j])->cnt = 1;
+					}
+				}
+				if (filter & out_filter::pviValuesAsString) {
+					if ((*currentItem->stringValueArray)->elt[j]) {
 						memcpy((*(*currentResult->StringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
 					}
-					if (filter & out_filter::pviValuesAsNumber) {
-						(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
+					else {
+						memcpy((*(*currentResult->StringValueArray)->elt[j])->str, "?", 1);
 					}
-					if (filter & out_filter::firstValueAsNumber && j == 0) {
+				}
+				if (filter & out_filter::pviValuesAsNumber) {
+					(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
+				}
+				if (filter & out_filter::firstValueAsString && j == 0) {
+					if (currentResult->StringValueArray) {
 						err += DSCopyHandle(&(**FirstStringValue)->elt[i], (*currentResult->StringValueArray)->elt[j]);
-						(**FirstDoubleValue)->elt[i] = (*currentItem->doubleValueArray)->elt[j];
 					}
-					if (filter & out_filter::valueArrayAsNumber) {
-						if (doubleValueArrayIndex < (**DoubleValueArray)->dimSizes[0] * (**DoubleValueArray)->dimSizes[1]) {
-							(**DoubleValueArray)->elt[doubleValueArrayIndex++] = (*currentItem->doubleValueArray)->elt[j];
-						}
-						else {
-							// array with mixed data types must be padded
-							doubleValueArrayIndex++;
+					else {
+						err += NumericArrayResize(uB, 1, (UHandle*)&(**FirstStringValue)->elt[i], (*(*currentItem->stringValueArray)->elt[j])->cnt);
+						if (err == noErr) {
+							memcpy((*(**FirstStringValue)->elt[i])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
+							(*(**FirstStringValue)->elt[i])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
 						}
 					}
 				}
+				if (filter & out_filter::firstValueAsNumber && j == 0) {
+					(**FirstDoubleValue)->elt[i] = (*currentItem->doubleValueArray)->elt[j];
+				}
+				if (filter & out_filter::valueArrayAsNumber) {
+					if (doubleValueArrayIndex < (**DoubleValueArray)->dimSizes[0] * (**DoubleValueArray)->dimSizes[1]) {
+						(**DoubleValueArray)->elt[doubleValueArrayIndex++] = (*currentItem->doubleValueArray)->elt[j];
+					}
+					else {
+						// array with mixed data types must be padded
+						doubleValueArrayIndex++;
+					}
+				}
+			}
+			if (filter & out_filter::pviElements) {
 				currentResult->valueArraySize = currentItem->numberOfValues;
 			}
 			if (filter & out_filter::valueArrayAsNumber && maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
@@ -2507,7 +2610,7 @@ extern "C" EXPORT void addEvent(LVUserEventRef* RefNum, sResult* ResultPtr) {
 		|| DSCheckPtr(ResultPtr) != noErr
 		|| !ResultPtr->PVName
 		|| DSCheckHandle(ResultPtr->PVName) != noErr
-		|| !ResultPtr->ValueNumberArray
+		/* || !ResultPtr->ValueNumberArray
 		|| DSCheckHandle(ResultPtr->ValueNumberArray) != noErr
 		|| !ResultPtr->StringValueArray
 		|| DSCheckHandle(ResultPtr->StringValueArray) != noErr
@@ -2520,13 +2623,13 @@ extern "C" EXPORT void addEvent(LVUserEventRef* RefNum, sResult* ResultPtr) {
 		|| !ResultPtr->ErrorIO.source
 		|| DSCheckHandle(ResultPtr->ErrorIO.source) != noErr
 		|| (ResultPtr->FieldNameArray && DSCheckHandle(ResultPtr->FieldNameArray) != noErr)
-		|| (ResultPtr->FieldValueArray && DSCheckHandle(ResultPtr->FieldValueArray) != noErr)) {
+		|| (ResultPtr->FieldValueArray && DSCheckHandle(ResultPtr->FieldValueArray) != noErr)*/) {
 		return;
 	}
-	if (!ResultPtr || !ResultPtr->PVName)
-		return;
+	//if (!ResultPtr || !ResultPtr->PVName)
+	//	return;
 	calabItem* currentItem = 0x0;
-	currentItem = globals.add(ResultPtr->PVName, 0x0);
+	currentItem = globals.add(ResultPtr->PVName, 0x0, 0);
 	int32 err = currentItem->lock();
 	if (err) CaLabDbgPrintf("lock failed on timout in addEvent");
 	currentItem->RefNum.push_back(*RefNum);
@@ -2699,7 +2802,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 				(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
 			}
 			for (uInt32 i = 0; i < iNumberOfValueSets && i < (**PvNameArray)->dimSize; i++) {
-				currentItem = globals.add((**PvNameArray)->elt[i], 0x0);
+				currentItem = globals.add((**PvNameArray)->elt[i], 0x0, 0);
 				(**PvIndexArray)->elt[i] = (uint64_t)currentItem;
 				currentItem->isPassive = false;
 			}
@@ -2848,7 +2951,7 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 			memcpy(pszValues[count], "undefined", strlen("undefined"));
 		count++;
 		// Create InfoStringArray2D or use previous one
-		err += NumericArrayResize(uQ, infoArrayDimensions, (UHandle*)InfoStringArray2D, infoArrayDimensions * lStringArraySets);
+		err += NumericArrayResize(uQ, infoArrayDimensions, (UHandle*)InfoStringArray2D, static_cast<size_t>(infoArrayDimensions) * lStringArraySets);
 		(**InfoStringArray2D)->dimSizes[0] = lStringArraySets;
 		(**InfoStringArray2D)->dimSizes[1] = infoArrayDimensions;
 		uInt32 iNameCounter = 0;
@@ -2997,7 +3100,8 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 				if (currentResult->FieldNameArray)
 					err += DeleteStringArray(currentResult->FieldNameArray);
 				currentResult->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*currentItem->FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-				(*currentResult->FieldNameArray)->dimSize = (*currentItem->FieldNameArray)->dimSize;
+				if (currentResult->FieldNameArray)
+					(*currentResult->FieldNameArray)->dimSize = (*currentItem->FieldNameArray)->dimSize;
 				for (uInt32 l = 0; l < (*currentItem->FieldNameArray)->dimSize; l++) {
 					int32 sz = LHStrLen((*currentItem->FieldNameArray)->elt[l]);;
 					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], sz);
@@ -3010,10 +3114,11 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 				if (currentResult->FieldValueArray)
 					err += DeleteStringArray(currentResult->FieldValueArray);
 				currentResult->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*currentItem->FieldValueArray)->dimSize * sizeof(LStrHandle[1]));
-				(*currentResult->FieldValueArray)->dimSize = (*currentItem->FieldValueArray)->dimSize;
+				if (currentResult->FieldValueArray)
+					(*currentResult->FieldValueArray)->dimSize = (*currentItem->FieldValueArray)->dimSize;
 				for (uInt32 l = 0; l < (*currentItem->FieldValueArray)->dimSize; l++) {
 					int32 sz = LHStrLen((*currentItem->FieldValueArray)->elt[l]);
-					if ((*currentItem->FieldValueArray)->elt[l]) {
+					if ((*currentItem->FieldValueArray)->elt[l] && currentResult->FieldValueArray) {
 						NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], sz);
 						LStrLen(*(*currentResult->FieldValueArray)->elt[l]) = sz;
 						memcpy(LStrBuf(*(*currentResult->FieldValueArray)->elt[l]), LStrBuf(*(*currentItem->FieldValueArray)->elt[l]), sz);
@@ -3068,14 +3173,14 @@ extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
 		}
 		if (*PvNameArray && **PvNameArray && ((uInt32)(**PvNameArray)->dimSize) > 0) {
 			for (uInt32 i = 0; i < (**PvNameArray)->dimSize; i++) {
-				char cName[MAX_NAME_SIZE];
+				char cName[MAX_NAME_SIZE]{};
 				_LToCStrN(*((**PvNameArray)->elt[i]), (CStr)cName, sizeof(cName));
 				std::string sName = cName;
 				globals.mapLock.lock_shared();
 				auto search = myItems.find(sName);
 				currentItem = (search == myItems.end()) ? NULL : search->second;
 				globals.mapLock.unlock_shared();
-				if (!valid(currentItem)) {
+				if (!currentItem || !valid(currentItem)) {
 					CaLabDbgPrintf("Error in disconnect: Index array is corrupted.");
 					break;
 				}
@@ -3085,7 +3190,7 @@ extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
 					pIndicator = strchr(currentItem->szName, '.');
 					if (pIndicator) {
 						int pos = (int)(strlen(currentItem->szName) - (pIndicator - currentItem->szName));
-						if (strncmp((const char*)(*currentItem->name)->str, (const char*)(*(**PvNameArray)->elt[i])->str, (*(**PvNameArray)->elt[i])->cnt - pos) == 0) {
+						if (strncmp((const char*)(*currentItem->name)->str, (const char*)(*(**PvNameArray)->elt[i])->str, static_cast<size_t>((*(**PvNameArray)->elt[i])->cnt) - pos) == 0) {
 							currentItem->disconnect();
 						}
 					}
@@ -3219,7 +3324,7 @@ extern "C" EXPORT uInt32 getCounter() {
 	return ++globalCounter;
 }
 
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 #else
 void loadFunctions() {
 	caLibHandle = dlopen("libca.so", RTLD_LAZY);
@@ -3288,7 +3393,7 @@ void caLabLoad(void) {
 	signal(SIGINT, signalHandler);
 	signal(SIGSEGV, signalHandler);
 	signal(SIGTERM, signalHandler);
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 	iResult = GetModuleHandleEx(
 		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, // GET_MODULE_HANDLE_EX_FLAG_PIN to prevent unload lib
 		(LPCTSTR)DllMain,
@@ -3319,7 +3424,7 @@ void caLabLoad(void) {
 
 // clean up library before unload
 void caLabUnload(void) {
-#if defined _WIN32 || defined _WIN64
+#if defined _WIN64
 #else
 	//dlclose(caLibHandle); <-- caused memory exceptions in memory manager of LV
 	//dlclose(comLibHandle);
@@ -3336,7 +3441,7 @@ uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize) {
         resultingSize = destSize;
     if (resultingSize > 0) {
         if (source)
-            strncpy((char*) dest, (char*)source->str, resultingSize - 1);
+			strncpy((char*)dest, (char*)source->str, static_cast<size_t>(resultingSize) - 1);
         dest[resultingSize - 1] = '\0';
     }
 	return resultingSize;

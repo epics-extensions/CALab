@@ -1,5 +1,5 @@
-<?xml version='1.0'?>
-<Project Type="Project" LVVersion="8508002">
+﻿<?xml version='1.0' encoding='UTF-8'?>
+<Project Type="Project" LVVersion="19008000">
 	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">false</Property>
 	<Property Name="NI.Project.Description" Type="Str">main project of CA Lab V1.7.1.1
@@ -7,6 +7,7 @@ including all needed libraries
 including basic examples</Property>
 	<Item Name="My Computer" Type="My Computer">
 		<Property Name="CCSymbols" Type="Str"></Property>
+		<Property Name="NI.SortType" Type="Int">3</Property>
 		<Property Name="server.app.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.control.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.tcp.acl" Type="Str">0800000008000000</Property>
@@ -29,16 +30,16 @@ including basic examples</Property>
 			<Item Name="TestPV_ai100000.cmd" Type="Document" URL="/&lt;userlib&gt;/calab/demo/TestPV_ai100000.cmd"/>
 		</Item>
 		<Item Name="Examples" Type="Folder">
-			<Item Name="Event Demo.vi" Type="VI" URL="Examples/Event Demo.vi"/>
-			<Item Name="Read Demo 1.vi" Type="VI" URL="Examples/Read Demo 1.vi"/>
-			<Item Name="Read Demo 2.vi" Type="VI" URL="Examples/Read Demo 2.vi"/>
-			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="Examples/SoftIOC Demo Sub.vi"/>
-			<Item Name="SoftIOC Demo.vi" Type="VI" URL="Examples/SoftIOC Demo.vi"/>
-			<Item Name="Write Demo - Looping.vi" Type="VI" URL="Examples/Write Demo - Looping.vi"/>
-			<Item Name="Write Demo - Timed.vi" Type="VI" URL="Examples/Write Demo - Timed.vi"/>
-			<Item Name="Write Demo.vi" Type="VI" URL="Examples/Write Demo.vi"/>
+			<Item Name="Event Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Event Demo.vi"/>
+			<Item Name="Read Demo 1.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Read Demo 1.vi"/>
+			<Item Name="Read Demo 2.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Read Demo 2.vi"/>
+			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/SoftIOC Demo Sub.vi"/>
+			<Item Name="SoftIOC Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/SoftIOC Demo.vi"/>
+			<Item Name="Write Demo - Looping.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Demo - Looping.vi"/>
+			<Item Name="Write Demo - Timed.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Demo - Timed.vi"/>
+			<Item Name="Write Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Demo.vi"/>
 		</Item>
-		<Item Name="CaLab.lvlib" Type="Library" URL="CaLab.lvlib"/>
+		<Item Name="CaLab.lvlib" Type="Library" URL="/&lt;userlib&gt;/calab/CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
 			<Item Name="vi.lib" Type="Folder">
 				<Item Name="Simple Error Handler.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Simple Error Handler.vi"/>
@@ -76,8 +77,9 @@ including basic examples</Property>
 				<Item Name="subFile Dialog.vi" Type="VI" URL="/&lt;vilib&gt;/express/express input/FileDialogBlock.llb/subFile Dialog.vi"/>
 				<Item Name="ex_CorrectErrorChain.vi" Type="VI" URL="/&lt;vilib&gt;/express/express shared/ex_CorrectErrorChain.vi"/>
 				<Item Name="System Exec.vi" Type="VI" URL="/&lt;vilib&gt;/Platform/system.llb/System Exec.vi"/>
-				<Item Name="General Error Handler CORE.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/General Error Handler CORE.vi"/>
-				<Item Name="Merge Errors.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Merge Errors.vi"/>
+				<Item Name="General Error Handler Core CORE.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/General Error Handler Core CORE.vi"/>
+				<Item Name="LVRectTypeDef.ctl" Type="VI" URL="/&lt;vilib&gt;/Utility/miscctls.llb/LVRectTypeDef.ctl"/>
+				<Item Name="NI_PackedLibraryUtility.lvlib" Type="Library" URL="/&lt;vilib&gt;/Utility/LVLibp/NI_PackedLibraryUtility.lvlib"/>
 			</Item>
 			<Item Name="user.lib" Type="Folder">
 				<Item Name="calab.dll" Type="Document" URL="/&lt;userlib&gt;/calab/Lib/calab.dll"/>
