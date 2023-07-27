@@ -1,8 +1,7 @@
 # CA Lab - LabVIEW (Realtime) + EPICS
 
-<a href="https://github.com/epics-extensions/CALab/releases"><img src="https://github.com/epics-extensions/CALab/assets/17197773/ddda9486-4d74-4e74-b729-1843c2a9ea0d" 
-     alt="CA Lab Logo"
-     style="float: left; margin-right: 10px;" /></a>
+[![Download](https://github.com/epics-extensions/CALab/assets/17197773/ddda9486-4d74-4e74-b729-1843c2a9ea0d 'Download CA Lab')](https://github.com/epics-extensions/CALab/releases)
+
 ## Overview
 
 What is CA Lab?<br/>
