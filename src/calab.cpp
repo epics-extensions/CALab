@@ -1585,8 +1585,6 @@ public:
 						}
 						if (StatusString) {
 							if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != (*StatusString)->cnt) {
-								if (!(*itEventResultCluster)->StatusString)
-									CaLabDbgPrintf("clust->StatusString newcount = %d", (*StatusString)->cnt);
 								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, (*StatusString)->cnt);
 								(*(*itEventResultCluster)->StatusString)->cnt = (*StatusString)->cnt;
 							}
