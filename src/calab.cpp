@@ -441,15 +441,15 @@ struct dbr_time_double {
 	dbr_double_t	value;
 };
 struct exception_handler_args {
-	void*		usr;
+	void* usr;
 	chanId		chid;
 	long		type;
 	long		count;
-	void*		addr;
+	void* addr;
 	long		stat;
 	long		op;
-	const char*	ctx;
-	const char*	pFile;
+	const char* ctx;
+	const char* pFile;
 	unsigned	lineNo;
 };
 typedef channel_state(*ca_state_t) (chid chan);
@@ -557,12 +557,12 @@ void caLabUnload(void);
 uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize);
 std::string myItemsFindEnum(std::string name, dbr_enum_t enumValue);
 
-ca_client_context*	pcac = 0x0;            // EPICS context
+ca_client_context* pcac = 0x0;            // EPICS context
 bool				bCaLabPolling = false; // TRUE: Avoids permanent open network ports. (CompactRIO)
 uInt32				globalCounter = 0;     // simple counter for debugging
 uInt32				reservedCounter = 0;   // simple counter for debugging
 static bool			stopped;               // indicator for closing library
-FILE*				pCaLabDbgFile = 0x0;   // file handle for optional debug file
+FILE* pCaLabDbgFile = 0x0;   // file handle for optional debug file
 std::atomic<int>	tasks(0);			   // number of parallel tasks
 static bool			err200 = false;        // send one error 200 message only
 uInt32				currentlyConnectedPos = 6 * sizeof(void*) + sizeof(unsigned int); // direct access to connect indicator in channel access object
@@ -590,7 +590,7 @@ std::string trim(const std::string& s) {
 // internal data object
 class calabItem {
 public:
-	void*						validAddress;							// check number for valid object
+	void* validAddress;							// check number for valid object
 	chanId						caID = 0x0;								// channel access ID
 	chtype						nativeType = -1;						// native data type (EPICS)
 	uInt32						numberOfValues = 0x0;					// number of values
@@ -606,7 +606,7 @@ public:
 	modifiedMap					fieldModified;							// indicator for changed field value
 	epicsMutexId				myLock;									// object mutex
 	LStrHandle					name = 0x0;								// PV name as LV string
-	calabItem*					parent = 0x0;							// parent of field object = main object with values
+	calabItem* parent = 0x0;							// parent of field object = main object with values
 	propertyMap					properties;								// properties / fields
 	int16_t						SeverityNumber = epicsSevInvalid;		// number of EPICS severity
 	LStrHandle					SeverityString = 0x0;					// LV string of EPICS severity
@@ -618,7 +618,7 @@ public:
 	dbr_gr_enum					sEnum;									// enumeration String
 	std::vector<LVUserEventRef>	RefNum;									// reference number for LV user event
 	std::vector<sResult*>		eventResultCluster;						// reference object for LV user event
-	void*						writeValueArray = 0x0;					// buffer for output
+	void* writeValueArray = 0x0;					// buffer for output
 	uInt32						writeValueArraySize = 0;				// size of output buffer
 	std::atomic<bool>			locked;									// indicator of locked object
 	std::chrono::high_resolution_clock::time_point timer;				// watch dog timer
@@ -627,7 +627,7 @@ public:
 		hasValue = false;
 		isConnected = false;
 		isPassive = false;
-		if(currentInstance)
+		if (currentInstance)
 			fieldModified[currentInstance] = false;
 		validAddress = this;
 		locked = false;
@@ -1060,7 +1060,7 @@ public:
 							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", enumValue);
 							fieldValue = szTmp;
 						}
-						parent->properties[std::string(szName + strlen(parent->szName)+1)] = fieldValue;
+						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = fieldValue;
 					}
 					else {
 						if (validDoubleArray) {
@@ -1159,7 +1159,7 @@ public:
 			}
 			setError(args.status);
 			hasValue = true;
-			if (bDbrTime && (RefNum.size() || parent && parent->RefNum.size())) {
+			if (bDbrTime && (RefNum.size() || (parent && parent->RefNum.size()))) {
 				unlock();
 				if (parent)
 					parent->postEvent();
@@ -1558,7 +1558,7 @@ public:
 									std::string fieldValue = nameIterator->second;
 									size_t fieldValueLength = fieldValue.size();
 									if (fieldValueLength) {
-										if (!(*(*itEventResultCluster)->FieldValueArray)->elt[l] || ((*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt != fieldValueLength)) {
+										if (!(*(*itEventResultCluster)->FieldValueArray)->elt[l] || ((size_t)(*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt != fieldValueLength)) {
 											err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[l], fieldValueLength);
 											(*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
 										}
@@ -1619,7 +1619,7 @@ public:
 							continue;
 						}
 					}
-				else {
+					else {
 						int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
 						if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
 							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
@@ -1977,14 +1977,14 @@ MgErr CaLabDbgPrintfD(const char* format, ...) {
 
 // callback of LabVIEW when any caLab-VI is loaded
 //    instanceState: undocumented pointer
-extern "C" EXPORT MgErr reserved(InstanceDataPtr* instanceState) {
+extern "C" EXPORT MgErr reserved(InstanceDataPtr * instanceState) {
 	reservedCounter++;
 	return 0;
 }
 
 // callback of LV when any caLab-VI is unloaded
 //    instanceState: undocumented pointer
-extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
+extern "C" EXPORT MgErr unreserved(InstanceDataPtr * instanceState) {
 	if (reservedCounter > 0) {
 		//CaLabDbgPrintf("unreserved %d", (uInt32)*instanceState);
 		reservedCounter--;
@@ -1996,7 +1996,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 
 // callback of LV when any caLab-VI is aborted
 //    instanceState: undocumented pointer
-extern "C" EXPORT MgErr aborted(InstanceDataPtr* instanceState) {
+extern "C" EXPORT MgErr aborted(InstanceDataPtr * instanceState) {
 	return 0;
 }
 
@@ -2185,7 +2185,7 @@ void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 //    CommunicationStatus:    status of Channel Access communication; 0 = no problem; 1 = any problem occurred
 //    FirstCall:              indicator for first call
 //    NoMDEL:                 indicator for ignoring monitor dead band (TRUE: use caget instead of camonitor)
-extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* FieldNameArray, sLongArrayHdl* PvIndexArray, double Timeout, sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, LVBoolean* CommunicationStatus, LVBoolean* FirstCall, LVBoolean* NoMDEL = 0, LVBoolean* IsInitialized = 0, int filter = 0) {
+extern "C" EXPORT void getValue(sStringArrayHdl * PvNameArray, sStringArrayHdl * FieldNameArray, sLongArrayHdl * PvIndexArray, double Timeout, sResultArrayHdl * ResultArray, sStringArrayHdl * FirstStringValue, sDoubleArrayHdl * FirstDoubleValue, sDoubleArray2DHdl * DoubleValueArray, LVBoolean * CommunicationStatus, LVBoolean * FirstCall, LVBoolean * NoMDEL = 0, LVBoolean * IsInitialized = 0, int filter = 0) {
 	epicsMutexLock(getLock);
 	if (filter <= 0) {
 		filter = 0xffff;
@@ -2213,7 +2213,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 		*CommunicationStatus = 0;
 		if (bCaLabPolling)
 			*NoMDEL = true;
-		if(*NoMDEL)
+		if (*NoMDEL)
 			*FirstCall = true;
 		if ((*PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize)) {
 			*FirstCall = true;
@@ -2512,7 +2512,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 					if (currentResult->FieldValueArray)
 						err += DeleteStringArray(currentResult->FieldValueArray);
 					currentResult->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (**FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-					if (currentResult->FieldValueArray  && *currentResult->FieldValueArray) {
+					if (currentResult->FieldValueArray && *currentResult->FieldValueArray) {
 						(*currentResult->FieldValueArray)->dimSize = (**FieldNameArray)->dimSize;
 						for (uInt32 l = 0; l < (**FieldNameArray)->dimSize; l++) {
 							propertyMapIterator nameIterator = currentItem->properties.find(std::string((char*)(*(*currentResult->FieldNameArray)->elt[l])->str, (size_t)(*(*currentResult->FieldNameArray)->elt[l])->cnt));
@@ -2520,7 +2520,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 								std::string fieldValue = nameIterator->second;
 								size_t fieldValueLength = fieldValue.size();
 								if (fieldValueLength) {
-									if (!(*currentResult->FieldValueArray)->elt[l] || ((*(*currentResult->FieldValueArray)->elt[l])->cnt != fieldValueLength)) {
+									if (!(*currentResult->FieldValueArray)->elt[l] || ((size_t)(*(*currentResult->FieldValueArray)->elt[l])->cnt != fieldValueLength)) {
 										err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
 										(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
 									}
@@ -2578,7 +2578,7 @@ extern "C" EXPORT void addEvent(LVUserEventRef * RefNum, sResult * ResultPtr) {
 // destroys all eventResultClusters in all PVs associated with an event
 //    RefNum:            reference number of event
 //    ResultArrayHdl:    target item
-extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
+extern "C" EXPORT void destroyEvent(LVUserEventRef * RefNum) {
 	globals.mapLock.lock_shared();
 	for (auto& item : myItems) {
 		calabItem* currentItem = item.second;
@@ -2627,7 +2627,7 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
 //        4 => Word signed integer              => short     => dbr_short_t
 //        5 => Long signed integer              => long      => dbr_long_t
 //        6 => Quad signed integer              => long      => dbr_long_t
-extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvIndexArray, sStringArray2DHdl* StringValueArray2D, sDoubleArray2DHdl* DoubleValueArray2D, sLongArray2DHdl* LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean* Synchronous, sErrorArrayHdl* ErrorArray, LVBoolean* Status, LVBoolean* FirstCall) {
+extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * PvIndexArray, sStringArray2DHdl * StringValueArray2D, sDoubleArray2DHdl * DoubleValueArray2D, sLongArray2DHdl * LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean * Synchronous, sErrorArrayHdl * ErrorArray, LVBoolean * Status, LVBoolean * FirstCall) {
 	// Don't enter if library terminates
 	if (stopped)
 		return;
@@ -2814,21 +2814,21 @@ bool comp(std::pair<std::string, calabItem*> a, std::pair<std::string, calabItem
 //   InfoStringArray2D:     container for results
 //   InfoStringArraySize:   elements in result container
 //   FirstCall:             indicator for first call
-extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHdl* ResultArray, LVBoolean* FirstCall) {
+extern "C" EXPORT void info(sStringArray2DHdl * InfoStringArray2D, sResultArrayHdl * ResultArray, LVBoolean * FirstCall) {
 	try {
 		// Don't enter if library terminates
 		if (stopped)
 			return;
-		const ENV_PARAM**	ppParam = env_param_list;	// Environment variables of EPICS context
+		const ENV_PARAM** ppParam = env_param_list;	// Environment variables of EPICS context
 		uInt32				lStringArraySets = 0;		// Number of result arrays
-		char**				pszNames = 0;				// Name array
-		char**				pszValues = 0;				// Value array
+		char** pszNames = 0;				// Name array
+		char** pszValues = 0;				// Value array
 		uInt32				count = 0;					// Number of environment variables
-		const char*			pVal = 0;					// Pointer to environment variables of EPICS context
+		const char* pVal = 0;					// Pointer to environment variables of EPICS context
 		uInt32				infoArrayDimensions = 2;	// Currently we are using two array as result
 		MgErr				err = noErr;				// Error code for debugging
-		sResult*			currentResult;				// Current LabVIEW result cluster
-		calabItem*			currentItem;				// Current local item
+		sResult* currentResult;				// Current LabVIEW result cluster
+		calabItem* currentItem;				// Current local item
 		epicsMutexLock(getLock);
 		while (*ppParam != NULL) {
 			lStringArraySets++;
@@ -3105,7 +3105,7 @@ extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHd
 // removes EPICS PVs from event service
 //   PvNameArray:     list of PVs, to be removed
 //   All:             ignore PvNameArray and disconnect all known data objects
-extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
+extern "C" EXPORT void disconnectPVs(sStringArrayHdl * PvNameArray, bool All) {
 	try {
 		// Don't enter if library terminates
 		if (stopped)

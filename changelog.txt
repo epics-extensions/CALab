@@ -1,4 +1,4 @@
-﻿Changelog of CA Lab
+﻿Changelog of CA Lab (Released: September 2023)
 V1.7.3.1
   # Support of different number or order of fields in CaLabGet/Event
   # CaLabInfo.vi: PV list now has alphabetically sorted PVs names
