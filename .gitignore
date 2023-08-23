@@ -17,3 +17,5 @@ libcalab.so
 *.lib
 *.exp
 /*.bat
+*.json
+/null
