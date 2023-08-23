@@ -14,7 +14,7 @@ Please check whether the specific user has full access to folder and files
 of CA Lab before first run. You find the CA Lab folder in user.lib of
 your LabVIEW™ installation.
 
-At first run of any caLab-VI some warnings will appear because there is a 
+At first run of any caLab-VI some warnings will appear because there is a
 new context. Please save changes therewith warnings won't appear again.
 A better way is described in chapter 2 (mass compiling VIs).
 
