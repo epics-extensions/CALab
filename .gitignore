@@ -19,3 +19,4 @@ libcalab.so
 /*.bat
 *.json
 /null
+/sync.ffs_db
