@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.3.1
+// Version     : 1.7.3.2
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -56,7 +56,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.7.3.1"
+#define CALAB_VERSION       "1.7.3.2"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
@@ -1492,7 +1492,7 @@ public:
 
 	// post LV user event
 	void postEvent() {
-		if (!reservedCounter) return; // no VIs ready to run
+		if (!reservedCounter || !isConnected) return; // no VIs ready to run
 #if defined _WIN32 || defined _WIN64
 		if (!dllStatus) return;		// DLL_PROCESS_DETACH
 #endif
@@ -1517,6 +1517,20 @@ public:
 					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
 						sStringArrayHdl resultStringArrayHdl = (*itEventResultCluster)->StringValueArray;
 						sDoubleArrayHdl resultNumberArrayHdl = (*itEventResultCluster)->ValueNumberArray;
+						if (!resultStringArrayHdl) {
+							(*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
+							if ((*itEventResultCluster)->StringValueArray && *((*itEventResultCluster)->StringValueArray)) {
+								(*((*itEventResultCluster)->StringValueArray))->dimSize = (*stringValueArray)->dimSize;
+								resultStringArrayHdl = (*itEventResultCluster)->StringValueArray;
+							}
+						}
+						if (!resultNumberArrayHdl) {
+							(*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
+							if ((*itEventResultCluster)->ValueNumberArray && *((*itEventResultCluster)->ValueNumberArray)) {
+								(*((*itEventResultCluster)->ValueNumberArray))->dimSize = (*doubleValueArray)->dimSize;
+								resultNumberArrayHdl = (*itEventResultCluster)->ValueNumberArray;
+							}
+						}
 						if (resultStringArrayHdl) {
 							if ((*resultStringArrayHdl)->dimSize != (*stringValueArray)->dimSize) {
 								CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*resultStringArrayHdl)->dimSize, (*stringValueArray)->dimSize);
@@ -2098,7 +2112,7 @@ void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 					}
 				}
 				else {
-					break;
+					continue;
 				}
 			}
 		}
@@ -2187,11 +2201,6 @@ extern "C" EXPORT void getValue(sStringArrayHdl * PvNameArray, sStringArrayHdl *
 	epicsMutexLock(getLock);
 	if (filter <= 0) {
 		filter = 0xffff;
-	}
-	if (!*FirstCall && *ResultArray) {
-		if (!(**ResultArray)->result[0].ValueNumberArray) {
-			*FirstCall = true;
-		}
 	}
 	try {
 		if (stopped) {

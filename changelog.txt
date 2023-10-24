@@ -1,4 +1,9 @@
-﻿Changelog of CA Lab (Released: September 2023)
+﻿Changelog of CA Lab (Released: no yet)
+V1.7.3.2
+  # Fixed problems with inactive Epics variables
+    at the time of programme start.
+
+----------------------------------------------------------------------
 V1.7.3.1
   # Support of different number or order of fields in CaLabGet/Event
   # CaLabInfo.vi: PV list now has alphabetically sorted PVs names
