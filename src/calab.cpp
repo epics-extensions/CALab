@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.3.2
+// Version     : 1.7.3.3
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -56,7 +56,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.7.3.2"
+#define CALAB_VERSION       "1.7.3.3"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
@@ -592,6 +592,7 @@ class calabItem {
 public:
 	void* validAddress;							// check number for valid object
 	chanId						caID = 0x0;								// channel access ID
+	chanId						caIDprec = 0x0;							// channel access ID for display precision
 	chtype						nativeType = -1;						// native data type (EPICS)
 	uInt32						numberOfValues = 0x0;					// number of values
 	char						szName[MAX_NAME_SIZE];					// PV name as null-terminated string
@@ -606,7 +607,7 @@ public:
 	modifiedMap					fieldModified;							// indicator for changed field value
 	epicsMutexId				myLock;									// object mutex
 	LStrHandle					name = 0x0;								// PV name as LV string
-	calabItem* parent = 0x0;							// parent of field object = main object with values
+	calabItem*					parent = 0x0;							// parent of field object = main object with values
 	propertyMap					properties;								// properties / fields
 	int16_t						SeverityNumber = epicsSevInvalid;		// number of EPICS severity
 	LStrHandle					SeverityString = 0x0;					// LV string of EPICS severity
@@ -618,10 +619,12 @@ public:
 	dbr_gr_enum					sEnum;									// enumeration String
 	std::vector<LVUserEventRef>	RefNum;									// reference number for LV user event
 	std::vector<sResult*>		eventResultCluster;						// reference object for LV user event
-	void* writeValueArray = 0x0;					// buffer for output
+	void*						writeValueArray = 0x0;					// buffer for output
 	uInt32						writeValueArraySize = 0;				// size of output buffer
 	std::atomic<bool>			locked;									// indicator of locked object
 	std::chrono::high_resolution_clock::time_point timer;				// watch dog timer
+	char						className[MAX_STRING_SIZE];				// class name of object
+	int32						prec;									// display precision; -1 == not initialized, -2 == not available
 
 	calabItem(void* currentInstance, LStrHandle name, sStringArrayHdl fieldNames = 0x0) {
 		hasValue = false;
@@ -673,6 +676,8 @@ public:
 		ErrorIO.source = 0x0;
 		sEnum.no_str = 0x0;
 		setError(ECA_DISCONN);
+		strncpy_s(className, "unknown", MAX_STRING_SIZE);
+		prec = -1;
 		timer = std::chrono::high_resolution_clock::now();
 	}
 
@@ -1002,7 +1007,23 @@ public:
 				bDbrTime = 1;
 				break;
 			case DBR_TIME_FLOAT:
-				for (long lCount = 0; lCount < args.count; lCount++) {
+				if (properties.size() && prec == -1) {
+					propertyMapIterator nameIterator = properties.find("PREC");
+					if (nameIterator != properties.end()) {
+						prec = std::stoi(nameIterator->second);
+					}
+					else {
+						prec = -2;
+					}
+				}
+				for (long lCount = 0; lCount < args.count; lCount++) {					
+					if(prec >= 0)
+						if(abs(((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) < 1e-3 || abs(((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) >= 1e7)
+							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*e", prec, ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
+						else
+							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*f", prec, ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
+					else
+						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->szName) {
 						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
@@ -1024,8 +1045,23 @@ public:
 				bDbrTime = 1;
 				break;
 			case DBR_TIME_DOUBLE:
+				if (properties.size() && prec == -1) {
+					propertyMapIterator nameIterator = properties.find("PREC");
+					if (nameIterator != properties.end()) {
+						prec = std::stoi(nameIterator->second);
+					}
+					else {
+						prec = -2;
+					}
+				}
 				for (long lCount = 0; lCount < args.count; lCount++) {
-					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
+					if(prec >= 0)
+						if(abs(((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) < 1e-3 || abs(((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) >= 1e7)
+							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*e", prec, ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
+						else
+							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*f", prec, ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
+					else
+						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
 					if (parent && parent->szName) {
 						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
 					}
@@ -1121,6 +1157,9 @@ public:
 					modified();
 				}
 				bDbrTime = 0;
+				break;
+			case DBR_CLASS_NAME:
+				strncpy_s(className, (const char*)((dbr_string_t*)dbr_value_ptr(args.dbr, DBR_CLASS_NAME)), MAX_STRING_SIZE);
 				break;
 			default:
 				setError(ECA_BADTYPE);
@@ -3044,7 +3083,7 @@ extern "C" EXPORT void info(sStringArray2DHdl * InfoStringArray2D, sResultArrayH
 				(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
 				currentResult->valueArraySize = currentItem->numberOfValues;
 			}
-			size_t propertiesSize = currentItem->properties.size();
+			size_t propertiesSize = currentItem->properties.size() + 2; // +1 for the class name and +1 for the native data type
 			if (!currentResult->FieldValueArray && propertiesSize) {
 				if (currentResult->FieldNameArray)
 					err += DeleteStringArray(currentResult->FieldNameArray);
@@ -3057,11 +3096,15 @@ extern "C" EXPORT void info(sStringArray2DHdl * InfoStringArray2D, sResultArrayH
 				if (currentResult->FieldValueArray)
 					(*currentResult->FieldValueArray)->dimSize = propertiesSize;
 				uInt32 l = 0;
+				std::string fieldName;
+				size_t fieldNameLength;
+				std::string fieldValue;
+				size_t fieldValueLength;
 				for (const std::pair<const std::string, std::string>& property : currentItem->properties) {
-					std::string fieldName = property.first;
-					size_t fieldNameLength = fieldName.size();
-					std::string fieldValue = property.second;
-					size_t fieldValueLength = fieldValue.size();
+					fieldName = property.first;
+					fieldNameLength = fieldName.size();
+					fieldValue = property.second;
+					fieldValueLength = fieldValue.size();
 					if (fieldNameLength && currentResult->FieldNameArray && *currentResult->FieldNameArray) {
 						NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], fieldNameLength);
 						if ((*currentResult->FieldNameArray)->elt[l] && *(*currentResult->FieldNameArray)->elt[l]) {
@@ -3084,6 +3127,44 @@ extern "C" EXPORT void info(sStringArray2DHdl * InfoStringArray2D, sResultArrayH
 					}
 					l++;
 				}
+				fieldName = "Class Name";
+				fieldNameLength = fieldName.size();
+				fieldValue = currentItem->className;
+				fieldValueLength = fieldValue.size();
+				if (fieldNameLength && currentResult->FieldNameArray && *currentResult->FieldNameArray && &(*currentResult->FieldNameArray)->elt[l]) {
+					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], fieldNameLength);
+					if ((*currentResult->FieldNameArray)->elt[l] && *(*currentResult->FieldNameArray)->elt[l]) {
+						memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, fieldName.c_str(), fieldNameLength);
+						(*(*currentResult->FieldNameArray)->elt[l])->cnt = (int32)fieldNameLength;
+					}
+				}
+				if (fieldValueLength && currentResult->FieldValueArray && *currentResult->FieldValueArray && &(*currentResult->FieldValueArray)->elt[l]) {
+					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
+					if ((*currentResult->FieldValueArray)->elt[l] && *(*currentResult->FieldValueArray)->elt[l]) {
+						memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
+						(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
+					}
+				}
+				l++;
+				fieldName = "Native Data Type";
+				fieldNameLength = fieldName.size();
+				fieldValue = dbr_type_to_text(currentItem->nativeType);
+				fieldValueLength = fieldValue.size();
+				if (fieldNameLength && currentResult->FieldNameArray && *currentResult->FieldNameArray && &(*currentResult->FieldNameArray)->elt[l]) {
+					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], fieldNameLength);
+					if ((*currentResult->FieldNameArray)->elt[l] && *(*currentResult->FieldNameArray)->elt[l]) {
+						memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, fieldName.c_str(), fieldNameLength);
+						(*(*currentResult->FieldNameArray)->elt[l])->cnt = (int32)fieldNameLength;
+					}
+				}
+				if (fieldValueLength && currentResult->FieldValueArray && *currentResult->FieldValueArray && &(*currentResult->FieldValueArray)->elt[l]) {
+					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
+					if ((*currentResult->FieldValueArray)->elt[l] && *(*currentResult->FieldValueArray)->elt[l]) {
+						memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
+						(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
+					}
+				}
+				l++;
 			}
 			currentItem->unlock();
 			iCount++;
@@ -3210,6 +3291,7 @@ static void caTask(void) {
 							if (currentItem->nativeType == DBF_ENUM && !currentItem->sEnum.no_str) {
 								iResult = ca_create_subscription(DBR_CTRL_ENUM, 1, currentItem->caID, DBE_VALUE, valueChanged, (void*)currentItem, &currentItem->caEnumEventID);
 							}
+							ca_get_callback(DBR_CLASS_NAME, currentItem->caID, valueChanged, 0x0);
 							currentItem->unlock();
 						}
 						else {
