@@ -43,4 +43,4 @@ CA Lab library builds an internal PV cache and monitors PVs to improve the read 
 CA Lab includes a EPICS Base package (caget, caput, camonitor, softIOC and more).
 
 <a href="https://github.com/epics-extensions/CALab/releases">🔗download Windows® setups and source code releases</a></br>
-<a href="https://www.helmholtz-berlin.de/zentrum/locations/it/calab">🔗more info and examples</a>
+<a href="https://github.com/epics-extensions/CALab/blob/main/calabdocs.pdf">🔗more info and examples</a>
