@@ -20,3 +20,4 @@ libcalab.so
 *.json
 /null
 /sync.ffs_db
+/calab/x64
