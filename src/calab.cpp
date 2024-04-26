@@ -211,7 +211,10 @@ BOOLEAN WINAPI DllMain(HINSTANCE hDllHandle, DWORD nReason, LPVOID Reserved) {
 	return 1;
 }
 #else // Workaround for EPICS library unload issue in Linux
-const short* dbf_text_dim = (const short*)dlsym(caLibHandle, "dbf_text_dim");
+const char** dbr_text = (const char**)dlsym(caLibHandle, "dbr_text");
+const char*  dbr_text_invalid = (const char* )dlsym(caLibHandle, "dbr_text_invalid");
+const short* dbf_text_dim     = (const short*)dlsym(caLibHandle, "dbf_text_dim");
+const short* dbr_text_dim     = (const short*)dlsym(caLibHandle, "dbr_text_dim");
 const char* epicsAlarmSeverityStrings[] = {
 	"NO_ALARM",
 	"MINOR",
@@ -261,6 +264,7 @@ const char* epicsAlarmConditionStrings[] = {
 #define CA_OP_CONN_UP              6
 #define CA_OP_CONN_DOWN            7
 #define dbf_type_to_DBR_TIME(type) (((type) >= 0 && (type) <= *dbf_text_dim-3) ? (type) + 2*(*dbf_text_dim-2) : -1)
+#define dbr_type_to_text(type)     (((type) >= 0 && (type) <  *dbr_text_dim)   ? dbr_text[(type)] : dbr_text_invalid)
 #define DEFMSG(SEVERITY,NUMBER)    (CA_INSERT_MSG_NO(NUMBER) | CA_INSERT_SEVERITY(SEVERITY))
 #define epicsMutexCreate()         epicsMutexOsiCreate(__FILE__,__LINE__)
 #define ECA_NORMAL                 DEFMSG(CA_K_SUCCESS,  0) /* success */
@@ -478,6 +482,7 @@ typedef int(*ca_clear_subscription_t)(evid eventID);
 typedef int(*ca_context_create_t) (ca_preemptive_callback_select select);
 typedef int(*ca_create_channel_t) (const char* pChanName, caCh* pConnStateCallback, void* pUserPrivate, capri priority, chid* pChanID);
 typedef int(*ca_create_subscription_t) (chtype type, unsigned long count, chid chanId, long mask, caEventCallBackFunc* pFunc, void* pArg, evid* pEventID);
+typedef int(*ca_array_get_callback_t) (chtype type, unsigned long count, chid chanId, caEventCallBackFunc* pFunc, void* pArg);
 typedef int(*ca_pend_io_t) (ca_real timeOut);
 #if defined _WIN32 || defined _WIN64
 #define EPICS_PRINTF_STYLE(f,a)
@@ -509,6 +514,7 @@ ca_context_create_t ca_context_create = 0x0;
 ca_context_destroy_t ca_context_destroy = 0x0;
 ca_create_channel_t ca_create_channel = 0x0;
 ca_create_subscription_t ca_create_subscription = 0x0;
+ca_array_get_callback_t ca_array_get_callback = 0x0;
 ca_current_context_t ca_current_context = 0x0;
 ca_detach_context_t ca_detach_context = 0x0;
 ca_element_count_t ca_element_count = 0x0;
@@ -538,9 +544,8 @@ typedef const unsigned short(*dbr_size_t);
 typedef const unsigned short(*dbr_value_size_t);
 dbr_value_size_t dbr_value_size = 0x0;
 dbr_size_t dbr_size = 0x0;
-#define dbr_size_n(TYPE,COUNT)\
-((unsigned)((COUNT)<=0?dbr_size[TYPE]:dbr_size[TYPE]+((COUNT)-1)*dbr_value_size[TYPE]))
-
+#define dbr_size_n(TYPE,COUNT) ((unsigned)((COUNT)<=0?dbr_size[TYPE]:dbr_size[TYPE]+((COUNT)-1)*dbr_value_size[TYPE]))
+#define ca_get_callback(type, chan, pFunc, pArg) ca_array_get_callback (type, 1u, chan, pFunc, pArg)
 #endif
 
 #define MAX_NAME_SIZE 61
@@ -676,7 +681,8 @@ public:
 		ErrorIO.source = 0x0;
 		sEnum.no_str = 0x0;
 		setError(ECA_DISCONN);
-		strncpy_s(className, "unknown", MAX_STRING_SIZE);
+        memcpy(className, "unknown", sizeof("unknown"));
+		className[sizeof("unknown")] = 0x0;
 		prec = -1;
 		timer = std::chrono::high_resolution_clock::now();
 	}
@@ -880,6 +886,7 @@ public:
 			int32 iSize;
 			MgErr err = noErr;
 			char szTmp[MAX_STRING_SIZE];
+			const char* tmpClassName = 0x0;
 			if (!szName[0] || args.status != ECA_NORMAL)
 				return;
 			int32 lerr = lock();
@@ -1159,7 +1166,10 @@ public:
 				bDbrTime = 0;
 				break;
 			case DBR_CLASS_NAME:
-				strncpy_s(className, (const char*)((dbr_string_t*)dbr_value_ptr(args.dbr, DBR_CLASS_NAME)), MAX_STRING_SIZE);
+				tmpClassName = (const char*)((dbr_string_t*)dbr_value_ptr(args.dbr, DBR_CLASS_NAME));
+				if(!tmpClassName || strlen(tmpClassName) > MAX_STRING_SIZE) break;
+                memcpy(className, tmpClassName, strlen(tmpClassName));
+				className[strlen(tmpClassName)] = 0x0;
 				break;
 			default:
 				setError(ECA_BADTYPE);
@@ -3369,6 +3379,7 @@ void loadFunctions() {
 	ca_context_destroy = (ca_context_destroy_t)dlsym(caLibHandle, "ca_context_destroy");
 	ca_create_channel = (ca_create_channel_t)dlsym(caLibHandle, "ca_create_channel");
 	ca_create_subscription = (ca_create_subscription_t)dlsym(caLibHandle, "ca_create_subscription");
+	ca_array_get_callback = (ca_array_get_callback_t)dlsym(caLibHandle, "ca_array_get_callback");
 	ca_current_context = (ca_current_context_t)dlsym(caLibHandle, "ca_current_context");
 	ca_detach_context = (ca_detach_context_t)dlsym(caLibHandle, "ca_detach_context");
 	ca_element_count = (ca_element_count_t)dlsym(caLibHandle, "ca_element_count");
