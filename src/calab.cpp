@@ -1017,7 +1017,9 @@ public:
 				if (properties.size() && prec == -1) {
 					propertyMapIterator nameIterator = properties.find("PREC");
 					if (nameIterator != properties.end()) {
-						prec = std::stoi(nameIterator->second);
+						if (nameIterator->second.size()) {
+							prec = std::stoi(nameIterator->second);
+						}
 					}
 					else {
 						prec = -2;
@@ -1055,7 +1057,9 @@ public:
 				if (properties.size() && prec == -1) {
 					propertyMapIterator nameIterator = properties.find("PREC");
 					if (nameIterator != properties.end()) {
-						prec = std::stoi(nameIterator->second);
+						if (nameIterator->second.size()) {
+							prec = std::stoi(nameIterator->second);
+						}
 					}
 					else {
 						prec = -2;
@@ -1241,8 +1245,8 @@ public:
 	//    ValuesPerSet:       numbers of values in row
 	//    Error:              resulting error
 	//    Timeout:            EPICS event timeout in seconds
-	//    Synchronous:        true = callback will be used (no interrupt of motor records)
-	void put(void* ValueArray2D, uInt32 DataType, uInt32 row, uInt32 ValuesPerSet, sError* Error, double Timeout, bool synchronous) {
+	//    Wait4Readback:      true = callback will be used (no interrupt of motor records)
+	void put(void* ValueArray2D, uInt32 DataType, uInt32 row, uInt32 ValuesPerSet, sError* Error, double Timeout, bool Wait4Readback) {
 		LStrHandle currentStringValue;
 		char szTmp[MAX_ERROR_SIZE];
 		uInt32 iResult = ECA_NORMAL;
@@ -1374,11 +1378,9 @@ public:
 				case 0:
 					iPos = row * ValuesPerSet + col;
 					currentStringValue = (**(sStringArray2DHdl*)ValueArray2D)->elt[iPos];
-					if (currentStringValue) {
-						if ((*currentStringValue)->cnt < MAX_STRING_SIZE - 1) {
-							memcpy(szTmp, (*currentStringValue)->str, (*currentStringValue)->cnt);
-							szTmp[(*currentStringValue)->cnt] = 0x0;
-						}
+					if (currentStringValue && (*currentStringValue)->cnt < MAX_STRING_SIZE) {
+						memcpy(szTmp, (*currentStringValue)->str, (*currentStringValue)->cnt);
+						szTmp[(*currentStringValue)->cnt] = 0x0;
 					}
 					else {
 						szTmp[0] = 0x0;
@@ -1386,6 +1388,24 @@ public:
 					if (nativeType != DBF_STRING && nativeType != DBF_ENUM)
 						while (strstr(szTmp, ","))
 							*(strstr(szTmp, ",")) = '.';
+					if (nativeType != DBF_STRING) {
+#if IsOpSystem64Bit
+						int64_t convertedValue = strtoll(szTmp, nullptr, 10);
+						if (convertedValue < INT32_MIN || convertedValue > INT32_MAX) {
+							char szError[MAX_ERROR_SIZE] = "value does not fit into 32-bit target PV";
+							stringSize = (int32)strlen(szError);
+							if (!Error->source || (*Error->source)->cnt != stringSize) {
+								NumericArrayResize(uB, 1, (UHandle*)&Error->source, stringSize);
+								(*Error->source)->cnt = stringSize;
+							}
+							memcpy((*Error->source)->str, szError, stringSize);
+							Error->code = ERROR_OFFSET;
+							Error->status = 0;
+							tasks.fetch_sub(1);
+							return;
+						}
+#endif
+					}
 					switch (nativeType) {
 					case DBF_STRING:
 					case DBF_ENUM:
@@ -1403,7 +1423,7 @@ public:
 						if (nativeType == DBF_STRING) {
 							currentStringValue = (**(sStringArray2DHdl*)ValueArray2D)->elt[iPos];
 							if (currentStringValue) {
-								if ((*currentStringValue)->cnt < MAX_STRING_SIZE - 1) {
+								if ((*currentStringValue)->cnt < MAX_STRING_SIZE) {
 									memcpy(szTmp, (*currentStringValue)->str, (*currentStringValue)->cnt);
 									szTmp[(*currentStringValue)->cnt] = 0x0;
 								}
@@ -1467,17 +1487,20 @@ public:
 			}
 			switch (DataType) {
 			case 0:
-				iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
+				if (Wait4Readback)
+					iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
+				else
+					iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
 				break;
 			case 1:
 				if (nativeType == DBF_STRING) {
-					if (synchronous)
+					if (Wait4Readback)
 						iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
 				}
 				else {
-					if (synchronous)
+					if (Wait4Readback)
 						iResult = ca_array_put_callback(DBR_FLOAT, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_FLOAT, stringSize, caID, writeValueArray);
@@ -1485,33 +1508,33 @@ public:
 				break;
 			case 2:
 				if (nativeType == DBF_STRING) {
-					if (synchronous)
+					if (Wait4Readback)
 						iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
 				}
 				else {
-					if (synchronous)
+					if (Wait4Readback)
 						iResult = ca_array_put_callback(DBR_DOUBLE, stringSize, caID, writeValueArray, putState, this);
 					else
 						iResult = ca_array_put(DBR_DOUBLE, stringSize, caID, writeValueArray);
 				}
 				break;
 			case 3:
-				if (synchronous)
+				if (Wait4Readback)
 					iResult = ca_array_put_callback(DBR_CHAR, stringSize, caID, writeValueArray, putState, this);
 				else
 					iResult = ca_array_put(DBR_CHAR, stringSize, caID, writeValueArray);
 				break;
 			case 4:
-				if (synchronous)
+				if (Wait4Readback)
 					iResult = ca_array_put_callback(DBR_SHORT, stringSize, caID, writeValueArray, putState, this);
 				else
 					iResult = ca_array_put(DBR_SHORT, stringSize, caID, writeValueArray);
 				break;
 			case 5:
 			case 6:
-				if (synchronous)
+				if (Wait4Readback)
 					iResult = ca_array_put_callback(DBR_LONG, stringSize, caID, writeValueArray, putState, this);
 				else
 					iResult = ca_array_put(DBR_LONG, stringSize, caID, writeValueArray);
