@@ -886,11 +886,18 @@ public:
 			int32 iSize;
 			MgErr err = noErr;
 			char szTmp[MAX_STRING_SIZE];
-			const char* tmpClassName = 0x0;
 			if (!szName[0] || args.status != ECA_NORMAL)
 				return;
 			int32 lerr = lock();
 			if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
+			if (args.type == DBR_CLASS_NAME) {
+				const char* tmpClassName = (const char*)((dbr_string_t*)dbr_value_ptr(args.dbr, DBR_CLASS_NAME));
+				if (!tmpClassName || strlen(tmpClassName) > MAX_STRING_SIZE) return;
+				memcpy(className, tmpClassName, strlen(tmpClassName));
+				className[strlen(tmpClassName)] = 0x0;
+				unlock();
+				return;
+			}
 			numberOfValues = args.count;
 			if (!parent && !doubleValueArray) {
 				err += NumericArrayResize(fD, 1, (UHandle*)&doubleValueArray, args.count);
@@ -1169,12 +1176,6 @@ public:
 				}
 				bDbrTime = 0;
 				break;
-			case DBR_CLASS_NAME:
-				tmpClassName = (const char*)((dbr_string_t*)dbr_value_ptr(args.dbr, DBR_CLASS_NAME));
-				if(!tmpClassName || strlen(tmpClassName) > MAX_STRING_SIZE) break;
-                memcpy(className, tmpClassName, strlen(tmpClassName));
-				className[strlen(tmpClassName)] = 0x0;
-				break;
 			default:
 				setError(ECA_BADTYPE);
 				hasValue = true;
@@ -1385,70 +1386,12 @@ public:
 					else {
 						szTmp[0] = 0x0;
 					}
-					if (nativeType != DBF_STRING && nativeType != DBF_ENUM)
-						while (strstr(szTmp, ","))
-							*(strstr(szTmp, ",")) = '.';
-					if (nativeType != DBF_STRING) {
-#if IsOpSystem64Bit
-						int64_t convertedValue = strtoll(szTmp, nullptr, 10);
-						if (convertedValue < INT32_MIN || convertedValue > INT32_MAX) {
-							char szError[MAX_ERROR_SIZE] = "value does not fit into 32-bit target PV";
-							stringSize = (int32)strlen(szError);
-							if (!Error->source || (*Error->source)->cnt != stringSize) {
-								NumericArrayResize(uB, 1, (UHandle*)&Error->source, stringSize);
-								(*Error->source)->cnt = stringSize;
-							}
-							memcpy((*Error->source)->str, szError, stringSize);
-							Error->code = ERROR_OFFSET;
-							Error->status = 0;
-							tasks.fetch_sub(1);
-							return;
-						}
-#endif
+					if (nativeType != DBF_STRING && nativeType != DBF_ENUM) {
+						char* found = 0x0;
+						while ((found = strstr(szTmp, ",")) != 0x0)
+							*found = '.';
 					}
-					switch (nativeType) {
-					case DBF_STRING:
-					case DBF_ENUM:
-						memcpy((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, szTmp, strlen(szTmp));
-						break;
-					case DBF_FLOAT:
-						if (nativeType == DBF_STRING) {
-							epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%f", (float)strtod(szTmp, 0x0));
-						}
-						else {
-							epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%f", (float)strtod(szTmp, 0x0));
-						}
-						break;
-					case DBF_DOUBLE:
-						if (nativeType == DBF_STRING) {
-							currentStringValue = (**(sStringArray2DHdl*)ValueArray2D)->elt[iPos];
-							if (currentStringValue) {
-								if ((*currentStringValue)->cnt < MAX_STRING_SIZE) {
-									memcpy(szTmp, (*currentStringValue)->str, (*currentStringValue)->cnt);
-									szTmp[(*currentStringValue)->cnt] = 0x0;
-								}
-							}
-							else {
-								szTmp[0] = 0x0;
-							}
-							memcpy((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, szTmp, strlen(szTmp));
-						}
-						else {
-							epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%f", (double)strtod(szTmp, 0x0));
-						}
-						break;
-					case DBF_CHAR:
-						epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%d", (char)strtol(szTmp, 0x0, 10));
-						break;
-					case DBF_SHORT:
-						epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%d", (dbr_short_t)strtol(szTmp, 0x0, 10));
-						break;
-					case DBF_LONG:
-						epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%ld", (long int)strtol(szTmp, 0x0, 10));
-						break;
-					default:
-						break;
-					}
+					memcpy((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, szTmp, strlen(szTmp));
 					break;
 				case 1:
 					iPos = row * ValuesPerSet + col;
@@ -2136,6 +2079,7 @@ void putState(evargs args) {
 	if (stopped)
 		return;
 	calabItem* item = (calabItem*)ca_puser(args.chid);
+	item->setError(args.status);
 	if (item)
 		item->putReadBack = true;
 	else
@@ -2865,8 +2809,18 @@ extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * P
 						epicsMutexUnlock(putLock);
 						return;
 					}
-					if (!currentItem->putReadBack) {
+					if (!currentItem->putReadBack) {						
 						break;
+					}
+					else {
+						(**ErrorArray)->result[row].code = currentItem->ErrorIO.code;
+						(**ErrorArray)->result[row].status = currentItem->ErrorIO.status;
+						size_t stringSize = (*(currentItem->ErrorIO.source))->cnt;
+						if (!&(**ErrorArray)->result[row] || (*((**ErrorArray)->result[row].source))->cnt != stringSize) {
+							NumericArrayResize(uB, 1, (UHandle*)&(**ErrorArray)->result[row].source, stringSize);
+							(*(**ErrorArray)->result[row].source)->cnt = (int32)stringSize;
+						}
+						memcpy((*(**ErrorArray)->result[row].source)->str, (*currentItem->ErrorIO.source)->str, stringSize);
 					}
 				}
 			} while (row < iNumberOfValueSets && row < (**PvNameArray)->dimSize && time(nullptr) < stop);
