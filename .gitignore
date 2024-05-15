@@ -23,7 +23,7 @@
 /x64
 \#*\#
 calab.o
-/calab/*
-/calab/Debug
-/calab/Release
+calab/*
+calab/Debug/
+calab/Release/
 libcalab.so
