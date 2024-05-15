@@ -2816,7 +2816,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * P
 						(**ErrorArray)->result[row].code = currentItem->ErrorIO.code;
 						(**ErrorArray)->result[row].status = currentItem->ErrorIO.status;
 						size_t stringSize = (*(currentItem->ErrorIO.source))->cnt;
-						if (!&(**ErrorArray)->result[row] || (*((**ErrorArray)->result[row].source))->cnt != stringSize) {
+						if (!&(**ErrorArray)->result[row] || (*((**ErrorArray)->result[row].source))->cnt != (int32)stringSize) {
 							NumericArrayResize(uB, 1, (UHandle*)&(**ErrorArray)->result[row].source, stringSize);
 							(*(**ErrorArray)->result[row].source)->cnt = (int32)stringSize;
 						}
