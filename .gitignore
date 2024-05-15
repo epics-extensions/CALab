@@ -23,5 +23,5 @@
 /x64
 \#*\#
 calab.o
-calab/*
+/calab/*
 libcalab.so
