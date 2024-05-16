@@ -1,5 +1,5 @@
 ﻿<?xml version='1.0' encoding='UTF-8'?>
-<Project Type="Project" LVVersion="23008000">
+<Project Type="Project" LVVersion="19008000">
 	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">true</Property>
 	<Property Name="NI.Project.Description" Type="Str">This project demonstrates a comprehensive interface between LabVIEW and the Experimental Physics and Industrial Control System (EPICS). The examples included in this project illustrate how to read, write, and receive EPICS values through events. Additionally, the project showcases the use of a self-instantiated SoftIOC (Soft Input/Output Controller), providing a practical example of its implementation.
