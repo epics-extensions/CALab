@@ -2079,12 +2079,13 @@ void putState(evargs args) {
 	if (stopped)
 		return;
 	calabItem* item = (calabItem*)ca_puser(args.chid);
-	item->setError(args.status);
-	if (item)
+	if (item) {
+		item->setError(args.status);
 		item->putReadBack = true;
-	else
+	}
+	else {
 		CaLabDbgPrintf("putState got corrupt evargs");
-
+	}
 }
 
 // check whether all data objects got values
@@ -3278,7 +3279,7 @@ static void caTask(void) {
 							if (currentItem->nativeType == DBF_ENUM && !currentItem->sEnum.no_str) {
 								iResult = ca_create_subscription(DBR_CTRL_ENUM, 1, currentItem->caID, DBE_VALUE, valueChanged, (void*)currentItem, &currentItem->caEnumEventID);
 							}
-							ca_get_callback(DBR_CLASS_NAME, currentItem->caID, valueChanged, 0x0);
+							ca_get_callback(DBR_CLASS_NAME, currentItem->caID, valueChanged, (void*)currentItem);
 							currentItem->unlock();
 						}
 						else {

@@ -1,8 +1,20 @@
 ﻿<?xml version='1.0' encoding='UTF-8'?>
-<Project Type="Project" LVVersion="19008000">
+<Project Type="Project" LVVersion="23008000">
+	<Property Name="CCSymbols" Type="Str"></Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">true</Property>
-	<Property Name="NI.Project.Description" Type="Str">Examples of CA Lab
-https://github.com/epics-extensions/CALab/</Property>
+	<Property Name="NI.Project.Description" Type="Str">This project demonstrates a comprehensive interface between LabVIEW and the Experimental Physics and Industrial Control System (EPICS). The examples included in this project illustrate how to read, write, and receive EPICS values through events. Additionally, the project showcases the use of a self-instantiated SoftIOC (Soft Input/Output Controller), providing a practical example of its implementation.
+
+Key Features:
+    - EPICS Value Reading: Demonstrates how to fetch data from EPICS channels
+       using LabVIEW.
+    - EPICS Value Writing: Shows the process of sending data to EPICS channels.
+    - Event-Based EPICS Communication: Explains how to handle EPICS events
+       within LabVIEW.
+    - SoftIOC Integration: Includes a step-by-step example of instantiating
+       and utilizing a SoftIOC within the LabVIEW environment.
+
+This project serves as a practical guide for engineers and researchers looking to integrate LabVIEW with EPICS for control and monitoring applications in scientific and industrial environments.</Property>
+	<Property Name="NI.Project.SaveVersion" Type="Str">Editor version</Property>
 	<Item Name="My Computer" Type="My Computer">
 		<Property Name="server.app.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.control.propertiesEnabled" Type="Bool">true</Property>
@@ -15,42 +27,25 @@ https://github.com/epics-extensions/CALab/</Property>
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
 		<Item Name="Examples" Type="Folder">
 			<Item Name="Parallel Event Demo Sub" Type="Folder">
-				<Item Name="Parallel Event Close.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Parallel Event Demo Sub/Parallel Event Close.vi"/>
-				<Item Name="Parallel Event Indicator.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Parallel Event Demo Sub/Parallel Event Indicator.vi"/>
-				<Item Name="Parallel Event Init.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Parallel Event Demo Sub/Parallel Event Init.vi"/>
-				<Item Name="Parallel Event Struct.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Parallel Event Demo Sub/Parallel Event Struct.vi"/>
-				<Item Name="Parallel Event Task.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Parallel Event Demo Sub/Parallel Event Task.vi"/>
+				<Item Name="Parallel Event Close.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Close.vi"/>
+				<Item Name="Parallel Event Indicator.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Indicator.vi"/>
+				<Item Name="Parallel Event Init.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Init.vi"/>
+				<Item Name="Parallel Event Struct.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Struct.vi"/>
+				<Item Name="Parallel Event Task.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Task.vi"/>
 			</Item>
-			<Item Name="caLab.db" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/caLab.db"/>
-			<Item Name="Event Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Event Demo.vi"/>
-			<Item Name="Parallel Event Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Parallel Event Demo.vi"/>
-			<Item Name="pvList.txt" Type="Document" URL="/&lt;userlib&gt;/caLab/Examples/pvList.txt"/>
-			<Item Name="Read Demo 1.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Read Demo 1.vi"/>
-			<Item Name="Read Demo 2.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Read Demo 2.vi"/>
-			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/SoftIOC Demo Sub.vi"/>
-			<Item Name="SoftIOC Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/SoftIOC Demo.vi"/>
-			<Item Name="Write Demo - Looping.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Demo - Looping.vi"/>
-			<Item Name="Write Demo - Timed.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Demo - Timed.vi"/>
-			<Item Name="Write Demo.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Demo.vi"/>
-			<Item Name="Write Random TestPV_ai.vi" Type="VI" URL="/&lt;userlib&gt;/calab/Examples/Write Random TestPV_ai.vi"/>
+			<Item Name="caLab.db" Type="Document" URL="../Examples/caLab.db"/>
+			<Item Name="Event Demo.vi" Type="VI" URL="../Examples/Event Demo.vi"/>
+			<Item Name="Parallel Event Demo.vi" Type="VI" URL="../Examples/Parallel Event Demo.vi"/>
+			<Item Name="pvList.txt" Type="Document" URL="../Examples/pvList.txt"/>
+			<Item Name="Read Demo 1.vi" Type="VI" URL="../Examples/Read Demo 1.vi"/>
+			<Item Name="Read Demo 2.vi" Type="VI" URL="../Examples/Read Demo 2.vi"/>
+			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="../Examples/SoftIOC Demo Sub.vi"/>
+			<Item Name="SoftIOC Demo.vi" Type="VI" URL="../Examples/SoftIOC Demo.vi"/>
+			<Item Name="Write Demo - Looping.vi" Type="VI" URL="../Examples/Write Demo - Looping.vi"/>
+			<Item Name="Write Demo - Timed.vi" Type="VI" URL="../Examples/Write Demo - Timed.vi"/>
+			<Item Name="Write Demo.vi" Type="VI" URL="../Examples/Write Demo.vi"/>
 		</Item>
-		<Item Name="Lib" Type="Folder">
-			<Item Name="ca.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/ca.dll"/>
-			<Item Name="caget.exe" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/caget.exe"/>
-			<Item Name="cainfo.exe" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/cainfo.exe"/>
-			<Item Name="calab.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/calab.dll"/>
-			<Item Name="camonitor.exe" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/camonitor.exe"/>
-			<Item Name="caput.exe" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/caput.exe"/>
-			<Item Name="caRepeater.exe" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/caRepeater.exe"/>
-			<Item Name="Com.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/Com.dll"/>
-			<Item Name="copy_epics_7_0_7_debug_libs.bat" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/copy_epics_7_0_7_debug_libs.bat"/>
-			<Item Name="copy_epics_7_0_7_release_libs.bat" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/copy_epics_7_0_7_release_libs.bat"/>
-			<Item Name="dbCore.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/dbCore.dll"/>
-			<Item Name="dbRecStd.dll" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/dbRecStd.dll"/>
-			<Item Name="softIoc.dbd" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/softIoc.dbd"/>
-			<Item Name="softIoc.exe" Type="Document" URL="/&lt;userlib&gt;/caLab/Lib/softIoc.exe"/>
-		</Item>
-		<Item Name="CaLab.lvlib" Type="Library" URL="/&lt;userlib&gt;/calab/CaLab.lvlib"/>
+		<Item Name="CaLab.lvlib" Type="Library" URL="../CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
 			<Item Name="vi.lib" Type="Folder">
 				<Item Name="Application Directory.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/file.llb/Application Directory.vi"/>
@@ -94,9 +89,13 @@ https://github.com/epics-extensions/CALab/</Property>
 				<Item Name="TagReturnType.ctl" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/TagReturnType.ctl"/>
 				<Item Name="Three Button Dialog CORE.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Three Button Dialog CORE.vi"/>
 				<Item Name="Three Button Dialog.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Three Button Dialog.vi"/>
+				<Item Name="Trim Whitespace One-Sided.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Trim Whitespace One-Sided.vi"/>
 				<Item Name="Trim Whitespace.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Trim Whitespace.vi"/>
 				<Item Name="Unset Busy.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/cursorutil.llb/Unset Busy.vi"/>
 				<Item Name="whitespace.ctl" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/whitespace.ctl"/>
+			</Item>
+			<Item Name="calab.dll" Type="Document" URL="calab.dll">
+				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
 			</Item>
 		</Item>
 		<Item Name="Build Specifications" Type="Build"/>
