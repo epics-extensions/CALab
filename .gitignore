@@ -4,6 +4,7 @@
 
 .\#*
 *.aps
+*.exe
 *.exp
 *.idb
 *.json
@@ -27,4 +28,3 @@ calab/*
 calab/Debug/
 calab/Release/
 libcalab.so
-*.exe
