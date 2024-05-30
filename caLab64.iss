@@ -148,8 +148,9 @@ Source: "vis\Private\SET_EPICS_CA_ADDR_LIST.vi"; DestDir: "{userappdata}\calab\P
 Source: "vis\Private\SoftIocPathName.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
 Source: "batch\startDemo.bat"; DestDir: "{userappdata}\calab\batch\"; Flags: confirmoverwrite; Components: caLab
 Source: "batch\startTestPV_ai100000.bat"; DestDir: "{userappdata}\calab\batch\"; Flags: confirmoverwrite; Components: caLab
-Source: "ReadMeFirst.txt"; DestDir: "{userappdata}\calab"; DestName: "ReadMeFirst.txt"; Flags: isreadme
+//Source: "ReadMeFirst.txt"; DestDir: "{userappdata}\calab"; DestName: "ReadMeFirst.txt"; Flags: isreadme
 Source: "changelog.txt"; DestDir: "{userappdata}\calab"; DestName: "changelog.txt"
+Source: "post_install.html"; DestDir: "{userappdata}\calab"; DestName: "post_install.html"
 
 [Dirs]
 Name: "{userappdata}\calab\Examples"; Components: caLab
@@ -238,7 +239,7 @@ Name: {group}\Uninstall; Filename: {uninstallexe}; IconFilename: {userappdata}\c
 // latest version: https://aka.ms/vs/17/release/vc_redist.x64.exe
 Components: vcruntimeadmin; Filename: {tmp}\vc_redist.x64.exe; Check: IsAdminInstallMode and NeedsVCRedistInstall; Parameters: "/passive /norestart /Q:a /c:""msiexec /qb /i vcredist.msi"" "; StatusMsg: Checking for VC++ RunTime ...
 Components: vcruntimeuser; Filename: {tmp}\vc_redist.x64.exe; Check: (not IsAdminInstallMode) and NeedsVCRedistInstall; Parameters: "/passive /norestart /Q:a /c:""msiexec /qb /i vcredist.msi"" "; Flags: runasoriginaluser; StatusMsg: Checking for VC++ RunTime ...
-
+Filename: "{userappdata}\calab\post_install.html"; Description: "Launch post installation checklist"; Flags: postinstall shellexec
 
 [UninstallRun]
 Filename: cmd; Parameters: /c taskkill /f /im camonitor.exe; Flags: RunHidden;
@@ -435,18 +436,5 @@ begin
     end else
       if (not WizardIsComponentSelected('vcruntimeuser')) then
         Result := SuppressibleMsgBox(msg, mbInformation, MB_YESNO, IDYES) = IDYES;
-  end;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if CurStep = ssDone then
-  begin
-    MsgBox('Now you should open' + #13#10 +
-		'LabVIEW™️ -> Tools -> Advanced -> Mass Compile ...' + #13#10 +
-		'and then open %APPDATA%\calab' + #13#10 +
-		'to prepare the CA Lab VIs.' + #13#10 + #13#10 +
-		'Then run' + #13#10 +
-		'%APPDATA%\calab\utilities\"add CaLab palette.vi"', mbInformation, MB_OK);
   end;
 end;
