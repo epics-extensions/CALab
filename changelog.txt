@@ -1,13 +1,16 @@
 ﻿Changelog of CA Lab
-V1.7.3.3  (Released: no yet)
-  + CaLabGet.vi: If the PREC (display precision) field is also queried,
-    the string output of the values is output accordingly.
-    This only applies to EPICS records that support the PREC field.
-  + CaLabInfo.vi: The EPICS record type and the native EPICS data type
-    are now also output in the PVList.
-  + Added utilities-VIs to add/remove CA Lab to/from palette set (LabVIEW™️)
-  # Fixed 39 character string bug.
-  # Fixed data type conversation
+V1.7.3.3  (Released: June 2024)
+  + When the PREC field is queried, the string output of the values is
+    formatted accordingly in CaLabGet.vi. This enhancement applies
+    only to EPICS records that support the PREC field.
+  + The EPICS record type and the native EPICS data type are now also
+    displayed in the PVList in CaLabInfo.vi.
+  + Added utilities-VIs to add/remove CA Lab to/from palette set (LV)
+  # Resolved the 39-character string bug.
+  # Fixed issues with 64-bit record handling for large numbers.
+  # Fixed data type conversationFixed problems with inactive Epics
+    variables at the time of programme start.
+  # Minor improvements of the SoftIOC Demo.vi
 
 ----------------------------------------------------------------------
 V1.7.3.2
