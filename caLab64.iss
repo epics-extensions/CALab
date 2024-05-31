@@ -148,7 +148,7 @@ Source: "vis\Private\SET_EPICS_CA_ADDR_LIST.vi"; DestDir: "{userappdata}\calab\P
 Source: "vis\Private\SoftIocPathName.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
 Source: "batch\startDemo.bat"; DestDir: "{userappdata}\calab\batch\"; Flags: confirmoverwrite; Components: caLab
 Source: "batch\startTestPV_ai100000.bat"; DestDir: "{userappdata}\calab\batch\"; Flags: confirmoverwrite; Components: caLab
-//Source: "ReadMeFirst.txt"; DestDir: "{userappdata}\calab"; DestName: "ReadMeFirst.txt"; Flags: isreadme
+Source: "ReadMeFirst.txt"; DestDir: "{userappdata}\calab"; DestName: "ReadMeFirst.txt"; Flags: confirmoverwrite; Components: caLab
 Source: "changelog.txt"; DestDir: "{userappdata}\calab"; DestName: "changelog.txt"
 Source: "post_install.html"; DestDir: "{userappdata}\calab"; DestName: "post_install.html"
 
@@ -242,9 +242,9 @@ Components: vcruntimeuser; Filename: {tmp}\vc_redist.x64.exe; Check: (not IsAdmi
 Filename: "{userappdata}\calab\post_install.html"; Description: "Launch post installation checklist"; Flags: postinstall shellexec
 
 [UninstallRun]
-Filename: cmd; Parameters: /c taskkill /f /im camonitor.exe; Flags: RunHidden;
-Filename: cmd; Parameters: /c taskkill /f /im softIoc.exe; Flags: RunHidden;
-Filename: cmd; Parameters: /c taskkill /f /im caRepeater.exe; Flags: RunHidden;
+RunOnceId: "UninstallEntry1"; Filename: cmd; Parameters: /c taskkill /f /im camonitor.exe; Flags: RunHidden;
+RunOnceId: "UninstallEntry2"; Filename: cmd; Parameters: /c taskkill /f /im softIoc.exe; Flags: RunHidden;
+RunOnceId: "UninstallEntry3"; Filename: cmd; Parameters: /c taskkill /f /im caRepeater.exe; Flags: RunHidden;
 
 [Code]
 function SplitString(const S, Delimiter: string): TArrayOfString;
