@@ -4,8 +4,7 @@ set EPICS_CA_ADDR_LIST=localhost
 set EPICS_CA_AUTO_ADDR_LIST=NO
 
 :: start ioc shell
-cd /d %APPDATA%\calab
-cd ..\demo
+cd /d %APPDATA%\calab\demo
 start DemoIOC.cmd
 
 :: read values with EPICS BASE tool "camonitor"
@@ -28,6 +27,5 @@ caput -a caLab:waveLong 8 71828 18284 59045 23536 2874 71352 66249 77572
 caput -a caLab:waveString 8 It's easy to access EPICS variables via "CA Lab". It's fast! It's free! Try it!
 
 :: read values with LabVIEW
-cd /d %APPDATA%\calab
-cd ..\Examples
+cd /d %APPDATA%\calab\Examples
 "Read Demo 2.vi"

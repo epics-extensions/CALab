@@ -4,6 +4,7 @@
 
 .\#*
 *.aps
+*.bak
 *.exe
 *.exp
 *.idb
@@ -14,6 +15,7 @@
 *.pdb
 *.tlog
 *.user
+*.zip
 /.vs
 /.vs/CALab/FileContentIndex
 /*.bat
