@@ -6,6 +6,9 @@ V1.7.3.3  (Released: June 2024)
   + The EPICS record type and the native EPICS data type are now also
     displayed in the PVList in CaLabInfo.vi.
   + Added utilities-VIs to add/remove CA Lab to/from palette set (LV)
+  ! To avoid confusion with the programming terminology,
+    in the caLabPut.vi the label of the input "synchronous"
+    has been changed to "wait". (The VI is 100% backward compatible.)
   # Resolved the 39-character string bug.
   # Fixed issues with 64-bit record handling for large numbers.
   # Fixed data type conversationFixed problems with inactive Epics
