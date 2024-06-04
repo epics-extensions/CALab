@@ -608,7 +608,7 @@ public:
 	std::atomic<bool>			hasValue;								// indicator for read value
 	std::atomic<bool>			isConnected;							// indicator for successfully connect to server
 	std::atomic<bool>			isPassive;								// indicator for polling values instead of monitoring
-	std::atomic<bool>			putReadBack;							// indicator for synchronized reading
+	std::atomic<bool>			putReadBack;							// indicator for the wait for the read-back
 	modifiedMap					fieldModified;							// indicator for changed field value
 	epicsMutexId				myLock;									// object mutex
 	LStrHandle					name = 0x0;								// PV name as LV string
@@ -2636,7 +2636,7 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef * RefNum) {
 //    LongValueArray2D:   2D-array of long values
 //    dataType:           type of EPICS channel
 //    Timeout:            EPICS event timeout in seconds
-//    Synchronous:        true = callback will be used (no interrupt of motor records)
+//    wait4readback:      true = callback will be used to get read back values
 //    ValuesSetInColumns: true = read values set vertically in array
 //    ErrorArray:         array of resulting errors
 //    Status:             0 = no problem; 1 = any problem occurred
@@ -2651,7 +2651,7 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef * RefNum) {
 //        4 => Word signed integer              => short     => dbr_short_t
 //        5 => Long signed integer              => long      => dbr_long_t
 //        6 => Quad signed integer              => long      => dbr_long_t
-extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * PvIndexArray, sStringArray2DHdl * StringValueArray2D, sDoubleArray2DHdl * DoubleValueArray2D, sLongArray2DHdl * LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean * Synchronous, sErrorArrayHdl * ErrorArray, LVBoolean * Status, LVBoolean * FirstCall) {
+extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * PvIndexArray, sStringArray2DHdl * StringValueArray2D, sDoubleArray2DHdl * DoubleValueArray2D, sLongArray2DHdl * LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean * wait4readback, sErrorArrayHdl * ErrorArray, LVBoolean * Status, LVBoolean * FirstCall) {
 	// Don't enter if library terminates
 	if (stopped)
 		return;
@@ -2751,7 +2751,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * P
 			return;
 		}
 		*Status = 0;
-		if (bCaLabPolling) *Synchronous = false;
+		if (bCaLabPolling) *wait4readback = false;
 		if (*FirstCall) {
 			if (*PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize) {
 				DSDisposeHandle(*PvIndexArray);
@@ -2779,24 +2779,24 @@ extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * P
 			}
 			switch (DataType) {
 			case 0:
-				currentItem->put((void*)StringValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *Synchronous);
+				currentItem->put((void*)StringValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *wait4readback);
 				break;
 			case 1:
 			case 2:
-				currentItem->put((void*)DoubleValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *Synchronous);
+				currentItem->put((void*)DoubleValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *wait4readback);
 				break;
 			case 3:
 			case 4:
 			case 5:
 			case 6:
-				currentItem->put((void*)LongValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *Synchronous);
+				currentItem->put((void*)LongValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *wait4readback);
 				break;
 			default:
 				// Handled in previous switch-case statement
 				break;
 			}
 		}
-		if (*Synchronous) {
+		if (*wait4readback) {
 			time_t stop = time(nullptr) + (time_t)Timeout;
 			uInt32 row;
 			double wait = .01;
@@ -2806,7 +2806,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * P
 					currentItem = (calabItem*)(**PvIndexArray)->elt[row];
 					if (!valid(currentItem)) {
 						*Status = 1;
-						DbgTime(); CaLabDbgPrintf("Error in putValue->sync: Index array is corrupted.");
+						DbgTime(); CaLabDbgPrintf("Error in putValue->wait4readback: Index array is corrupted.");
 						epicsMutexUnlock(putLock);
 						return;
 					}
