@@ -167,8 +167,8 @@ Name: custom; Description: Custom installation; Flags: iscustom
 Name: caLab; Description: LabVIEW™️ VIs for get PVs, put PVs and create new PVs at EPICS; Types: full vis
 Name: catools; Description: native tools (caget.exe, camonitor.exe, caput.exe, cainfo.exe); Types: full
 Name: sources; Description: sources; Types: full
-Name: vcruntimeadmin; Description: "Check if bundled VS runtime install is necessary? (admin required)"; Types: full custom; Check: IsAdminInstallMode
-Name: vcruntimeuser; Description: "Check if bundled VS runtime install is necessary? (admin required)"; Types: full custom; Check: not IsAdminInstallMode
+Name: vcruntimeadmin; Description: "Check if bundled VS runtime install is necessary? (admin may be required)"; Types: full custom; Check: IsAdminInstallMode
+Name: vcruntimeuser; Description: "Check if bundled VS runtime install is necessary? (admin may be required)"; Types: full custom; Check: not IsAdminInstallMode
 
 [Languages]
 Name: en; MessagesFile: compiler:Default.isl; LicenseFile: "LICENSE"
