@@ -14,6 +14,8 @@ V1.7.3.3  (Released: June 2024)
   # Fixed data type conversationFixed problems with inactive Epics
     variables at the time of programme start.
   # Minor improvements of the SoftIOC Demo.vi
+  # The setup no longer requires admin rights.
+  # The CA Lab libraries and VIs are now saved under %APPDATA%\calab.
 
 ----------------------------------------------------------------------
 V1.7.3.2
