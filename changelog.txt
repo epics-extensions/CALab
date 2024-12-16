@@ -1,4 +1,17 @@
 ﻿Changelog of CA Lab
+V1.7.4.1 (Released: December 2024)
+  # Resolved Windows Setup Issues
+    - Added "Install for all users"
+    - Fixed issues with the custom installation location
+    - Automated PATH variable configuration
+    - Enhanced the post-installation page
+  # Improved path search for EPICS components in certain VIs
+  # Updated VC Redist to Version 14.42.34433.0
+  # Updated EPICS Base to Version 7.0.8.2
+  # The C++ source code for CA Lab remains unchanged
+  Fixed crash when enabling field values without field names enabled
+
+----------------------------------------------------------------------
 V1.7.3.3  (Released: June 2024)
   + When the PREC field is queried, the string output of the values is
     formatted accordingly in CaLabGet.vi. This enhancement applies

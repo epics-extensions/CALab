@@ -1,162 +1,42 @@
 ﻿// Setup build script for Windows
 
 [Files]
-Source: "x64\Release\calab.dll"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "src\calab.cpp"; DestDir: "{userappdata}\calab\src"; Flags: confirmoverwrite; Components: sources
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\ca.dll"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\caget.exe"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\cainfo.exe"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\camonitor.exe"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\caput.exe"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\caRepeater.exe"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\Com.dll"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\dbCore.dll"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\dbRecStd.dll"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\softIoc.exe"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\dbd\softIoc.dbd"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab or caTools
+// General Installation Files
+Source: "x64\Release\calab.dll"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab
+Source: "src\calab.cpp"; DestDir: "{app}\src"; Flags: confirmoverwrite; Components: sources
+
+// EPICS Dependencies
+Source: "..\..\..\epics\current-epics-base\bin\windows-x64\*.dll"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab or caTools
+Source: "..\..\..\epics\current-epics-base\bin\windows-x64\*.exe"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caTools
+Source: "..\..\..\epics\current-epics-base\dbd\softIoc.dbd"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab or caTools
+
+// Visual Studio Redistributable
 Source: "..\VC_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
-Source: "vis\caLab-errors.txt"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLab.lvlib"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLab.lvlps"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLab.lvproj"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\calab.mnu"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabDisconnect.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabEvent.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabEventUnregister.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabFilter.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabGet.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabInfo.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabInit.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabPut.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\CaLabSoftIOC.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\PV Info.ctl"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\PV Info.vi"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\PV.ctl"; DestDir: "{userappdata}\calab"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\demo\db\demo.db"; DestDir: "{userappdata}\calab\Demo\db"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\demo\db\TestPV_ai100000.db"; DestDir: "{userappdata}\calab\Demo\db"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\demo\DemoIOC.cmd"; DestDir: "{userappdata}\calab\Demo"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\demo\TestPV_ai100000.cmd"; DestDir: "{userappdata}\calab\Demo"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\caLab.db"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Event Demo.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Parallel Event Demo Sub\Parallel Event Close.vi"; DestDir: "{userappdata}\calab\Examples\Parallel Event Demo Sub\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Parallel Event Demo Sub\Parallel Event Indicator.vi"; DestDir: "{userappdata}\calab\Examples\Parallel Event Demo Sub\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Parallel Event Demo Sub\Parallel Event Init.vi"; DestDir: "{userappdata}\calab\Examples\Parallel Event Demo Sub\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Parallel Event Demo Sub\Parallel Event Struct.vi"; DestDir: "{userappdata}\calab\Examples\Parallel Event Demo Sub\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Parallel Event Demo Sub\Parallel Event Task.vi"; DestDir: "{userappdata}\calab\Examples\Parallel Event Demo Sub\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Parallel Event Demo.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\pvList.txt"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Read Demo 1.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Read Demo 2.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\SoftIOC Demo Sub.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\SoftIOC Demo.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Write Demo - Looping.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Write Demo - Timed.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Write Demo.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Examples\Write Random TestPV_ai.vi"; DestDir: "{userappdata}\calab\Examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\utilities\add CaLab palette.vi"; DestDir: "{userappdata}\calab\utilities"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\utilities\remove CaLab palette.vi"; DestDir: "{userappdata}\calab\utilities"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabDisconnect_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabDisconnect_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabEvent_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabEvent_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabGet_Main_Initialized.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabGet_Main.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabGet_Result_Filter.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabInit_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabInit_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabPut_Main_Initialized.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabPut_Main.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabSoftIocEnd.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CaLabSoftIocStart.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\CheckWindows.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\ConfigurationSet.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\DbdPathName.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\DbPathName.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Get_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Get_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Get_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Get_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Ioc_Config.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\ioc_mbbi_config.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\port5064free.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_Boolean-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_DBL-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I16-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I32-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I64-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_I8-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_SGL-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String-1D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String-1D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String-1D_PV-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String-1D_PV.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String-2D_PV-1D-I.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\Put_String-2D_PV-1D.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\RestartCounter.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\SET_EPICS_CA_ADDR_LIST.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\Private\SoftIocPathName.vi"; DestDir: "{userappdata}\calab\Private\"; Flags: confirmoverwrite; Components: caLab
-Source: "batch\startDemo.bat"; DestDir: "{userappdata}\calab\batch\"; Flags: confirmoverwrite; Components: caLab
-Source: "batch\startTestPV_ai100000.bat"; DestDir: "{userappdata}\calab\batch\"; Flags: confirmoverwrite; Components: caLab
-Source: "ReadMeFirst.txt"; DestDir: "{userappdata}\calab"; DestName: "ReadMeFirst.txt"; Flags: confirmoverwrite; Components: caLab
-Source: "changelog.txt"; DestDir: "{userappdata}\calab"; DestName: "changelog.txt"
-Source: "post_install.html"; DestDir: "{userappdata}\calab"; DestName: "post_install.html"
+
+// LabVIEW VIs
+Source: "vis\*.txt"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\*.vi"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\*.ctl"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\*.mnu"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\*.lvlib"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\*.lvproj"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\private\*"; DestDir: "{app}\private"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\utilities\*"; DestDir: "{app}\utilities"; Flags: confirmoverwrite; Components: caLab
+
+// Demo Files
+Source: "vis\demo\*.*"; DestDir: "{app}\demo"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\demo\db\*.*"; DestDir: "{app}\demo\db"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\examples\*.*"; DestDir: "{app}\examples"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\examples\Parallel Event Demo Sub\*.*"; DestDir: "{app}\examples\Parallel Event Demo Sub"; Flags: confirmoverwrite; Components: caLab
+
+// Documentation
+Source: "readMeFirst.txt"; DestDir: "{app}\docs"; DestName: "readMeFirst.txt"; Flags: confirmoverwrite; Components: caLab
+Source: "changelog.txt"; DestDir: "{app}\docs"; DestName: "changelog.txt"
 
 [Dirs]
-Name: "{userappdata}\calab\Examples"; Components: caLab
-Name: "{userappdata}\calab"; Components: caLab or caTools
-Name: "{userappdata}\calab\Private"; Components: caLab
-Name: "{userappdata}\calab\src"; Components: sources
+Name: "{app}\examples"; Components: caLab
+Name: "{app}\private"; Components: caLab
+Name: "{app}\src"; Components: sources
 
 [Types]
 Name: full; Description: Full installation
@@ -167,8 +47,7 @@ Name: custom; Description: Custom installation; Flags: iscustom
 Name: caLab; Description: LabVIEW™️ VIs for get PVs, put PVs and create new PVs at EPICS; Types: full vis
 Name: catools; Description: native tools (caget.exe, camonitor.exe, caput.exe, cainfo.exe); Types: full
 Name: sources; Description: sources; Types: full
-Name: vcruntimeadmin; Description: "Check if bundled VS runtime install is necessary? (admin may be required)"; Types: full custom; Check: IsAdminInstallMode
-Name: vcruntimeuser; Description: "Check if bundled VS runtime install is necessary? (admin may be required)"; Types: full custom; Check: not IsAdminInstallMode
+Name: vcruntime; Description: "Check if bundled VS runtime install is necessary?"; Types: full custom; Check: IsAdminInstallMode
 
 [Languages]
 Name: en; MessagesFile: compiler:Default.isl; LicenseFile: "LICENSE"
@@ -186,17 +65,17 @@ AppComments=Before un/installing CA Lab, you should close all EPICS applications
 AppContact=carsten.winkler@helmholtz-berlin.de
 AppCopyright=HZB GmbH
 AppendDefaultGroupName=true
-AppId={{A9194CD2-4489-4268-B21B-7E622C31267F}
+AppId={{BE88DBDA-488E-43D8-866D-FA2D2DE3F952}
 AppName=CA Lab 64-bit
 AppPublisher=HZB GmbH
 AppPublisherURL=www.helmholtz-berlin.de
 AppSupportURL=https://hz-b.de/calab
 AppUpdatesURL=https://hz-b.de/calab
-AppVersion=1.7.3.3
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+AppVersion=1.7.4.1
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=true
-DefaultDirName={userappdata}\calab
+DefaultDirName={autopf}\user.lib\calab
 DefaultGroupName=National Instruments\caLab
 DirExistsWarning=no
 DisableStartupPrompt=true
@@ -204,42 +83,43 @@ InfoAfterFile=
 InfoBeforeFile="changelog.txt"
 LanguageDetectionMethod=none
 LicenseFile="LICENSE"
-OutputBaseFilename=caLabSetup_1733x64
+OutputBaseFilename=caLabSetup_1741x64
 OutputDir=.
 PrivilegesRequired=none
+PrivilegesRequiredOverridesAllowed=dialog
 SetupIconFile=res\caLab.ico
 ShowLanguageDialog=no
 UninstallDisplayIcon={userappdata}\calab\caLab.dll,1
 UninstallDisplayName=CA Lab 64-bit
 UninstallLogMode=append
+UsePreviousAppDir=no
 VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
 VersionInfoProductName=CA Lab
-VersionInfoProductVersion=1.7.3.3
-VersionInfoTextVersion=1.7.3.3
-VersionInfoVersion=1.7.3.3
+VersionInfoProductVersion=1.7.4.1
+VersionInfoTextVersion=1.7.4.1
+VersionInfoVersion=1.7.4.1
 WizardImageFile="res\WizardImage-IS.bmp"
 WizardSmallImageFile=res\WizardSmallImage-IS2.bmp
-MinVersion=0,6.1
-UsePreviousAppDir=False
-VersionInfoProductTextVersion=Version: 1.7.3.3
-VersionInfoOriginalFileName=caLabSetup_1733x64.exe
+MinVersion=0,6.1sp1
+VersionInfoProductTextVersion=Version: 1.7.4.1
+VersionInfoOriginalFileName=caLabSetup_1741x64.exe
 
 [Icons]
-Name: {group}\CA Lab project; Filename: {userappdata}\calab; IconFilename: {userappdata}\calab\caLab.dll; IconIndex: 0
+Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\caLab.dll; IconIndex: 0
 Name: {group}\Online documentation; Filename: https://hz-b.de/calab
-Name: {group}\Start Demo; Filename: {userappdata}\calab\batch\startDemo.bat; Flags: createonlyiffileexists; Components: ; WorkingDir: {userappdata}\calab; IconFilename: {userappdata}\calab\caLab.dll; IconIndex: 2
-Name: {group}\Demo SoftIOC; Filename: {userappdata}\calab\Demo\DemoIOC.cmd; Flags: createonlyiffileexists; Components: ; WorkingDir: {userappdata}\calab\Demo; IconFilename: {userappdata}\calab\caLab.dll; IconIndex: 2
-Name: {group}\Uninstall; Filename: {uninstallexe}; IconFilename: {userappdata}\calab\caLab.dll; IconIndex: 1
+Name: {group}\Start Demo; Filename: {app}\batch\startDemo.bat; Flags: createonlyiffileexists; WorkingDir: {app}; IconFilename: {app}\caLab.dll; IconIndex: 2
+Name: {group}\Demo SoftIOC; Filename: {app}\Demo\DemoIOC.cmd; Flags: createonlyiffileexists; Components: ; WorkingDir: {app}\Demo; IconFilename: {app}\caLab.dll; IconIndex: 2
+Name: {group}\Uninstall; Filename: {uninstallexe}; IconFilename: {app}\caLab.dll; IconIndex: 1
 
 [Run]
 // install redistributable packages for Visual Studio 2015, 2017, 2019, and 2022
 // https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
 // latest version: https://aka.ms/vs/17/release/vc_redist.x64.exe
-Components: vcruntimeadmin; Filename: {tmp}\vc_redist.x64.exe; Check: IsAdminInstallMode and NeedsVCRedistInstall; Parameters: "/passive /norestart /Q:a /c:""msiexec /qb /i vcredist.msi"" "; StatusMsg: Checking for VC++ RunTime ...
-Components: vcruntimeuser; Filename: {tmp}\vc_redist.x64.exe; Check: (not IsAdminInstallMode) and NeedsVCRedistInstall; Parameters: "/passive /norestart /Q:a /c:""msiexec /qb /i vcredist.msi"" "; Flags: runasoriginaluser; StatusMsg: Checking for VC++ RunTime ...
-Filename: "{userappdata}\calab\post_install.html"; Description: "Launch post installation checklist"; Flags: postinstall shellexec
+Components: vcruntime; Filename: {tmp}\vc_redist.x64.exe; Check: NeedsVCRedistInstall; Parameters: "/passive /norestart"; StatusMsg: Checking for VC++ RunTime ...
+Filename: "{app}\docs\post_install.html"; Description: "Important: Open the post installation checklist"; \
+    Flags: postinstall shellexec
 
 [UninstallRun]
 RunOnceId: "UninstallEntry1"; Filename: cmd; Parameters: /c taskkill /f /im camonitor.exe; Flags: RunHidden;
@@ -247,7 +127,128 @@ RunOnceId: "UninstallEntry2"; Filename: cmd; Parameters: /c taskkill /f /im soft
 RunOnceId: "UninstallEntry3"; Filename: cmd; Parameters: /c taskkill /f /im caRepeater.exe; Flags: RunHidden;
 
 [Code]
+procedure CreateNextStepsHtml();
+var
+  Content: String;
+  AppPathEscaped: String;
+  PaletteSection: String;
+begin
+  AppPathEscaped := ExpandConstant('{app}');
+  StringChange(AppPathEscaped, '\', '\\');
+  PaletteSection := '';
+  if not IsAdminInstallMode then
+  begin
+    PaletteSection :=
+      '<label for="step2" class="step"> Add CA Lab to palette set (User Controls / User Libraries)</label><br>' +
+      '<div class="substep">' +
+      '<input type="checkbox" id="substep4" name="substep4" value="substep4">' +
+      '<label for="substep4"> go to LabVIEW<sup>&trade;</sup> &rarr; and run <code id="code1">"<span id="lvPath"></span>\utilities\add CaLab palette.vi"</code>' +
+      '<button type="button" onclick="copyToClipboard(''code1'')">copy code</button></label><br>' +
+      '</div>' +
+      '<label for="step3" class="step"> Let''s see if everything is working fine</label><br>' +
+      '<div class="substep">' +
+      '<input type="checkbox" id="substep5" name="substep5" value="substep5">' +
+      '<label for="substep5"> go to LabVIEW<sup>&trade;</sup> and run<br>' +
+      '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code1a">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code>' +
+      '<button type="button" onclick="copyToClipboard(''code1a'')">copy code</button></label><br>' +
+      '</div>';
+  end;
+
+  Content := '<!DOCTYPE html> <html> <head> <title>CA Lab Post Installation</title>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"> <style>' +
+    'body { font-family: Verdana, sans-serif; margin: 0; padding: 0; background-color: #f0f0f0; }' +
+    'form { margin-bottom: 250px; padding: 0; } svg { margin-top: 0; }' +
+    'input[type="checkbox"] { transform: scale(1.5); margin-right: 10px; background-color: #f0f0f0; }' +
+    'input[type="checkbox"]:checked + label { color: #000; } label { color: #666; }' +
+    'button { background-color: #4caf4f30; } code { background-color: #afafaf; padding: 2px; }' +
+    '.step { font-weight: bold; margin-top: 30px; } .substep { font-weight: normal; margin-left: 30px; margin-bottom: 5px; }' +
+    '.char { opacity: 0; animation: fadeIn 0.3s forwards; }' +
+    '@keyframes fadeIn { to { opacity: 1; } }' +
+    '/* Animation delays for each character */' +
+    '.char:nth-child(n) { animation-delay: calc(0.2s * var(--char-index)); }' +
+    '.progress-container { width: 100%; height: 20px; background-color: #4caf4f30; border-radius: 10px; margin: 20px 0; position: relative; }' +
+    '#progress-bar { width: 0%; height: 100%; background-color: #4CAF50; border-radius: 10px; transition: width 0.2s ease-in-out; }' +
+    '#progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #000; }' +
+    '</style> </head> <body style="font-size: larger; margin: 0em 1em 1em 1em;">' +
+    '<div style="position: relative; width: 500px; height: 260px; margin: 0 auto;">' +
+    '<img src="https://github.com/epics-extensions/CALab/releases/download/v1.7.2.2/CaLab.png" alt="CA Lab Logo"' +
+    ' style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 260px; width: 260px;">' +
+    '<svg width="500" height="160" style="position: absolute; top: 130px; left: 50%; transform: translate(-50%, 30px);">' +
+    '<path id="curve" d="M 120 -5 Q 230 185 375 10" fill="transparent" />' +
+    '<text width="500" y="20" style="font: 28px Verdana, sans-serif; text-anchor: middle;">' +
+    '<textPath href="#curve" startOffset="50%">' +
+    '<tspan class="char" style="--char-index: 1">N</tspan>' +
+    '<tspan class="char" style="--char-index: 2">e</tspan>' +
+    '<tspan class="char" style="--char-index: 3">x</tspan>' +
+    '<tspan class="char" style="--char-index: 4">t</tspan>' +
+    '<tspan class="char" style="--char-index: 5">&nbsp;</tspan>' +
+    '<tspan class="char" style="--char-index: 6">S</tspan>' +
+    '<tspan class="char" style="--char-index: 7">t</tspan>' +
+    '<tspan class="char" style="--char-index: 8">e</tspan>' +
+    '<tspan class="char" style="--char-index: 9">p</tspan>' +
+    '<tspan class="char" style="--char-index: 10">s</tspan>' +
+    '</textPath> </text> </svg> </div>' +
+    '<div class="progress-container">' +
+    '<div id="progress-bar"></div>' +
+    '<div id="progress-text">0%</div>' +
+    '</div>' +
+    '<form action="/submit" method="get">' +
+    '<label for="step1" class="step"> Compile CA Lab to current LabVIEW<sup>&trade;</sup> version</label><br>' +
+    '<div class="substep">' +
+    '<input type="checkbox" id="substep1" name="substep1" value="substep1">' +
+    '<label for="substep1"> go to LabVIEW<sup>&trade;</sup> &rarr; Tools &rarr; Advanced &rarr; Mass Compile &hellip;</label><br>' +
+    '<input type="checkbox" id="substep2" name="substep2" value="substep2">' +
+    '<label for="substep2"> then open <code id="code0">"<span id="lvPath"></span>"</code> (could be repeated)</label>' +
+    '<button type="button" onclick="copyToClipboard(''code0'')">copy code</button><br>' +
+    '<input type="checkbox" id="substep3" name="substep3" value="substep3">' +
+    '<label for="substep3"> click &quot;Mass Compile&quot; (you can ignore &quot;Insane Array&quot; warnings)</label><br>' +
+    '</div>' +
+    PaletteSection +
+    '<label for="step3" class="step"> Lets see if everything is working fine</label><br>' +
+    '<div class="substep"><input type="checkbox" id="substep5" name="substep5" value="substep5">' +
+    '<label for="substep5"> go to LabVIEW<sup>&trade;</sup> and run<br>' +
+    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code1">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code> <button type="button" onclick="copyToClipboard(''code1'')">copy code</button><br>' +
+    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(softIoc and caRepeater may trigger the firewall. You should grant them access.)</label></div><br>' +
+    '<label for="step4" class="step"> EPICS Base control commands</label><br>' +
+    '<label for="substep21">open a command prompt</label><br>' +
+    '<input type="checkbox" id="substep22" name="substep22" value="substep22">' +
+    '<label for="substep22">caget, camonitor, caput and softIoc should now be available as commands<br>' +
+    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(They may all trigger the firewall. You should grant them access.)</label><br>' +
+    '</form>' +
+    '<script>' +
+    'function updateProgress() {' +
+    '  const checkboxes = document.querySelectorAll(''input[type="checkbox"]'');' +
+    '  const total = checkboxes.length;' +
+    '  const checked = Array.from(checkboxes).filter(cb => cb.checked).length;' +
+    '  const percentage = Math.round((checked / total) * 100);' +
+    '  document.getElementById(''progress-bar'').style.width = percentage + ''%'';' +
+    '  document.getElementById(''progress-text'').textContent = percentage + ''%'';' +
+    '}' +
+    'function copyToClipboard(id) {' +
+    '  const codeElement = document.getElementById(id);' +
+    '  const text = codeElement.innerText || codeElement.textContent;' +
+    '  navigator.clipboard.writeText(text);' +
+    '}' +
+    'document.querySelectorAll(''input[type="checkbox"]'').forEach(checkbox => {' +
+    '  checkbox.addEventListener(''change'', updateProgress);' +
+    '});' +
+    'const lvPathElements = document.querySelectorAll(''#lvPath'');' +
+    'lvPathElements.forEach(element => {' +
+    '  element.textContent = "' + AppPathEscaped + '";' +
+    '});' +
+    'updateProgress();' +
+    '</script>' +
+    '<a href="https://www.helmholtz-berlin.de/zentrum/organisation/it/calab/index_en.html"' +
+    ' style="position: fixed; bottom: 0; right: 0; padding: 10px 20px;' +
+    ' background-color: #4caf50; color: #fff; text-decoration: none;">More documentation</a>' +
+    '</body> </html>';
+  SaveStringToFile(ExpandConstant('{app}\docs\post_install.html'), Content, False);
+end;
+
+// Function to split a string into an array of strings by a delimiter 
 function SplitString(const S, Delimiter: string): TArrayOfString;
+{ Function for Inno Setup Compiler }
+{ Returns array of strings split by the given delimiter }
 var
   I, Start, DelimLen: Integer;
 begin
@@ -265,7 +266,10 @@ begin
   Result[Length(Result)-1] := Copy(S, Start, MaxInt);
 end;
 
+// Function to check if a file exists in system PATH
 function SearchPath(FileName: string): Boolean;
+{ Function for Inno Setup Compiler }
+{ Returns True if file is found in any PATH directory, False otherwise }
 var
   I: Integer;
   FoldersArray: TArrayOfString;
@@ -291,13 +295,13 @@ begin
   Result := False;
 end;
 
+// Function to perform pre-installation checks
 function InitializeSetup(): Boolean;
-var
-  foundPath: string;
+{ Function for Inno Setup Compiler }
+{ Returns True if setup can proceed, False if conflicting files are found }
 begin
-  if (SearchPath('caRepeater.exe') or
-      SearchPath('ca.dll') or
-      SearchPath('Com.dll')) then
+  // Check for conflicting files on the system
+  if (SearchPath('caRepeater.exe') or SearchPath('ca.dll') or SearchPath('Com.dll')) then
   begin
     MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
     Result := False;
@@ -306,11 +310,124 @@ begin
     Result := True;
 end;
 
+// Function to initialize the installation wizard
+procedure InitializeWizard();
+{ Function for Inno Setup Compiler }
+{ Sets up initial directory paths based on LabVIEW installation }
+var
+  lvPath : String;
+begin
+  if IsAdminInstallMode then
+    begin
+      lvPath := '';
+      RegQueryStringValue(HKEY_LOCAL_MACHINE, 'Software\National Instruments\LabVIEW\CurrentVersion\', 'Path', lvPath);
+      WizardForm.DirEdit.Text := AddBackslash(lvPath) + 'user.lib\calab';
+    end
+  else
+    WizardForm.DirEdit.Text := ExpandConstant('{userappdata}\calab');
+end;
+
+// Function to add installation directory to system PATH
+procedure ModifyPath;
+{ Function for Inno Setup Compiler }
+{ Adds application lib directory to system PATH environment variable }
+var
+  RegKey: string;
+  CurrentPath: string;
+  NewPath: string;
+  AppLibPath: string;
+  RootKey: Integer;
+begin
+  // Pre-calculate registry root key
+  RootKey := HKEY_CURRENT_USER;
+  if IsAdminInstallMode then
+    RootKey := HKEY_LOCAL_MACHINE;
+
+  // Set appropriate registry key based on install mode
+  if IsAdminInstallMode then
+    RegKey := 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+  else
+    RegKey := 'Environment';
+
+  // Get the current PATH using pre-calculated root key
+  if not RegQueryStringValue(RootKey, RegKey, 'Path', CurrentPath) then
+    CurrentPath := '';
+
+  // Prepare path to add
+  AppLibPath := ExpandConstant('{app}\lib');
+
+  // Check if path already exists
+  if Pos(Uppercase(AppLibPath), Uppercase(CurrentPath)) = 0 then
+  begin
+    // Add the new path with semicolon separator if needed
+    if CurrentPath <> '' then
+      NewPath := CurrentPath + ';' + AppLibPath
+    else
+      NewPath := AppLibPath;
+
+    // Write the new PATH using pre-calculated root key
+    RegWriteExpandStringValue(RootKey, RegKey, 'Path', NewPath);
+  end;
+  RegWriteExpandStringValue(RootKey, RegKey, 'CALAB_HOME', ExpandConstant('{app}'));
+end;
+
+// Function to remove installation directory from system PATH
+procedure RemovePath;
+{ Function for Inno Setup Compiler }
+{ Removes application lib directory from system PATH environment variable }
+var
+  RegKey: string;
+  CurrentPath, NewPath: string;
+  AppLibPath: string;
+  RootKey: Integer;
+  PathParts: TArrayOfString;
+  I: Integer;
+begin
+  // Pre-calculate registry root key
+  RootKey := HKEY_CURRENT_USER;
+  if IsAdminInstallMode then
+    RootKey := HKEY_LOCAL_MACHINE;
+
+  // Set appropriate registry key based on install mode
+  if IsAdminInstallMode then
+    RegKey := 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment'
+  else
+    RegKey := 'Environment';
+
+  // Get the current PATH
+  if RegQueryStringValue(RootKey, RegKey, 'Path', CurrentPath) then
+  begin
+    AppLibPath := ExpandConstant('{app}\lib');
+    
+    // Split path into parts
+    PathParts := SplitString(CurrentPath, ';');
+    NewPath := '';
+    
+    // Rebuild path excluding our entry
+    for I := 0 to GetArrayLength(PathParts)-1 do
+    begin
+      if Uppercase(PathParts[I]) <> Uppercase(AppLibPath) then
+      begin
+        if NewPath <> '' then
+          NewPath := NewPath + ';';
+        NewPath := NewPath + PathParts[I];
+      end;
+    end;
+
+    // Write back cleaned path
+    if NewPath <> CurrentPath then
+      RegWriteExpandStringValue(RootKey, RegKey, 'Path', NewPath);
+  end;
+
+  // remove CALAB_HOME if it exists
+  if RegValueExists(RootKey, RegKey, 'CALAB_HOME') then
+    RegDeleteValue(RootKey, RegKey, 'CALAB_HOME');
+end;
+
+// Function to compare version strings
 function CompareVersion(V1, V2: string): Integer;
-// Compare version strings
-// Returns 0, if the versions are equal.
-// Returns -1, if the V1 is older than the V2.
-// Returns 1, if the V1 is newer than the V2.
+{ Function for Inno Setup Compiler }
+{ Returns 0 if versions equal, -1 if V1 older than V2, 1 if V1 newer than V2 }
 var
   P, N1, N2: Integer;
 begin
@@ -357,6 +474,7 @@ begin
   end;
 end;
 
+// Function to check if Visual C++ Redistributable is installed
 function VCinstalled(const regKey: string): Boolean;
 { Function for Inno Setup Compiler }
 { Returns True if same or later Microsoft Visual C++ 2015 Redistributable is installed, otherwise False. }
@@ -390,51 +508,48 @@ begin
   end;
 end;
 
+// Function to check if VC++ redistributable installation is needed
 function NeedsVCRedistInstall: Boolean;
+{ Function for Inno Setup Compiler }
+{ Returns True if VC++ redistributable needs to be installed, False otherwise }
 begin
   if NOT IsWin64 then
-    { 32-bit OS, 32-bit installer }
     Result := not (VCinstalled('SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X86'))
   else if Is64BitInstallMode then
-    { 64-bit OS, 64-bit installer }
     Result := not (VCinstalled('SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'))
   else
-    { 64-bit OS, 32-bit installer }
     Result := not (VCinstalled('SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x86'));  
 end;
 
-procedure CurPageChanged(CurPageID: Integer);
+// Procedure called after installation steps
+procedure CurStepChanged(CurStep: TSetupStep);
+{ Function for Inno Setup Compiler }
+{ Handles post-installation PATH modifications }
 begin
-  if CurPageID = wpSelectComponents then
-    if (not IsAdminInstallMode) then
-    begin
-      // Runtime query/install component unchecked by default
-      // in User mode installs. Checked in Admin installs.
-      WizardForm.ComponentsList.Checked[3] := False;
-      //WizardForm.ComponentsList.ItemEnabled[4] := False;
-    end;
+  if CurStep = ssPostInstall then
+    CreateNextStepsHtml();
+    ModifyPath();
 end;
 
-function NextButtonClick(CurPageID: Integer): Boolean;
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+{ Function for Inno Setup Compiler }
+{ Handles PATH cleanup and file removal during uninstallation }
 var
-  msg: String;
+  VersionFile: string;
 begin
-  Result := True;
-  msg := 'The option to check for/install the VS' + #13#10 +
-        'runtime is unchecked. Please make sure a' + #13#10 +
-        'compatible version of the Visual Studio' + #13#10 +
-        'VC++ runtime is already installed (by you' + #13#10 +
-        'or an admin), or click "No" and check' + #13#10 +
-        'the box before proceeding.' + #13#10 + #13#10 +
-        'You will need admin privileges to' + #13#10 +
-        'to install the runtime.' + #13#10 + #13#10 +
-        'Do you wish to proceed as is?';
-  if CurPageID = wpSelectComponents then begin
-    if IsAdminInstallMode then begin
-      if (not WizardIsComponentSelected('vcruntimeadmin')) then
-        Result := SuppressibleMsgBox(msg, mbInformation, MB_YESNO, IDYES) = IDYES
-    end else
-      if (not WizardIsComponentSelected('vcruntimeuser')) then
-        Result := SuppressibleMsgBox(msg, mbInformation, MB_YESNO, IDYES) = IDYES;
+  if CurUninstallStep = usPostUninstall then
+  begin
+    // Delete version file if it exists
+    VersionFile := ExpandConstant('{app}\docs\post_install.html');
+    if FileExists(VersionFile) then
+      DeleteFile(VersionFile);
+    VersionFile := ExpandConstant('{app}\CaLab.aliases');
+    if FileExists(VersionFile) then
+      DeleteFile(VersionFile);
+    // Remove docs directory
+    RemoveDir(ExpandConstant('{app}\docs'));
+
+    // Remove PATH entry
+    RemovePath;
   end;
 end;

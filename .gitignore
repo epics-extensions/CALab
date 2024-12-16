@@ -31,3 +31,6 @@ calab/Debug/
 calab/Release/
 libcalab.so
 /vis/CaLab.aliases
+batch/copyFiles.bat
+copy*.bat
+post_install*

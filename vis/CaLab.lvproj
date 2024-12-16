@@ -27,23 +27,23 @@ This project serves as a practical guide for engineers and researchers looking t
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
 		<Item Name="Examples" Type="Folder">
 			<Item Name="Parallel Event Demo Sub" Type="Folder">
-				<Item Name="Parallel Event Close.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Close.vi"/>
-				<Item Name="Parallel Event Indicator.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Indicator.vi"/>
-				<Item Name="Parallel Event Init.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Init.vi"/>
-				<Item Name="Parallel Event Struct.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Struct.vi"/>
-				<Item Name="Parallel Event Task.vi" Type="VI" URL="../Examples/Parallel Event Demo Sub/Parallel Event Task.vi"/>
+				<Item Name="Parallel Event Close.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Close.vi"/>
+				<Item Name="Parallel Event Indicator.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Indicator.vi"/>
+				<Item Name="Parallel Event Init.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Init.vi"/>
+				<Item Name="Parallel Event Struct.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Struct.vi"/>
+				<Item Name="Parallel Event Task.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Task.vi"/>
 			</Item>
 			<Item Name="caLab.db" Type="Document" URL="../Examples/caLab.db"/>
-			<Item Name="Event Demo.vi" Type="VI" URL="../Examples/Event Demo.vi"/>
-			<Item Name="Parallel Event Demo.vi" Type="VI" URL="../Examples/Parallel Event Demo.vi"/>
+			<Item Name="Event Demo.vi" Type="VI" URL="../examples/Event Demo.vi"/>
+			<Item Name="Parallel Event Demo.vi" Type="VI" URL="../examples/Parallel Event Demo.vi"/>
 			<Item Name="pvList.txt" Type="Document" URL="../Examples/pvList.txt"/>
-			<Item Name="Read Demo 1.vi" Type="VI" URL="../Examples/Read Demo 1.vi"/>
-			<Item Name="Read Demo 2.vi" Type="VI" URL="../Examples/Read Demo 2.vi"/>
-			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="../Examples/SoftIOC Demo Sub.vi"/>
-			<Item Name="SoftIOC Demo.vi" Type="VI" URL="../Examples/SoftIOC Demo.vi"/>
-			<Item Name="Write Demo - Looping.vi" Type="VI" URL="../Examples/Write Demo - Looping.vi"/>
-			<Item Name="Write Demo - Timed.vi" Type="VI" URL="../Examples/Write Demo - Timed.vi"/>
-			<Item Name="Write Demo.vi" Type="VI" URL="../Examples/Write Demo.vi"/>
+			<Item Name="Read Demo 1.vi" Type="VI" URL="../examples/Read Demo 1.vi"/>
+			<Item Name="Read Demo 2.vi" Type="VI" URL="../examples/Read Demo 2.vi"/>
+			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="../examples/SoftIOC Demo Sub.vi"/>
+			<Item Name="SoftIOC Demo.vi" Type="VI" URL="../examples/SoftIOC Demo.vi"/>
+			<Item Name="Write Demo - Looping.vi" Type="VI" URL="../examples/Write Demo - Looping.vi"/>
+			<Item Name="Write Demo - Timed.vi" Type="VI" URL="../examples/Write Demo - Timed.vi"/>
+			<Item Name="Write Demo.vi" Type="VI" URL="../examples/Write Demo.vi"/>
 		</Item>
 		<Item Name="CaLab.lvlib" Type="Library" URL="../CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
@@ -106,6 +106,7 @@ This project serves as a practical guide for engineers and researchers looking t
 			<Item Name="calab.dll" Type="Document" URL="calab.dll">
 				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
 			</Item>
+			<Item Name="Get_EPICS_binaries_path.vi" Type="VI" URL="../private/Get_EPICS_binaries_path.vi"/>
 		</Item>
 		<Item Name="Build Specifications" Type="Build"/>
 	</Item>

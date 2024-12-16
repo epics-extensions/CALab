@@ -12,7 +12,7 @@
 //==================================================================================================
 // Name        : caLab.cpp
 // Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.3.3
+// Version     : 1.7.4.1
 // Copyright   : HZB
 // Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
 // GitHub      : https://github.com/epics-extensions/CALab
@@ -56,7 +56,7 @@ void __attribute__((destructor))  caLabUnload(void);
 void* caLibHandle = 0x0;
 void* comLibHandle = 0x0;
 #endif
-#define CALAB_VERSION       "1.7.3.3"
+#define CALAB_VERSION       "1.7.4.1"
 #define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
 #define MAX_ERROR_SIZE		255
 
@@ -2216,6 +2216,11 @@ void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t T
 //    NoMDEL:                 indicator for ignoring monitor dead band (TRUE: use caget instead of camonitor)
 extern "C" EXPORT void getValue(sStringArrayHdl * PvNameArray, sStringArrayHdl * FieldNameArray, sLongArrayHdl * PvIndexArray, double Timeout, sResultArrayHdl * ResultArray, sStringArrayHdl * FirstStringValue, sDoubleArrayHdl * FirstDoubleValue, sDoubleArray2DHdl * DoubleValueArray, LVBoolean * CommunicationStatus, LVBoolean * FirstCall, LVBoolean * NoMDEL = 0, LVBoolean * IsInitialized = 0, int filter = 0) {
 	epicsMutexLock(getLock);
+	// Add validation for field values requiring field names
+	if ((filter & out_filter::pviFieldValues) && !(filter & out_filter::pviFieldNames)) {
+		// Disable field values if field names not enabled
+        filter &= ~out_filter::pviFieldValues;
+    }
 	if (filter <= 0) {
 		filter = 0xffff;
 	}
@@ -2532,7 +2537,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl * PvNameArray, sStringArrayHdl *
 						memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, (*(**FieldNameArray)->elt[l])->str, (*(**FieldNameArray)->elt[l])->cnt);
 					}
 				}
-				if (filter & out_filter::pviFieldValues && (*FirstCall || currentItem->fieldModified[PvNameArray].load()) && (FieldNameArray && *FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize)) {
+				if (filter & out_filter::pviFieldValues && (*FirstCall || currentItem->fieldModified[PvNameArray].load()) && (FieldNameArray && *FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize) && currentResult->FieldNameArray) {
 					if (currentResult->FieldValueArray)
 						err += DeleteStringArray(currentResult->FieldValueArray);
 					currentResult->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (**FieldNameArray)->dimSize * sizeof(LStrHandle[1]));

@@ -5,6 +5,6 @@ echo Type 'dbl' to get a list of all available records.
 echo Type 'exit' to terminate this session.
 echo ---
 
-%APPDATA%\calab\softIoc.exe -D %APPDATA%\calab\softIoc.dbd -d %APPDATA%\calab\Demo\db\TestPV_ai100000.db
+"%CALAB_HOME%\lib\softIoc.exe" -D "%CALAB_HOME%\lib\softIoc.dbd" -d "%CALAB_HOME%\Demo\db\TestPV_ai100000.db"
 
 :end
