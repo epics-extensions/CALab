@@ -20,7 +20,7 @@ opkg install git
 mkdir /usr/local/epics
 cd /usr/local/epics
     # Note the trailing dot on the next line
-git clone --recursive https://github.com/epics-base/epics-base.git .
+git clone --recursive -b 7.0 https://github.com/epics-base/epics-base.git base-7.0 .
 export PATH=$HOME/localperl/bin:$PATH
 make INSTALL_LOCATION=/usr/local/epics
 cd /etc/ld.so.conf.d
