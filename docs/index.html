@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Read vs. Write Performance</title>
+  
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+
+  <style>
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #333;
+    }
+    #vis-container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Performance Analysis: Read vs. Write</h1>
+  <p>Hier ist die interaktive Grafik, die die Lese- und Schreibleistung basierend auf der Anzahl der Werte (PVs) vergleicht.</p>
+
+  <div id="vis-container">
+    <div id="vis"></div>
+  </div>
+
+  <script type="text/javascript">
+    // Der Pfad zu Ihrer JSON-Datei.
+    // Da sie im selben Ordner liegt, reicht der Dateiname.
+    const specUrl = 'read_write_performance.json';
+
+    // Optionen für Vega-Embed (optional, aber nützlich)
+    const embedOptions = {
+      actions: true // Zeigt die "Speichern als PNG/SVG"-Aktionen an
+    };
+
+    // vegaEmbed aufrufen:
+    // 1. Parameter: Der CSS-Selektor für den Container (hier: '#vis')
+    // 2. Parameter: Der Pfad zur JSON-Spezifikation (hier: specUrl)
+    // 3. Parameter: Die Optionen (optional)
+    vegaEmbed('#vis', specUrl, embedOptions)
+      .then(result => {
+        // Wird ausgeführt, wenn die Grafik erfolgreich geladen wurde
+        console.log('Chart successfully rendered');
+        console.log('Vega-Lite View:', result.view);
+      })
+      .catch(error => {
+        // Wird ausgeführt, wenn ein Fehler auftritt (z.B. Datei nicht gefunden)
+        console.error('Error rendering chart:', error);
+        document.getElementById('vis').innerHTML = 
+          '<p style="color: red;">Fehler beim Laden der Grafik. Stellen Sie sicher, dass die Datei "read_write_performance.json" im selben Ordner liegt und Sie einen Webserver verwenden.</p>';
+      });
+  </script>
+
+</body>
+</html>
