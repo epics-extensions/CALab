@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Read vs. Write Performance</title>
+  <title>CA Lab - Read vs. Write Performance</title>
   
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -32,38 +32,38 @@
 </head>
 <body>
 
-  <h1>Performance Analysis: Read vs. Write</h1>
-  <p>Hier ist die interaktive Grafik, die die Lese- und Schreibleistung basierend auf der Anzahl der Werte (PVs) vergleicht.</p>
+  <h1>CA Lab - Performance Analysis: Read vs. Write</h1>
+  <p>Here is the interactive chart that compares reading and writing performance based on the number of values (PVs).</p>
 
   <div id="vis-container">
     <div id="vis"></div>
   </div>
 
   <script type="text/javascript">
-    // Der Pfad zu Ihrer JSON-Datei.
-    // Da sie im selben Ordner liegt, reicht der Dateiname.
+    // The path to your JSON file.
+    // Since it is located in the same folder, the file name is sufficient.
     const specUrl = 'read_write_performance.json';
 
-    // Optionen für Vega-Embed (optional, aber nützlich)
+    // Options for Vega-Embed (optional, but useful)
     const embedOptions = {
-      actions: true // Zeigt die "Speichern als PNG/SVG"-Aktionen an
+      actions: true // Displays the "Save as PNG/SVG" actions
     };
 
-    // vegaEmbed aufrufen:
-    // 1. Parameter: Der CSS-Selektor für den Container (hier: '#vis')
-    // 2. Parameter: Der Pfad zur JSON-Spezifikation (hier: specUrl)
-    // 3. Parameter: Die Optionen (optional)
+    // Call vegaEmbed:
+    // 1st parameter: The CSS selector for the container (here: '#vis')
+    // 2nd parameter: The path to the JSON specification (here: specUrl)
+    // 3rd parameter: The options (optional)
     vegaEmbed('#vis', specUrl, embedOptions)
       .then(result => {
-        // Wird ausgeführt, wenn die Grafik erfolgreich geladen wurde
+        // Executed when the graphic has been loaded successfully
         console.log('Chart successfully rendered');
         console.log('Vega-Lite View:', result.view);
       })
       .catch(error => {
-        // Wird ausgeführt, wenn ein Fehler auftritt (z.B. Datei nicht gefunden)
+        // Executed when an error occurs (e.g., file not found)
         console.error('Error rendering chart:', error);
         document.getElementById('vis').innerHTML = 
-          '<p style="color: red;">Fehler beim Laden der Grafik. Stellen Sie sicher, dass die Datei "read_write_performance.json" im selben Ordner liegt und Sie einen Webserver verwenden.</p>';
+          '<p style="color: red;">Error loading the graphic. Missing file: "read_write_performance.json".</p>';
       });
   </script>
 
