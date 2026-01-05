@@ -34,3 +34,8 @@ libcalab.so
 batch/copyFiles.bat
 copy*.bat
 post_install*
+src/calab - Kopie.cpp
+*.7z
+*.html
+/vis/tests
+*.patch
