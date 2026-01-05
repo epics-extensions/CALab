@@ -27,6 +27,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\calab.cpp" />
+    <ClCompile Include="src\epics_dynamic_linux.cpp" />
+    <ClCompile Include="src\globals.cpp" />
+    <ClCompile Include="src\PVItem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\caLab.ico" />
@@ -35,6 +38,13 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="res\calab.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\calab.h" />
+    <ClInclude Include="src\epics_compat.h" />
+    <ClInclude Include="src\globals.h" />
+    <ClInclude Include="src\PVItem.h" />
+    <ClInclude Include="src\TimeoutUniqueLock.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -66,9 +76,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -124,6 +134,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
       <ExceptionHandling>Async</ExceptionHandling>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -144,6 +155,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
       <ExceptionHandling>Async</ExceptionHandling>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -166,6 +178,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
       <ExceptionHandling>Async</ExceptionHandling>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -185,6 +198,7 @@
       <PreprocessorDefinitions>EPICS_BUILD_DLL;EPICS_CALL_DLL;NDEBUG;__STDC__=0;_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

@@ -1,203 +1,353 @@
-// This software is copyrighted by the HELMHOLTZ-ZENTRUM BERLIN FUER MATERIALIEN UND ENERGIE G.M.B.H., BERLIN, GERMANY (HZB).
-// The following terms apply to all files associated with the software. HZB hereby grants permission to use, copy, and modify
-// this software and its documentation for non-commercial educational or research purposes, provided that existing copyright
-// notices are retained in all copies. The receiver of the software provides HZB with all enhancements, including complete
-// translations, made by the receiver.
-// IN NO EVENT SHALL HZB BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
-// OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY DERIVATIVES THEREOF, EVEN IF HZB HAS BEEN ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE. HZB SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS,
-// AND HZB HAS NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
-
+﻿//==================================================================================================
+// Name      : calab.cpp
+// Authors   : Carsten Winkler, Brian Powell
+// Version   : 1.8.0.1
+// Copyright : HZB
+// Description: Modernized CALab core for reading/writing EPICS PVs and LabVIEW events
+// GitHub    : https://github.com/epics-extensions/CALab
+//
+// The following terms apply to all files associated with the software. HZB hereby grants
+// permission to use, copy, and modify this software and its documentation for non-commercial
+// educational or research purposes, provided that existing copyright notices are retained
+// in all copies. The receiver of the software provides HZB with all enhancements, including
+// complete translations, made by the receiver.
+// IN NO EVENT SHALL HZB BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL,
+// OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR
+// ANY DERIVATIVES THEREOF, EVEN IF HZB HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// HZB SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+// WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, AND HZB HAS NO OBLIGATION TO PROVIDE
+// MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 //==================================================================================================
-// Name        : caLab.cpp
-// Authors     : Carsten Winkler, Brian Powell
-// Version     : 1.7.4.1
-// Copyright   : HZB
-// Description : library for reading, writing and handle events of EPICS variables (PVs) in LabVIEW
-// GitHub      : https://github.com/epics-extensions/CALab
-//==================================================================================================
 
-#include <extcode.h>
-#include <atomic>
-#include <chrono>
-#include <csignal>
-#include <ctime>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <locale>
 #include <string>
-#include <time.h>
 #include <vector>
 #include <unordered_map>
-#include <map>
+#include <unordered_set>
 #include <algorithm>
 #include <shared_mutex>
-#include <epicsVersion.h>
-
+#include <cstdarg>
+#include <ctime>
+#include <cstdlib>
+#include <sstream>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <deque>
+#include <atomic>
+#include <cstdint>
+#include <cmath>
+#include <limits>
+#include <cstring>
+#include <cstdio>
+#include "calab.h"
+#include "TimeoutUniqueLock.h"
+#include "globals.h"
+#include <cinttypes>
 #if defined _WIN32 || defined _WIN64
 #include <alarm.h>
-#include <alarmString.h>
-#include <cadef.h>
+#include <epicsVersion.h>
 #include <envDefs.h>
 #include <epicsStdio.h>
-#include <windows.h>
-#include <libloaderapi.h>
-#define EXPORT __declspec(dllexport)
 #else
-#include <dlfcn.h>
-#include <shareLib.h>
-#include <limits.h>
-#define EXPORT
-#define __stdcall
-void __attribute__((constructor)) caLabLoad(void);
-void __attribute__((destructor))  caLabUnload(void);
-void* caLibHandle = 0x0;
-void* comLibHandle = 0x0;
+#include "epics_compat.h"
+#include <epicsVersion.h>
 #endif
-#define CALAB_VERSION       "1.7.4.1"
-#define ERROR_OFFSET        7000           // User defined error codes of LabVIEW start at this number
-#define MAX_ERROR_SIZE		255
 
-#if defined _WIN32 || defined _WIN64
-// Support for the community version of LabVIEW (32 bit) running on Windows
+#ifndef CALAB_VERSION
+#define CALAB_VERSION "1.8.0.1"
+#endif
+
+
+// Utility for building a vector of sequential integers.
+namespace {
+	inline std::vector<uInt32> makeIndexRange(uInt32 n) {
+		std::vector<uInt32> v;
+		v.reserve(n);
+		for (uInt32 i = 0; i < n; ++i) v.push_back(i);
+		return v;
+	}
+}
+
+namespace {
+	// RAII guard to ensure the current thread is attached to the EPICS CA context.
+	struct CaContextGuard {
+		bool attached = false;
+		CaContextGuard() {
+			Globals& g = Globals::getInstance();
+			// Attach only if this thread does not already have a context.
+			if (ca_current_context() == nullptr && g.pcac) {
+				if (ca_attach_context(g.pcac) == ECA_NORMAL) {
+					attached = true;
+				}
+			}
+		}
+		~CaContextGuard() {
+			if (attached) {
+				ca_detach_context();
+			}
+		}
+	};
+}
+
+static_assert(sizeof(uintptr_t) == sizeof(void*), "calab: uintptr_t must be same size as void* (pointer-sized integer required)");
+using atomic_ptr_t = std::atomic<uintptr_t>;
+static bool try_schedule_deletion(PvIndexEntry* entry);
+static void mark_deletion_done(PvIndexEntry* entry) noexcept;
+
+// Attempt to atomically load the array slot and acquire a usage-ref for the entry.
+// Guarantees that the returned entry was still the current element when acquired.
+// If the slot is empty or acquisition fails, returns nullptr.
+// Note: eltPtr must point to the array element storage (interpreted as atomic_ptr_t).
+static PvIndexEntry* acquireEntryFromElt(void* eltPtr) noexcept {
+	if (!eltPtr) return nullptr;
+	auto atomicElt = reinterpret_cast<atomic_ptr_t*>(eltPtr);
+
+	for (;;) {
+		uintptr_t raw = atomicElt->load(std::memory_order_acquire);
+		if (!raw) return nullptr;
+
+		PvIndexEntry* entry = reinterpret_cast<PvIndexEntry*>(raw);
+		if (!entry) return nullptr;
+
+		{
+			if (!isLiveEntry(entry)) {
+				uintptr_t expected = raw;
+				(void)atomicElt->compare_exchange_strong(
+					expected, 0, std::memory_order_acq_rel, std::memory_order_acquire);
+				return nullptr;
+			}
+
+			if (!entry->try_acquire()) {
+				return nullptr;
+			}
+		}
+
+		uintptr_t now = atomicElt->load(std::memory_order_acquire);
+		if (now == raw) {
+			return entry;
+		}
+
+		entry->release();
+	}
+}
+
+
+// Release an acquired entry reference.
+static void releaseEntry(PvIndexEntry* entry) noexcept {
+	if (!entry) return;
+	entry->release();
+}
+
+static bool tryReclaimAndDelete(PvIndexEntry* entry,
+	std::chrono::seconds hardTimeout = std::chrono::seconds(30)) noexcept {
+	if (!entry) return true;
+
+	if (!try_schedule_deletion(entry)) {
+		return true;
+	}
+
+	if (!isLiveEntry(entry)) {
+		mark_deletion_done(entry);
+		return true;
+	}
+
+	Globals& g = Globals::getInstance();
+
+	entry->mark_deleting();
+
+	if (hardTimeout.count() > 0) {
+		const auto start = std::chrono::steady_clock::now();
+		while (entry->current_refs() != 0) {
+			ca_pend_event(0.001);
+			g.waitForNotification(std::chrono::milliseconds(20));
+
+			if (std::chrono::steady_clock::now() - start > hardTimeout) {
+				mark_deletion_done(entry);
+				return false;
+			}
+		}
+	}
+	else {
+		if (entry->current_refs() != 0) {
+			CaLabDbgPrintf("tryReclaimAndDelete: immediate-delete requested but refs=%u for %p",
+				entry->current_refs(), static_cast<void*>(entry));
+			mark_deletion_done(entry);
+			return false;
+		}
+	}
+
+	if (entry->metaInfo) { delete entry->metaInfo; entry->metaInfo = nullptr; }
+	entry->pvItem = nullptr;
+
+#if defined(_MSC_VER)
+#	include <crtdbg.h>
+	if (_CrtIsValidHeapPointer(entry)) {
+		mark_deletion_done(entry);
+		delete entry;
+	}
+	else {
+		CaLabDbgPrintf("tryReclaimAndDelete: entry %p invalid at deletion time; skipping delete",
+			static_cast<void*>(entry));
+		mark_deletion_done(entry);
+	}
 #else
-#if UINTPTR_MAX == 0xffffffff
-#error "unsupported ProcessorType (32-bit)"
-#endif
-#endif
-
-#ifndef __GNUC__
-#pragma warning(push)
-#pragma warning(disable:4996)
+	mark_deletion_done(entry);
+	delete entry;
 #endif
 
-#if  IsOpSystem64Bit
-#define uPtr uQ
+	return true;
+}
+
+
+// Lightweight RAII wrapper for acquired PvIndexEntry references.
+struct PvEntryHandle {
+	PvIndexEntry* entry = nullptr;
+	PvEntryHandle() noexcept = default;
+
+	// Disable copy to avoid double-release
+	PvEntryHandle(const PvEntryHandle&) noexcept = delete;
+	PvEntryHandle& operator=(const PvEntryHandle&) noexcept = delete;
+
+	// Move semantics: transfer ownership of the acquired ref
+	PvEntryHandle(PvEntryHandle&& other) noexcept : entry(other.entry) { other.entry = nullptr; }
+	PvEntryHandle& operator=(PvEntryHandle&& other) noexcept {
+		if (this != &other) {
+			if (entry) releaseEntry(entry);
+			entry = other.entry;
+			other.entry = nullptr;
+		}
+		return *this;
+	}
+
+	PvEntryHandle(sLongArrayHdl* arr, size_t idx) noexcept {
+		if (!arr || !*arr || !**arr) return;
+		if (idx >= (**arr)->dimSize) return;
+		// pass pointer to the element storage (element interpreted as pointer-sized integer)
+		entry = acquireEntryFromElt(&(**arr)->elt[static_cast<uInt32>(idx)]);
+	}
+	~PvEntryHandle() noexcept { if (entry) releaseEntry(entry); }
+
+	PvIndexEntry* get() const noexcept { return entry; }
+	explicit operator bool() const noexcept { return entry != nullptr; }
+	PvIndexEntry* operator->() const noexcept { return entry; }
+	PvIndexEntry& operator*() const noexcept { return *entry; }
+};
+// Deletion scheduler to avoid double-delete races when same entry pointer appears in multiple arrays.
+static std::mutex g_deletionMutex;
+static std::unordered_set<PvIndexEntry*> g_deletionScheduled;
+
+static bool try_schedule_deletion(PvIndexEntry* entry) {
+	if (!entry) return false;
+	std::lock_guard<std::mutex> lk(g_deletionMutex);
+	auto res = g_deletionScheduled.insert(entry);
+	return res.second; // true if inserted (we are owner), false if already scheduled
+}
+
+static void mark_deletion_done(PvIndexEntry* entry) noexcept {
+	if (!entry) return;
+	std::lock_guard<std::mutex> lk(g_deletionMutex);
+	g_deletionScheduled.erase(entry);
+}
+
+static inline void sanitizePvIndexArray(sLongArray* arr, size_t dim) noexcept {
+#if UINTPTR_MAX == 0xffffffffu
+	if (!arr) return;
+	for (size_t i = 0; i < dim; ++i) {
+		arr->elt[i] = static_cast<uint64_t>(static_cast<uintptr_t>(arr->elt[i]));
+	}
 #else
-#define uPtr uL
+	(void)arr;
+	(void)dim;
 #endif
+}
+
+static void deferredDeletionWorker(std::vector<PvIndexEntry*> entries) {
+	const auto hardTimeout = std::chrono::seconds(60);
+	for (PvIndexEntry* entry : entries) {
+		if (!entry) continue;
+		if (!tryReclaimAndDelete(entry, hardTimeout)) {
+			CaLabDbgPrintf("deferredDeletionWorker: could not reclaim %p within timeout; skipping for now.", static_cast<void*>(entry));
+		}
+	}
+}
+
+inline bool tryClaimAndDeletePvIndexEntry(void* eltPtr) {
+	if (!eltPtr) return false;
+	auto atomicElt = reinterpret_cast<atomic_ptr_t*>(eltPtr);
+	uintptr_t raw = atomicElt->load(std::memory_order_acquire);
+	if (raw == 0) return false;
+	uintptr_t expected = raw;
+	// Try to atomically replace current slot with 0 (claim it)
+	if (!atomicElt->compare_exchange_strong(expected, 0, std::memory_order_acq_rel, std::memory_order_acquire)) {
+		return false;
+	}
+
+	PvIndexEntry* entry = reinterpret_cast<PvIndexEntry*>(raw);
+	if (!entry) return false;
+
+	// Try to become the canonical deleter for this entry.
+	if (!try_schedule_deletion(entry)) {
+		CaLabDbgPrintf("tryClaimAndDeletePvIndexEntry: deletion already scheduled for %p -> skipping", static_cast<void*>(entry));
+		// Slot cleared by us; another path will perform (or has performed) deletion.
+		return true;
+	}
+
+	// Prevent further acquirers
+	entry->mark_deleting();
+
+	// Wait for concurrent users to release their refs.
+	Globals& g = Globals::getInstance();
+	const auto start = std::chrono::steady_clock::now();
+	const auto hardTimeout = std::chrono::seconds(30); // conservative safety timeout
+	while (entry->current_refs() != 0) {
+		// Let CA and other threads make progress, and wait for notifications
+		ca_pend_event(0.001);
+		g.waitForNotification(std::chrono::milliseconds(20));
+
+		// Log and break-to-defer on suspiciously large refcounts (defensive)
+		const unsigned refs = entry->current_refs();
+		if (refs > (1u << 24)) {
+			CaLabDbgPrintf("tryClaimAndDeletePvIndexEntry: suspicious refcount %u for %p during delete; deferring.", refs, static_cast<void*>(entry));
+			// schedule deferred deletion by spawning worker with single entry
+			std::vector<PvIndexEntry*> v;
+			v.push_back(entry);
+			std::thread(deferredDeletionWorker, std::move(v)).detach();
+			// We already own deletion token but deferredDeletionWorker will call tryReclaimAndDelete (which uses the token logic)
+			mark_deletion_done(entry);
+			return true;
+		}
+
+		if (std::chrono::steady_clock::now() - start > hardTimeout) {
+			CaLabDbgPrintf("tryClaimAndDeletePvIndexEntry: timeout waiting for refs to drop (%u remain). Proceeding with caution.", entry->current_refs());
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+	}
+
+	// Now safe to delete (we own the deletion token)
+	if (entry->metaInfo) {
+		delete entry->metaInfo;
+		entry->metaInfo = nullptr;
+	}
+	entry->pvItem = nullptr;
+	//  CaLabDbgPrintf("tryClaimAndDeletePvIndexEntry: deleted entry %p", static_cast<void*>(entry));
+	mark_deletion_done(entry);
+	delete entry;
+
+	return true;
+}
 
 
-#if MSWin && (ProcessorType == kX86)
-/* Windows x86 targets use 1-byte structure packing. */
-#pragma pack(push,1)
-#pragma warning (disable : 4103)
-#endif
+// =================================================================================
+// Global Variables & Asynchronous Worker
+// =================================================================================
 
-/* lv_prolog.h and lv_epilog.h set up the correct alignment for LabVIEW data. */
-#include "lv_prolog.h"
-// undocumented but used LV function
-TH_REENTRANT EXTERNC MgErr _FUNCC DbgPrintfv(const char* buf, va_list args);
-
-// Internal typedefs
-typedef struct {
-	size_t dimSize;
-	LStrHandle elt[1];
-} sStringArray;
-typedef sStringArray** sStringArrayHdl;
-
-typedef struct {
-	uInt32 dimSizes[2];
-	LStrHandle elt[1];
-} sStringArray2D;
-typedef sStringArray2D** sStringArray2DHdl;
-
-typedef struct {
-	size_t dimSize;
-	double elt[1];
-} sDoubleArray;
-typedef sDoubleArray** sDoubleArrayHdl;
-
-typedef struct {
-	uInt32 dimSizes[2];
-	double elt[1];
-} sDoubleArray2D;
-typedef sDoubleArray2D** sDoubleArray2DHdl;
-
-typedef struct {
-	size_t dimSize;
-	uInt32 elt[1];
-} sIntArray;
-typedef sIntArray** sIntArrayHdl;
-
-typedef struct {
-	size_t dimSize;
-	uint64_t elt[1];
-} sLongArray;
-typedef sLongArray** sLongArrayHdl;
-
-typedef struct {
-	uInt32 dimSizes[2];
-	int64_t elt[1];
-} sLongArray2D;
-typedef sLongArray2D** sLongArray2DHdl;
-
-typedef struct {
-	LVBoolean status;                  // error status
-	uInt32 code;                       // error code
-	LStrHandle source;                 // error message
-} sError;
-typedef sError** sErrorHdl;
-
-typedef struct {
-	size_t dimSize;
-	sError result[1];
-} sErrorArray;
-typedef sErrorArray** sErrorArrayHdl;
-
-typedef struct {
-	LStrHandle PVName;                 // names of PV as string array
-	uInt32 valueArraySize;             // size of value array
-	sStringArrayHdl StringValueArray;  // values as string array
-	sDoubleArrayHdl ValueNumberArray;  // values as double array
-	LStrHandle StatusString;           // status of PV as string
-	int16_t StatusNumber;              // status of PV as short
-	LStrHandle SeverityString;         // severity of PV as string
-	int16_t SeverityNumber;            // severity of PV as short
-	LStrHandle TimeStampString;        // time stamp of PV as string
-	uInt32 TimeStampNumber;            // severity of PV as integer
-	sStringArrayHdl FieldNameArray;    // optional field names as string array
-	sStringArrayHdl FieldValueArray;   // field values as string array
-	sError ErrorIO;                    // error structure
-} sResult;
-typedef sResult* sResultPtr;
-typedef sResult** sResultHdl;
-
-typedef struct {
-	size_t dimSize;
-	sResult result[1];
-} sResultArray;
-typedef sResultArray** sResultArrayHdl;
-#include "lv_epilog.h"
-
-typedef enum {
-	firstValueAsString = 1,
-	firstValueAsNumber = 2,
-	valueArrayAsNumber = 4,
-	errorOut = 8,
-	pviElements = 16,
-	pviValuesAsString = 32,
-	pviValuesAsNumber = 64,
-	pviStatusAsString = 128,
-	pviStatusAsNumber = 256,
-	pviSeverityAsString = 512,
-	pviSeverityAsNumber = 1024,
-	pviTimestampAsString = 2048,
-	pviTimestampAsNumber = 4096,
-	pviFieldNames = 8192,
-	pviFieldValues = 16384,
-	pviError = 32768
-} out_filter;
-typedef std::unordered_map<std::string, std::string> propertyMap;
-typedef propertyMap::iterator propertyMapIterator;
-typedef std::unordered_map<void*, std::atomic<bool>> modifiedMap;
-typedef modifiedMap::iterator modifiedMapIterator;
-
-#if defined _WIN32 || defined _WIN64
-HMODULE libRef = 0x0;
 DWORD dllStatus = DLL_PROCESS_DETACH;
+uInt32 globalCounter = 0;
+
+#if defined _WIN32 || defined _WIN64
+// Standard Windows DLL entry point to track process attachment/detachment.
 BOOLEAN WINAPI DllMain(HINSTANCE hDllHandle, DWORD nReason, LPVOID Reserved) {
 	dllStatus = nReason;
 	switch (nReason) {
@@ -209,1749 +359,3769 @@ BOOLEAN WINAPI DllMain(HINSTANCE hDllHandle, DWORD nReason, LPVOID Reserved) {
 	}
 	}
 	return 1;
-}
-#else // Workaround for EPICS library unload issue in Linux
-const char** dbr_text = (const char**)dlsym(caLibHandle, "dbr_text");
-const char*  dbr_text_invalid = (const char* )dlsym(caLibHandle, "dbr_text_invalid");
-const short* dbf_text_dim     = (const short*)dlsym(caLibHandle, "dbf_text_dim");
-const short* dbr_text_dim     = (const short*)dlsym(caLibHandle, "dbr_text_dim");
-const char* epicsAlarmSeverityStrings[] = {
-	"NO_ALARM",
-	"MINOR",
-	"MAJOR",
-	"INVALID"
 };
-const char* epicsAlarmConditionStrings[] = {
-	"NO_ALARM",
-	"READ",
-	"WRITE",
-	"HIHI",
-	"HIGH",
-	"LOLO",
-	"LOW",
-	"STATE",
-	"COS",
-	"COMM",
-	"TIMEOUT",
-	"HWLIMIT",
-	"CALC",
-	"SCAN",
-	"LINK",
-	"SOFT",
-	"BAD_SUB",
-	"UDF",
-	"DISABLE",
-	"SIMM",
-	"READ_ACCESS",
-	"WRITE_ACCESS"
-};
-#define alarmSeverityString        epicsAlarmSeverityStrings
-#define alarmStatusString          epicsAlarmConditionStrings
-#define MAX_STRING_SIZE            40
-#define MAX_ENUM_STATES            16
-#define MAX_ENUM_STRING_SIZE       26
-#define epicsThreadPriorityBaseMax 91
-#define NO_ALARM                   0
-#define CA_K_ERROR                 2
-#define CA_K_SUCCESS               1
-#define CA_K_WARNING               0
-#define CA_V_MSG_NO                0x03
-#define CA_V_SEVERITY              0x00
-#define CA_M_MSG_NO                0x0000FFF8
-#define CA_M_SEVERITY              0x00000007
-#define CA_INSERT_MSG_NO(code)     (((code)<< CA_V_MSG_NO)&CA_M_MSG_NO)
-#define CA_INSERT_SEVERITY(code)   (((code)<< CA_V_SEVERITY)& CA_M_SEVERITY)
-#define CA_OP_CONN_UP              6
-#define CA_OP_CONN_DOWN            7
-#define dbf_type_to_DBR_TIME(type) (((type) >= 0 && (type) <= *dbf_text_dim-3) ? (type) + 2*(*dbf_text_dim-2) : -1)
-#define dbr_type_to_text(type)     (((type) >= 0 && (type) <  *dbr_text_dim)   ? dbr_text[(type)] : dbr_text_invalid)
-#define DEFMSG(SEVERITY,NUMBER)    (CA_INSERT_MSG_NO(NUMBER) | CA_INSERT_SEVERITY(SEVERITY))
-#define epicsMutexCreate()         epicsMutexOsiCreate(__FILE__,__LINE__)
-#define ECA_NORMAL                 DEFMSG(CA_K_SUCCESS,  0) /* success */
-#define ECA_ALLOCMEM               DEFMSG(CA_K_WARNING,  6)
-#define ECA_BADTYPE                DEFMSG(CA_K_ERROR,   14)
-#define ECA_DISCONN                DEFMSG(CA_K_WARNING, 24)
-#define ECA_UNRESPTMO              DEFMSG(CA_K_WARNING,   60)
-#define DBE_VALUE                  (1<<0)
-#define DBE_ALARM                  (1<<2)
-#define DBF_STRING                 0
-#define	DBF_INT                    1
-#define	DBF_SHORT                  1
-#define	DBF_FLOAT                  2
-#define	DBF_ENUM                   3
-#define	DBF_CHAR                   4
-#define	DBF_LONG                   5
-#define	DBF_DOUBLE                 6
-#define DBF_NO_ACCESS              7
-#define DBR_STRING	DBF_STRING
-#define	DBR_INT		DBF_INT
-#define	DBR_SHORT	DBF_INT
-#define	DBR_FLOAT	DBF_FLOAT
-#define	DBR_ENUM	DBF_ENUM
-#define	DBR_CHAR	DBF_CHAR
-#define	DBR_LONG	DBF_LONG
-#define	DBR_DOUBLE	DBF_DOUBLE
-#define DBR_STS_STRING	7
-#define	DBR_STS_SHORT	8
-#define	DBR_STS_INT	DBR_STS_SHORT
-#define	DBR_STS_FLOAT	9
-#define	DBR_STS_ENUM	10
-#define	DBR_STS_CHAR	11
-#define	DBR_STS_LONG	12
-#define	DBR_STS_DOUBLE	13
-#define	DBR_TIME_STRING	14
-#define	DBR_TIME_INT	15
-#define	DBR_TIME_SHORT	15
-#define	DBR_TIME_FLOAT	16
-#define	DBR_TIME_ENUM	17
-#define	DBR_TIME_CHAR	18
-#define	DBR_TIME_LONG	19
-#define	DBR_TIME_DOUBLE	20
-#define	DBR_GR_STRING	21
-#define	DBR_GR_SHORT	22
-#define	DBR_GR_INT	DBR_GR_SHORT
-#define	DBR_GR_FLOAT	23
-#define	DBR_GR_ENUM	24
-#define	DBR_GR_CHAR	25
-#define	DBR_GR_LONG	26
-#define	DBR_GR_DOUBLE	27
-#define	DBR_CTRL_STRING	28
-#define DBR_CTRL_SHORT	29
-#define DBR_CTRL_INT	DBR_CTRL_SHORT
-#define	DBR_CTRL_FLOAT	30
-#define DBR_CTRL_ENUM	31
-#define	DBR_CTRL_CHAR	32
-#define	DBR_CTRL_LONG	33
-#define	DBR_CTRL_DOUBLE	34
-#define DBR_PUT_ACKT	DBR_CTRL_DOUBLE + 1
-#define DBR_PUT_ACKS    DBR_PUT_ACKT + 1
-#define DBR_STSACK_STRING DBR_PUT_ACKS + 1
-#define DBR_CLASS_NAME DBR_STSACK_STRING + 1
-#define	LAST_BUFFER_TYPE	DBR_CLASS_NAME
-enum epicsAlarmSeverity {
-	epicsSevNone = NO_ALARM,
-	epicsSevMinor,
-	epicsSevMajor,
-	epicsSevInvalid,
-	ALARM_NSEV
-};
-
-enum epicsAlarmCondition {
-	epicsAlarmNone = NO_ALARM,
-	epicsAlarmRead,
-	epicsAlarmWrite,
-	epicsAlarmHiHi,
-	epicsAlarmHigh,
-	epicsAlarmLoLo,
-	epicsAlarmLow,
-	epicsAlarmState,
-	epicsAlarmCos,
-	epicsAlarmComm,
-	epicsAlarmTimeout,
-	epicsAlarmHwLimit,
-	epicsAlarmCalc,
-	epicsAlarmScan,
-	epicsAlarmLink,
-	epicsAlarmSoft,
-	epicsAlarmBadSub,
-	epicsAlarmUDF,
-	epicsAlarmDisable,
-	epicsAlarmSimm,
-	epicsAlarmReadAccess,
-	epicsAlarmWriteAccess,
-	ALARM_NSTATUS
-};
-#define firstEpicsAlarmSev  epicsSevNone
-#define MINOR_ALARM         epicsSevMinor
-#define MAJOR_ALARM         epicsSevMajor
-#define INVALID_ALARM       epicsSevInvalid
-#define lastEpicsAlarmSev   epicsSevInvalid
-
-struct ca_client_context;
-typedef double ca_real;
-typedef long chtype;
-typedef unsigned capri;
-typedef void(*EPICSTHREADFUNC)(void* parm);
-typedef struct oldChannelNotify* chid;
-typedef struct oldSubscription* evid;
-typedef struct epicsMutexParm* epicsMutexId;
-typedef struct epicsThreadOSD* epicsThreadId;
-typedef chid chanId;
-typedef uint8_t epicsUInt8;
-typedef int16_t epicsInt16;
-typedef uint16_t epicsUInt16;
-typedef int32_t epicsInt32;
-typedef uint32_t epicsUInt32;
-typedef float epicsFloat32;
-typedef double epicsFloat64;
-typedef epicsUInt16 dbr_enum_t;
-typedef epicsInt16 dbr_short_t;
-typedef epicsUInt8 dbr_char_t;
-typedef epicsInt32 dbr_long_t;
-typedef epicsFloat32 dbr_float_t;
-typedef epicsFloat64 dbr_double_t;
-typedef char epicsOldString[MAX_STRING_SIZE];
-typedef epicsOldString dbr_string_t;
-typedef enum { ca_disable_preemptive_callback, ca_enable_preemptive_callback } ca_preemptive_callback_select;
-typedef enum { epicsThreadStackSmall, epicsThreadStackMedium, epicsThreadStackBig } epicsThreadStackSizeClass;
-typedef enum { cs_never_conn, cs_prev_conn, cs_conn, cs_closed } channel_state;
-typedef enum { epicsMutexLockOK, epicsMutexLockTimeout, epicsMutexLockError } epicsMutexLockStatus;
-typedef struct epicsTimeStamp {
-	epicsUInt32    secPastEpoch;
-	epicsUInt32    nsec;
-} epicsTimeStamp;
-typedef struct envParam {
-	char* name;
-	char* pdflt;
-} ENV_PARAM;
-struct  connection_handler_args {
-	chanId  chid;
-	long    op;
-};
-typedef struct event_handler_args {
-	void* usr;
-	chanId          chid;
-	long            type;
-	long            count;
-	const void* dbr;
-	int             status;
-} evargs;
-struct dbr_gr_enum {
-	dbr_short_t	status;
-	dbr_short_t	severity;
-	dbr_short_t	no_str;
-	char		strs[MAX_ENUM_STATES][MAX_ENUM_STRING_SIZE];
-	dbr_enum_t	value;
-};
-struct dbr_ctrl_enum {
-	dbr_short_t	status;
-	dbr_short_t	severity;
-	dbr_short_t	no_str;
-	char	strs[MAX_ENUM_STATES][MAX_ENUM_STRING_SIZE];
-	dbr_enum_t	value;
-};
-struct dbr_time_short {
-	dbr_short_t	status;
-	dbr_short_t	severity;
-	epicsTimeStamp	stamp;
-	dbr_short_t	RISC_pad;
-	dbr_short_t	value;
-};
-struct dbr_time_double {
-	dbr_short_t	status;
-	dbr_short_t	severity;
-	epicsTimeStamp	stamp;
-	dbr_long_t	RISC_pad;
-	dbr_double_t	value;
-};
-struct exception_handler_args {
-	void* usr;
-	chanId		chid;
-	long		type;
-	long		count;
-	void* addr;
-	long		stat;
-	long		op;
-	const char* ctx;
-	const char* pFile;
-	unsigned	lineNo;
-};
-typedef channel_state(*ca_state_t) (chid chan);
-typedef void caCh(struct connection_handler_args args);
-typedef void caEventCallBackFunc(struct event_handler_args);
-typedef struct ca_client_context* (*ca_current_context_t) ();
-typedef const char* (*ca_message_t)(long ca_status);
-typedef const char* (*ca_name_t) (chid chan);
-typedef const char* (*envGetConfigParamPtr_t)(const ENV_PARAM* pParam);
-typedef const ENV_PARAM* (*env_param_list_t);
-typedef const unsigned short(*dbr_value_offset_t);
-#define dbr_value_ptr(PDBR, DBR_TYPE) ((void*)(((char*)PDBR)+dbr_value_offset[DBR_TYPE]))
-typedef epicsMutexId(*epicsMutexOsiCreate_t)(const char* pFileName, int lineno);
-typedef epicsThreadId(*epicsThreadCreate_t) (const char* name, unsigned int priority, unsigned int stackSize, EPICSTHREADFUNC funptr, void* parm);
-typedef epicsMutexLockStatus(*epicsMutexLock_t)(epicsMutexId id);
-typedef epicsMutexLockStatus(*epicsMutexTryLock_t)(epicsMutexId id);
-typedef void caExceptionHandler(struct exception_handler_args);
-typedef int(*ca_add_exception_event_t) (caExceptionHandler* pfunc, void* pArg);
-typedef int(*ca_array_get_t) (chtype type, unsigned long count, chid pChan, void* pValue);
-typedef int(*ca_array_put_t) (chtype type, unsigned long count, chid chanId, const void* pValue);
-typedef int(*ca_array_put_callback_t) (chtype type, unsigned long count, chid chanId, const void* pValue, caEventCallBackFunc* pFunc, void* pArg);
-typedef int(*ca_attach_context_t) (struct ca_client_context* context);
-typedef int(*ca_flush_io_t) (void);
-typedef int(*ca_clear_channel_t)(chid chanId);
-typedef int(*ca_clear_subscription_t)(evid eventID);
-typedef int(*ca_context_create_t) (ca_preemptive_callback_select select);
-typedef int(*ca_create_channel_t) (const char* pChanName, caCh* pConnStateCallback, void* pUserPrivate, capri priority, chid* pChanID);
-typedef int(*ca_create_subscription_t) (chtype type, unsigned long count, chid chanId, long mask, caEventCallBackFunc* pFunc, void* pArg, evid* pEventID);
-typedef int(*ca_array_get_callback_t) (chtype type, unsigned long count, chid chanId, caEventCallBackFunc* pFunc, void* pArg);
-typedef int(*ca_pend_io_t) (ca_real timeOut);
-#if defined _WIN32 || defined _WIN64
-#define EPICS_PRINTF_STYLE(f,a)
-typedef int(__stdcall* epicsSnprintf_t)(char* str, size_t size, const char* format, ...) EPICS_PRINTF_STYLE(3, 4);
-#else
-#define EPICS_PRINTF_STYLE(f,a) __attribute__((format(__printf__,f,a)))
-typedef int(*epicsSnprintf_t)(char* str, size_t size, const char* format, ...) __attribute__((format(__printf__, 3, 4)));
-#endif
-typedef short(*ca_field_type_t) (chid chan);
-typedef size_t(__stdcall* epicsTimeToStrftime_t) (char* pBuff, size_t bufLength, const char* pFormat, const epicsTimeStamp* pTS);
-typedef unsigned int(*epicsThreadGetStackSize_t)(epicsThreadStackSizeClass size);
-typedef unsigned long(*ca_element_count_t) (chid chan);
-typedef void* (*ca_puser_t)(chid chan);
-typedef void(*ca_context_destroy_t) (void);
-typedef void(*ca_detach_context_t) ();
-typedef void(*epicsMutexDestroy_t)(epicsMutexId id);
-typedef void(*epicsMutexUnlock_t)(epicsMutexId id);
-typedef void(*epicsThreadSleep_t)(double seconds);
-typedef const char* (*ca_version_t)(void);
-
-ca_add_exception_event_t ca_add_exception_event = 0x0;
-ca_attach_context_t ca_attach_context = 0x0;
-ca_array_get_t ca_array_get = 0x0;
-ca_array_put_t ca_array_put = 0x0;
-ca_array_put_callback_t ca_array_put_callback = 0x0;
-ca_clear_channel_t ca_clear_channel = 0x0;
-ca_clear_subscription_t ca_clear_subscription = 0x0;
-ca_context_create_t ca_context_create = 0x0;
-ca_context_destroy_t ca_context_destroy = 0x0;
-ca_create_channel_t ca_create_channel = 0x0;
-ca_create_subscription_t ca_create_subscription = 0x0;
-ca_array_get_callback_t ca_array_get_callback = 0x0;
-ca_current_context_t ca_current_context = 0x0;
-ca_detach_context_t ca_detach_context = 0x0;
-ca_element_count_t ca_element_count = 0x0;
-ca_field_type_t ca_field_type = 0x0;
-ca_flush_io_t ca_flush_io = 0x0;
-ca_message_t ca_message = 0x0;
-ca_name_t ca_name = 0x0;
-ca_pend_io_t ca_pend_io = 0x0;
-ca_puser_t ca_puser = 0x0;
-ca_state_t ca_state = 0x0;
-ca_version_t ca_version = 0x0;
-dbr_value_offset_t dbr_value_offset = 0x0;
-envGetConfigParamPtr_t envGetConfigParamPtr = 0x0;
-env_param_list_t env_param_list = 0x0;
-epicsMutexDestroy_t epicsMutexDestroy = 0x0;
-epicsMutexLock_t epicsMutexLock = 0x0;
-epicsMutexTryLock_t epicsMutexTryLock = 0x0;
-epicsMutexOsiCreate_t epicsMutexOsiCreate = 0x0;
-epicsMutexUnlock_t epicsMutexUnlock = 0x0;
-epicsSnprintf_t epicsSnprintf = 0x0;
-epicsThreadCreate_t epicsThreadCreate = 0x0;
-epicsThreadGetStackSize_t epicsThreadGetStackSize = 0x0;
-epicsThreadSleep_t epicsThreadSleep = 0x0;
-epicsTimeToStrftime_t epicsTimeToStrftime = 0x0;
-
-typedef const unsigned short(*dbr_size_t);
-typedef const unsigned short(*dbr_value_size_t);
-dbr_value_size_t dbr_value_size = 0x0;
-dbr_size_t dbr_size = 0x0;
-#define dbr_size_n(TYPE,COUNT) ((unsigned)((COUNT)<=0?dbr_size[TYPE]:dbr_size[TYPE]+((COUNT)-1)*dbr_value_size[TYPE]))
-#define ca_get_callback(type, chan, pFunc, pArg) ca_array_get_callback (type, 1u, chan, pFunc, pArg)
 #endif
 
-#define MAX_NAME_SIZE 61
+namespace {
+	// Task structure to hold data from a CA value-changed event for background processing.
+	struct ValueChangeTask {
+		std::string pvName;
+		int type = 0;
+		unsigned nElems = 0;
+		int errorCode = ECA_NORMAL; // EPICS CA status for this event (ECA_*).
+		bool hasTimeMeta = false;
+		uint32_t secPastEpoch = 0;
+		uint32_t nsec = 0;
+		uint16_t status = 0;
+		uint16_t severity = 0;
+		size_t dataBytes = 0;
+		void* dataCopy = nullptr; // Ownership is transferred to PVItem; freed here on failure.
+	};
 
-MgErr DeleteStringArray(sStringArrayHdl array);
-void DbgTime(void);
-MgErr CaLabDbgPrintf(const char* format, ...);
-MgErr CaLabDbgPrintfD(const char* format, ...);
-void connectionChanged(connection_handler_args args);
-void valueChanged(evargs args);
-void putState(evargs args);
-void caLabLoad(void);
-void caLabUnload(void);
-uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize);
-std::string myItemsFindEnum(std::string name, dbr_enum_t enumValue);
+	// Globals for the value-changed worker queue.
+	std::mutex g_vcMutex;
+	std::condition_variable g_vcCv;
+	std::deque<ValueChangeTask> g_vcQueue;
+	std::atomic<bool> g_vcStop{ false };
+	std::atomic<bool> g_vcStarted{ false };
+	std::mutex g_vcStartMtx;
+	std::thread g_vcThread;
 
-ca_client_context* pcac = 0x0;            // EPICS context
-bool				bCaLabPolling = false; // TRUE: Avoids permanent open network ports. (CompactRIO)
-uInt32				globalCounter = 0;     // simple counter for debugging
-uInt32				reservedCounter = 0;   // simple counter for debugging
-static bool			stopped;               // indicator for closing library
-FILE* pCaLabDbgFile = 0x0;   // file handle for optional debug file
-std::atomic<int>	tasks(0);			   // number of parallel tasks
-static bool			err200 = false;        // send one error 200 message only
-uInt32				currentlyConnectedPos = 6 * sizeof(void*) + sizeof(unsigned int); // direct access to connect indicator in channel access object
-epicsMutexId		getLock;               // used to protect the getValue() entry point
-epicsMutexId		putLock;               // used to protect the putValue() entry point
 
-// https://www.techiedelight.com/trim-string-cpp-remove-leading-trailing-spaces/
-const std::string WHITESPACE = " \n\r\t\f\v";
-std::string ltrim(const std::string& s)
-{
-	size_t start = s.find_first_not_of(WHITESPACE);
-	return (start == std::string::npos) ? "" : s.substr(start);
-}
-
-std::string rtrim(const std::string& s)
-{
-	size_t end = s.find_last_not_of(WHITESPACE);
-	return (end == std::string::npos) ? "" : s.substr(0, end + 1);
-}
-
-std::string trim(const std::string& s) {
-	return rtrim(ltrim(s));
-}
-
-// internal data object
-class calabItem {
-public:
-	void* validAddress;							// check number for valid object
-	chanId						caID = 0x0;								// channel access ID
-	chanId						caIDprec = 0x0;							// channel access ID for display precision
-	chtype						nativeType = -1;						// native data type (EPICS)
-	uInt32						numberOfValues = 0x0;					// number of values
-	char						szName[MAX_NAME_SIZE];					// PV name as null-terminated string
-	evid						caEnumEventID = 0x0;					// event ID for subscription of enums
-	evid						caEventID = 0x0;						// event ID for subscription of values
-	sDoubleArrayHdl				doubleValueArray = 0x0;					// buffer for read values (Doubles)
-	sError						ErrorIO;								// error struct buffer
-	std::atomic<bool>			hasValue;								// indicator for read value
-	std::atomic<bool>			isConnected;							// indicator for successfully connect to server
-	std::atomic<bool>			isPassive;								// indicator for polling values instead of monitoring
-	std::atomic<bool>			putReadBack;							// indicator for the wait for the read-back
-	modifiedMap					fieldModified;							// indicator for changed field value
-	epicsMutexId				myLock;									// object mutex
-	LStrHandle					name = 0x0;								// PV name as LV string
-	calabItem*					parent = 0x0;							// parent of field object = main object with values
-	propertyMap					properties;								// properties / fields
-	int16_t						SeverityNumber = epicsSevInvalid;		// number of EPICS severity
-	LStrHandle					SeverityString = 0x0;					// LV string of EPICS severity
-	int16_t						StatusNumber = epicsAlarmComm;			// number of EPICS status
-	LStrHandle					StatusString = 0x0;						// LV string of EPICS status
-	sStringArrayHdl				stringValueArray = 0x0;					// buffer for read values (LV strings)
-	uInt32						TimeStampNumber = 0;					// number of time stamp
-	LStrHandle					TimeStampString = 0x0;					// LV string of time stamp
-	dbr_gr_enum					sEnum;									// enumeration String
-	std::vector<LVUserEventRef>	RefNum;									// reference number for LV user event
-	std::vector<sResult*>		eventResultCluster;						// reference object for LV user event
-	void*						writeValueArray = 0x0;					// buffer for output
-	uInt32						writeValueArraySize = 0;				// size of output buffer
-	std::atomic<bool>			locked;									// indicator of locked object
-	std::chrono::high_resolution_clock::time_point timer;				// watch dog timer
-	char						className[MAX_STRING_SIZE];				// class name of object
-	int32						prec;									// display precision; -1 == not initialized, -2 == not available
-
-	calabItem(void* currentInstance, LStrHandle name, sStringArrayHdl fieldNames = 0x0) {
-		hasValue = false;
-		isConnected = false;
-		isPassive = false;
-		if (currentInstance)
-			fieldModified[currentInstance] = false;
-		validAddress = this;
-		locked = false;
-		myLock = epicsMutexCreate();
-		if ((*name)->cnt < MAX_NAME_SIZE - 1) {
-			NumericArrayResize(uB, 1, (UHandle*)&this->name, (*name)->cnt);
-			memcpy((*this->name)->str, (*name)->str, (*name)->cnt);
-			(*this->name)->cnt = (*name)->cnt;
-			memcpy(szName, (*name)->str, (*name)->cnt);
-			szName[(*name)->cnt] = 0x0;
+	// Stops the background worker thread and drains any remaining tasks.
+	void stopWorker() {
+		if (!g_vcStarted.load()) return;
+		g_vcStop.store(true);
+		g_vcCv.notify_all();
+		if (g_vcThread.joinable()) {
+			g_vcThread.join();
 		}
-		else {
-			NumericArrayResize(uB, 1, (UHandle*)&this->name, MAX_NAME_SIZE - 1);
-			memcpy((*this->name)->str, (*name)->str, MAX_NAME_SIZE - 1);
-			(*this->name)->cnt = MAX_NAME_SIZE - 1;
-			memcpy(szName, (*name)->str, MAX_NAME_SIZE - 1);
-			szName[MAX_NAME_SIZE - 1] = 0x0;
-			CaLabDbgPrintf("%s was cropped to %d characters (max EPICS name size)", szName, MAX_NAME_SIZE - 1);
-		}
-		// White spaces in PV names are not allowed
-		if (strchr(szName, ' ') || strchr(szName, '\t')) {
-			if (strchr(szName, ' ')) {
-				DbgTime(); CaLabDbgPrintf("white space in PV name \"%s\" detected", szName);
-				*(strchr(szName, ' ')) = 0;
-			}
-			if (strchr(szName, '\t')) {
-				DbgTime(); CaLabDbgPrintf("tabulator in PV name \"%s\" detected", szName);
-				*(strchr(szName, '\t')) = 0;
-			}
-			NumericArrayResize(uB, 1, (UHandle*)&this->name, strlen(szName));
-			memcpy((*this->name)->str, szName, strlen(szName));
-			(*this->name)->cnt = (int32)strlen(szName);
-		}
-		if (fieldNames && *fieldNames) {
-			for (uInt32 i = 0; i < (*fieldNames)->dimSize; i++) {
-				if (*(*fieldNames)->elt[i] && (*(*fieldNames)->elt[i])->cnt) {
-					std::string fieldName = std::string((char*)(*(*fieldNames)->elt[i])->str, (size_t)(*(*fieldNames)->elt[i])->cnt);
-					fieldName = trim(fieldName);
-					properties[fieldName] = "";
+		g_vcStarted.store(false);
+	}
+
+	// Processes a single value change task from the queue.
+	void processValueChangeTask(ValueChangeTask& task) {
+		Globals& g = Globals::getInstance();
+		PVItem* pvItem = nullptr;
+
+		// (1) Lookup PV item with a shared lock to allow concurrent lookups.
+		{
+			TimeoutSharedLock<std::shared_timed_mutex> pvRegistrySharedLock(
+				g.pvRegistryLock, "valueChanged-lookup-worker", std::chrono::milliseconds(200));
+			if (!pvRegistrySharedLock.isLocked()) {
+				CaLabDbgPrintf("Error: Failed to acquire shared lock for %s in worker (lookup).", task.pvName.c_str());
+				if (task.dataCopy) {
+					try {
+						free(task.dataCopy);
+					} catch (...) {
+						CaLabDbgPrintf("Error: Exception #1 during free() of dataCopy for PV %s", task.pvName.c_str());
+					}
+					task.dataCopy = nullptr;
 				}
-			}
-		}
-		ErrorIO.source = 0x0;
-		sEnum.no_str = 0x0;
-		setError(ECA_DISCONN);
-        memcpy(className, "unknown", sizeof("unknown"));
-		className[sizeof("unknown")] = 0x0;
-		prec = -1;
-		timer = std::chrono::high_resolution_clock::now();
-	}
-
-	~calabItem() {
-#if defined _WIN32 || defined _WIN64
-		if (!dllStatus) return; // DLL_PROCESS_DETACH
-#endif
-		MgErr err = noErr;
-		int32 lerr = lock();
-		if (lerr) CaLabDbgPrintf("lock failed in ~calabItem");
-		szName[0] = 0x0;
-		unlock();
-		if (RefNum.size() || eventResultCluster.size()) {
-			std::vector<LVUserEventRef>::iterator itRefNum = RefNum.begin();
-			while (itRefNum != RefNum.end()) {
-				itRefNum = RefNum.erase(itRefNum);
-			}
-			std::vector<sResult*>::iterator itEventResultCluster = eventResultCluster.begin();
-			while (itEventResultCluster != eventResultCluster.end()) {
-				itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
-			}
-		}
-		err += DSDisposeHandle(name);
-		if (doubleValueArray)
-			err += DSDisposeHandle(doubleValueArray);
-		if (stringValueArray) {
-			for (uInt32 i = 0; i < (*stringValueArray)->dimSize; i++)
-				err += DSDisposeHandle((*stringValueArray)->elt[i]);
-			(*stringValueArray)->dimSize = 0;
-			err += DSDisposeHandle(stringValueArray);
-		}
-		if (StatusString)
-			err += DSDisposeHandle(StatusString);
-		if (SeverityString)
-			err += DSDisposeHandle(SeverityString);
-		if (TimeStampString)
-			err += DSDisposeHandle(TimeStampString);
-		if (ErrorIO.source)
-			err += DSDisposeHandle(ErrorIO.source);
-		if (err)
-			CaLabDbgPrintf("Error: Memory exception in cItem::~Item");
-		epicsMutexDestroy(myLock);
-		if (writeValueArray)
-			free(writeValueArray);
-	}
-
-	// lock this instance
-	// return non-zero if lock fails
-	int32 lock() {
-#ifdef _DEBUG
-		int32 loopcount = 0;
-#endif
-		bool havelock = true;
-		locked = true;
-		std::chrono::duration<double> diff;
-		std::chrono::high_resolution_clock::time_point lockTimer = std::chrono::high_resolution_clock::now();
-		//epicsMutexLock(myLock);
-		while (epicsMutexTryLock(myLock) != epicsMutexLockOK) {
-#ifdef _DEBUG
-			loopcount++;
-#endif
-			diff = std::chrono::high_resolution_clock::now() - lockTimer;
-			if (diff.count() > 10) {
-				havelock = false;
-				break;
-			}
-		}
-#ifdef _DEBUG
-		if (!havelock)
-			CaLabDbgPrintf("%s has delayed mutex after %d tries", szName, loopcount);
-#endif
-		return !havelock;
-	}
-
-	// unlock this instance
-	void unlock() {
-		epicsMutexUnlock(myLock);
-		locked = false;
-	}
-
-	// write error struct
-	//    iError: error code
-	MgErr setError(int32 iError) {
-		int32 iSize = 0;
-		MgErr err = noErr;
-		iSize = (int32)strlen(ca_message(iError));
-		if (!ErrorIO.source || (*ErrorIO.source)->cnt != iSize) {
-			err += NumericArrayResize(uB, 1, (UHandle*)&ErrorIO.source, iSize);
-			(*ErrorIO.source)->cnt = iSize;
-		}
-		memcpy((*ErrorIO.source)->str, ca_message(iError), iSize);
-		if (iError <= ECA_NORMAL)
-			ErrorIO.code = 0;
-		else
-			ErrorIO.code = iError + ERROR_OFFSET;
-		ErrorIO.status = 0;
-		return err;
-	}
-
-	// disconnect instance from server
-	void disconnect() {
-		int32 err = lock();
-		if (err) CaLabDbgPrintf("lock failed in disconnect");
-		isPassive = true;
-		fieldModified.clear();
-		if (RefNum.size() || eventResultCluster.size()) {
-			std::vector<LVUserEventRef>::iterator itRefNum = RefNum.begin();
-			while (itRefNum != RefNum.end()) {
-				itRefNum = RefNum.erase(itRefNum);
-			}
-			std::vector<sResult*>::iterator itEventResultCluster = eventResultCluster.begin();
-			while (itEventResultCluster != eventResultCluster.end()) {
-				itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
-			}
-		}
-		unlock();
-	}
-
-	void modified() {
-		if (parent) {
-			modifiedMapIterator it = parent->fieldModified.begin();
-			while (it != parent->fieldModified.end()) {
-				it->second = true;
-				it++;
-			}
-		}
-		else {
-			modifiedMapIterator it = fieldModified.begin();
-			while (it != fieldModified.end()) {
-				it->second = true;
-				it++;
-			}
-		}
-	}
-
-	// callback for changed connection state
-	void itemConnectionChanged(connection_handler_args args) {
-		try {
-			if (!szName[0]) {
-				CaLabDbgPrintf("Missing PV name in itemConnectionChanged");
 				return;
 			}
-			int32 size;
-			if (args.op == CA_OP_CONN_UP) {
-				int32 err = lock();
-				if (err) CaLabDbgPrintf("lock failed in connection up");
-				isConnected = true;
-				if (RefNum.size()) {
-					modified();
-					unlock();
-					postEvent();
+			auto it = g.pvRegistry.find(task.pvName);
+			if (it == g.pvRegistry.end()) {
+				CaLabDbgPrintf("Worker: PV %s not found in registry", task.pvName.c_str());
+				if (task.dataCopy) {
+					try {
+						free(task.dataCopy);
+					}
+					catch (...) {
+						CaLabDbgPrintf("Error: Exception #2 during free() of dataCopy for PV %s", task.pvName.c_str());
+					}
+					task.dataCopy = nullptr;
 				}
-				else {
-					modified();
-					unlock();
-				}
+				return;
 			}
-			else if (args.op == CA_OP_CONN_DOWN) {
-				int32 err = lock();
-				if (err) CaLabDbgPrintf("lock failed in connection down");
-				isConnected = false;
-				size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
-				if (!StatusString || (*StatusString)->cnt != size) {
-					NumericArrayResize(uB, 1, (UHandle*)&StatusString, size);
-					(*StatusString)->cnt = size;
-				}
-				memcpy((*StatusString)->str, alarmStatusString[epicsAlarmComm], size);
-				StatusNumber = epicsAlarmComm;
-				size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
-				if (!SeverityString || (*SeverityString)->cnt != size) {
-					NumericArrayResize(uB, 1, (UHandle*)&SeverityString, size);
-					(*SeverityString)->cnt = size;
-				}
-				memcpy((*SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
-				SeverityNumber = epicsSevInvalid;
-				setError(ECA_DISCONN);
-				if (RefNum.size()) {
-					modified();
-					unlock();
-					postEvent();
-				}
-				else {
-					modified();
-					unlock();
-				}
-			}
+			pvItem = it->second.get();
 		}
-		catch (std::exception& ex) {
-			DbgTime(); CaLabDbgPrintf("%s", ex.what());
-		}
-	}
 
-	// callback for changed value (incl. field values)
-	void itemValueChanged(evargs args) {
-		try {
-			bool bDbrTime = false;
-			bool validDoubleArray = false;
-			bool validStringArray = false;
-			dbr_ctrl_enum* tmpEnum;
-			int32 iSize;
-			MgErr err = noErr;
-			char szTmp[MAX_STRING_SIZE];
-			if (!szName[0] || args.status != ECA_NORMAL)
-				return;
-			int32 lerr = lock();
-			if (lerr) CaLabDbgPrintf("lock failed in itemValueChanged");
-			if (args.type == DBR_CLASS_NAME) {
-				const char* tmpClassName = (const char*)((dbr_string_t*)dbr_value_ptr(args.dbr, DBR_CLASS_NAME));
-				if (!tmpClassName || strlen(tmpClassName) > MAX_STRING_SIZE) return;
-				memcpy(className, tmpClassName, strlen(tmpClassName));
-				className[strlen(tmpClassName)] = 0x0;
-				unlock();
+		// (2) Acquire a short exclusive lock on the PVItem to update its data.
+		{
+			TimeoutUniqueLock<std::mutex> itemLock(
+				pvItem->ioMutex(),
+				"valueChanged-item-worker",
+				std::chrono::milliseconds(200)
+			);
+			if (!itemLock.isLocked()) {
+				CaLabDbgPrintf("Error: Failed to acquire unique lock for %s in worker (item).", task.pvName.c_str());
+				if (task.dataCopy) {
+					try {
+						free(task.dataCopy);
+					}
+					catch (...) {
+						CaLabDbgPrintf("Error: Exception #3 during free() of dataCopy for PV %s", task.pvName.c_str());
+					}
+					task.dataCopy = nullptr;
+				}
 				return;
 			}
-			numberOfValues = args.count;
-			if (!parent && !doubleValueArray) {
-				err += NumericArrayResize(fD, 1, (UHandle*)&doubleValueArray, args.count);
-				if (err == noErr) {
-					(*doubleValueArray)->dimSize = args.count;
+
+			pvItem->setNumberOfValues(task.nElems);
+			pvItem->setErrorCode(task.errorCode);
+
+			if (task.hasTimeMeta) {
+				pvItem->setTimestamp(task.secPastEpoch);
+				pvItem->setTimestampNSec(task.nsec);
+				pvItem->setStatus(task.status);
+				pvItem->setSeverity(task.severity);
+			}
+
+			// Transfer ownership of the data buffer to the PVItem.
+			if (task.dataCopy) {
+				pvItem->clearDbr();
+				pvItem->setDbr(task.dataCopy);
+				task.dataCopy = nullptr; // Ownership moved.
+				pvItem->setHasValue(true);
+			}
+		}
+
+		// If this is an .RTYP PV, update the parent's record type.
+		const bool isRtypeString = task.pvName.size() >= 5 && task.pvName.compare(task.pvName.size() - 5, 5, ".RTYP") == 0;
+		if (isRtypeString) {
+			PVItem* parentPvItem = nullptr;
+			{
+				// No need to lock the registry; the parent pointer is on the pvItem itself.
+				std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+				parentPvItem = pvItem->parent;
+			}
+			if (parentPvItem) {
+				std::string recordType;
+				{
+					// Derive recordType from the freshly set value.
+					std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+					auto values = pvItem->dbrValue2String();
+					if (!values.empty()) recordType = values[0];
+				}
+				if (!recordType.empty()) {
+					TimeoutUniqueLock<std::mutex> parentLock(
+						parentPvItem->ioMutex(),
+						"valueChanged-parent-worker",
+						std::chrono::milliseconds(200)
+					);
+					if (parentLock.isLocked()) {
+						pvItem->parent->setRecordType(recordType);
+					}
+					else {
+						CaLabDbgPrintf("Error: Failed to acquire unique lock for parent of %s in worker (RTYP).", task.pvName.c_str());
+					}
 				}
 			}
-			if (!parent && doubleValueArray && (DSCheckHandle(doubleValueArray) == noErr)) {
-				if (!doubleValueArray || (long)(*doubleValueArray)->dimSize < args.count) {
-					err += NumericArrayResize(fD, 1, (UHandle*)&doubleValueArray, args.count);
-					if (err == noErr) {
-						(*doubleValueArray)->dimSize = args.count;
-					}
+		}
+
+		// If this is a field PV (e.g., 'base.FIELD' but not '.RTYP'), store its string value on the parent.
+		{
+			// Fast check: contains a dot and does not end with .RTYP.
+			const size_t dotPos = task.pvName.find('.');
+			if (dotPos != std::string::npos && !isRtypeString) {
+				PVItem* parentPvItem = nullptr;
+				{
+					std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+					parentPvItem = pvItem->parent;
 				}
-				validDoubleArray = true;
-			}
-			if (!parent && !stringValueArray) {
-				stringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + args.count * sizeof(LStrHandle[1]));
-				(*stringValueArray)->dimSize = args.count;
-			}
-			if (!parent && stringValueArray && (err = (DSCheckHandle(stringValueArray)) == noErr)) {
-				if (!stringValueArray || (long)(*stringValueArray)->dimSize < args.count) {
-					if (stringValueArray && (long)(*stringValueArray)->dimSize != args.count) {
-						err += DeleteStringArray(stringValueArray);
-					}
-					stringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + args.count * sizeof(LStrHandle[1]));
-					(*stringValueArray)->dimSize = args.count;
-				}
-				validStringArray = true;
-			}
-			switch (args.type) {
-			case DBR_TIME_STRING:
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					char* tmp;
-					iSize = (int32)strlen(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					if (parent && parent->szName) {
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = strtod(((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], &tmp);
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), ((dbr_string_t*)dbr_value_ptr(args.dbr, args.type))[lCount], iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_TIME_SHORT:
-				short shortValue;
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					shortValue = ((dbr_short_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", (uInt32)shortValue);
-					if (parent && parent->szName) {
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = shortValue;
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_TIME_CHAR:
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_char_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					if (parent && parent->szName) {
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = ((dbr_char_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_TIME_LONG:
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_long_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					if (parent && parent->szName) {
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = ((dbr_long_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_TIME_FLOAT:
-				if (properties.size() && prec == -1) {
-					propertyMapIterator nameIterator = properties.find("PREC");
-					if (nameIterator != properties.end()) {
-						if (nameIterator->second.size()) {
-							prec = std::stoi(nameIterator->second);
-						}
-					}
-					else {
-						prec = -2;
-					}
-				}
-				for (long lCount = 0; lCount < args.count; lCount++) {					
-					if(prec >= 0)
-						if(abs(((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) < 1e-3 || abs(((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) >= 1e7)
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*e", prec, ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-						else
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*f", prec, ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					else
-						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					if (parent && parent->szName) {
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = ((dbr_float_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_TIME_DOUBLE:
-				if (properties.size() && prec == -1) {
-					propertyMapIterator nameIterator = properties.find("PREC");
-					if (nameIterator != properties.end()) {
-						if (nameIterator->second.size()) {
-							prec = std::stoi(nameIterator->second);
-						}
-					}
-					else {
-						prec = -2;
-					}
-				}
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					if(prec >= 0)
-						if(abs(((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) < 1e-3 || abs(((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]) >= 1e7)
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*e", prec, ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-						else
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%.*f", prec, ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					else
-						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%g", ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					if (parent && parent->szName) {
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = std::string(szTmp);
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = ((dbr_double_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_TIME_ENUM:
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					dbr_enum_t enumValue = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-					if (sEnum.no_str > 0 && enumValue < sEnum.no_str)
-						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", sEnum.strs[((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]]);
-					else if (sEnum.no_str == 0)
-						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount]);
-					else
-						iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%s", "Illegal Value");
-					if (parent && parent->szName) {
-						std::string fieldValue = myItemsFindEnum(szName, enumValue);
-						if (fieldValue.empty()) {
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", enumValue);
-							fieldValue = szTmp;
-						}
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = fieldValue;
-					}
-					else {
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), szTmp, iSize);
-						}
-					}
-				}
-				bDbrTime = 1;
-				break;
-			case DBR_CTRL_ENUM:
-				tmpEnum = (dbr_ctrl_enum*)args.dbr;
-				if (!tmpEnum) break;
-				sEnum.no_str = tmpEnum->no_str;
-				for (uInt32 i = 0; i < (uInt32)tmpEnum->no_str; i++) {
-					epicsSnprintf(sEnum.strs[i], MAX_ENUM_STRING_SIZE, "%s", tmpEnum->strs[i]);
-				}
-				for (long lCount = 0; lCount < args.count; lCount++) {
-					iSize = 0;
-					if (parent && parent->szName) {
-						dbr_enum_t enumValue = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						std::string fieldValue = myItemsFindEnum(szName, enumValue);
-						if (fieldValue.empty()) {
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", enumValue);
-							fieldValue = szTmp;
-						}
-						parent->properties[std::string(szName + strlen(parent->szName) + 1)] = fieldValue;
-					}
-					else {
-						dbr_enum_t enumValue = ((dbr_enum_t*)dbr_value_ptr(args.dbr, args.type))[lCount];
-						std::string enumStringValue = myItemsFindEnum(szName, enumValue);
-						if (enumStringValue.empty()) {
-							iSize = epicsSnprintf(szTmp, MAX_STRING_SIZE, "%d", enumValue);
-							enumStringValue = "szTmp";
+				if (parentPvItem) {
+					// Extract field name and its most recent string value.
+					const std::string fieldName = task.pvName.substr(dotPos + 1);
+					std::string fieldString;
+					{
+						std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+						// Use string conversion for strings/enums, and numeric->string otherwise.
+						auto strValues = pvItem->dbrValue2String();
+						if (!strValues.empty()) {
+							fieldString = strValues[0];
 						}
 						else {
-							iSize = (int32)enumStringValue.size();
-						}
-						if (validDoubleArray) {
-							(*doubleValueArray)->elt[lCount] = enumValue;
-						}
-						if (validStringArray) {
-							if (LHStrLen((*stringValueArray)->elt[lCount]) != iSize) {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*stringValueArray)->elt[lCount], iSize);
-								LStrLen(*(*stringValueArray)->elt[lCount]) = iSize;
-							}
-							if (iSize)
-								memcpy(LStrBuf(*(*stringValueArray)->elt[lCount]), enumStringValue.c_str(), iSize);
-						}
-					}
-					modified();
-				}
-				bDbrTime = 0;
-				break;
-			default:
-				setError(ECA_BADTYPE);
-				hasValue = true;
-				unlock();
-				return;
-			}
-			if (args.status == ECA_NORMAL) {
-				// Update time stamp, status, severity and error messages
-				if (bDbrTime) {
-					iSize = (int32)epicsTimeToStrftime(szTmp, MAX_STRING_SIZE, "%Y-%m-%d %H:%M:%S.%06f", &((struct dbr_time_short*)args.dbr)->stamp);
-					if (!TimeStampString || (*TimeStampString)->cnt != iSize) {
-						err += NumericArrayResize(uB, 1, (UHandle*)&TimeStampString, iSize);
-						(*TimeStampString)->cnt = iSize;
-					}
-					memcpy((*TimeStampString)->str, szTmp, iSize);
-					TimeStampNumber = ((struct dbr_time_short*)args.dbr)->stamp.secPastEpoch;
-
-					iSize = (int32)strlen(alarmStatusString[((struct dbr_time_short*)args.dbr)->status]);
-					if (!StatusString || (*StatusString)->cnt != iSize) {
-						err += NumericArrayResize(uB, 1, (UHandle*)&StatusString, iSize);
-						(*StatusString)->cnt = iSize;
-					}
-					memcpy((*StatusString)->str, alarmStatusString[((struct dbr_time_short*)args.dbr)->status], iSize);
-					StatusNumber = ((struct dbr_time_short*)args.dbr)->status;
-
-					iSize = (int32)strlen(alarmSeverityString[((struct dbr_time_short*)args.dbr)->severity]);
-					if (!SeverityString || (*SeverityString)->cnt != iSize) {
-						err += NumericArrayResize(uB, 1, (UHandle*)&SeverityString, iSize);
-						(*SeverityString)->cnt = iSize;
-					}
-					memcpy((*SeverityString)->str, alarmSeverityString[((struct dbr_time_short*)args.dbr)->severity], iSize);
-					SeverityNumber = ((struct dbr_time_short*)args.dbr)->severity;
-					modified();
-				}
-			}
-			setError(args.status);
-			hasValue = true;
-			if (bDbrTime && (RefNum.size() || (parent && parent->RefNum.size()))) {
-				unlock();
-				if (parent)
-					parent->postEvent();
-				else
-					postEvent();
-			}
-			else {
-				unlock();
-			}
-		}
-		catch (std::exception& ex) {
-			DbgTime(); CaLabDbgPrintf("%s", ex.what());
-			if (locked.load())
-				unlock();
-		}
-	}
-
-	// write EPICS PV
-	//    ValueArray2D:       data array (buffer)
-	//    DataType:           data type
-	//      # => LabVIEW => C++ => EPICS
-	//	    0 = > String = > char[] = > dbr_string_t
-	//		1 = > Single - precision, floating - point = > float = > dbr_float_t
-	//		2 = > Double - precision, floating - point = > double = > dbr_double_t
-	//		3 = > Byte signed integer = > char = > dbr_char_t
-	//		4 = > Word signed integer = > short = > dbr_short_t
-	//		5 = > Long signed integer = > int = > dbr_long_t
-	//		6 = > Quad signed integer = > long = > dbr_long_t
-	//    Row:                row in data array
-	//    ValuesPerSet:       numbers of values in row
-	//    Error:              resulting error
-	//    Timeout:            EPICS event timeout in seconds
-	//    Wait4Readback:      true = callback will be used (no interrupt of motor records)
-	void put(void* ValueArray2D, uInt32 DataType, uInt32 row, uInt32 ValuesPerSet, sError* Error, double Timeout, bool Wait4Readback) {
-		LStrHandle currentStringValue;
-		char szTmp[MAX_ERROR_SIZE];
-		uInt32 iResult = ECA_NORMAL;
-		uInt32 iPos = 0;
-		uInt32 valuesPerSetMax;
-		int32 stringSize;
-		uInt32 size = 0;
-		try {
-			if (stopped || !caID || !*(((bool*)caID) + currentlyConnectedPos) || !numberOfValues) {
-				if (!stopped) {
-					iResult = ECA_DISCONN;
-					stringSize = (int32)strlen(ca_message(iResult));
-					if (!Error->source || (*Error->source)->cnt != stringSize) {
-						NumericArrayResize(uB, 1, (UHandle*)&Error->source, stringSize);
-						(*Error->source)->cnt = stringSize;
-					}
-					memcpy((*Error->source)->str, ca_message(iResult), stringSize);
-					if (iResult != ECA_NORMAL)
-						Error->code = ERROR_OFFSET + iResult;
-					else
-						Error->code = 0;
-					Error->status = 0;
-				}
-				return;
-			}
-			valuesPerSetMax = numberOfValues;
-			tasks.fetch_add(1);
-			putReadBack = false;
-			if (ValuesPerSet > valuesPerSetMax)
-				stringSize = valuesPerSetMax;
-			else
-				stringSize = ValuesPerSet;
-			// Create new transfer object (writeValueArray)
-			switch (DataType) {
-			case 0:
-				size = static_cast<unsigned long long>(stringSize) * MAX_STRING_SIZE * sizeof(char);
-				if (writeValueArraySize != size) {
-					void* tmp = realloc(writeValueArray, size);
-					if (tmp) {
-						writeValueArray = (char*)tmp;
-						writeValueArraySize = size;
-					}
-				}
-				memset(writeValueArray, 0, size);
-				break;
-			case 1:
-				if (nativeType == DBF_STRING) {
-					size = static_cast<unsigned long long>(stringSize) * MAX_STRING_SIZE * sizeof(char);
-					if (writeValueArraySize != size) {
-						void* tmp = realloc(writeValueArray, size);
-						if (tmp) {
-							writeValueArray = (char*)tmp;
-							writeValueArraySize = size;
-						}
-					}
-					memset(writeValueArray, 0, size);
-				}
-				else {
-					size = stringSize * sizeof(float);
-					if (writeValueArraySize != size) {
-						void* tmp = realloc(writeValueArray, size);
-						if (tmp) {
-							writeValueArray = (float*)tmp;
-							writeValueArraySize = size;
-						}
-					}
-				}
-				break;
-			case 2:
-				if (nativeType == DBF_STRING) {
-					size = static_cast<unsigned long long>(stringSize) * MAX_STRING_SIZE * sizeof(char);
-					if (writeValueArraySize != size) {
-						void* tmp = realloc(writeValueArray, size);
-						if (tmp) {
-							writeValueArray = (char*)tmp;
-							writeValueArraySize = size;
-						}
-					}
-					memset(writeValueArray, 0, size);
-				}
-				else {
-					size = stringSize * sizeof(double);
-					if (writeValueArraySize != size) {
-						void* tmp = realloc(writeValueArray, size);
-						if (tmp) {
-							writeValueArray = (double*)tmp;
-							writeValueArraySize = size;
-						}
-					}
-				}
-				break;
-			case 3:
-				size = stringSize * sizeof(char);
-				if (writeValueArraySize != size) {
-					void* tmp = realloc(writeValueArray, size);
-					if (tmp) {
-						writeValueArray = (char*)tmp;
-						writeValueArraySize = size;
-					}
-				}
-				break;
-			case 4:
-				size = stringSize * sizeof(short);
-				if (writeValueArraySize != size) {
-					void* tmp = realloc(writeValueArray, size);
-					if (tmp) {
-						writeValueArray = (short*)tmp;
-						writeValueArraySize = size;
-					}
-				}
-				break;
-			case 5:
-			case 6:
-				size = stringSize * sizeof(int);
-				if (writeValueArraySize != size) {
-					void* tmp = realloc(writeValueArray, size);
-					if (tmp) {
-						writeValueArray = (int*)tmp;
-						writeValueArraySize = size;
-					}
-				}
-				break;
-			default:
-				// Handled in previous switch-case statement
-				break;
-			}
-			for (int32 col = 0; col < stringSize; col++) {
-				switch (DataType) {
-				case 0:
-					iPos = row * ValuesPerSet + col;
-					currentStringValue = (**(sStringArray2DHdl*)ValueArray2D)->elt[iPos];
-					if (currentStringValue && (*currentStringValue)->cnt < MAX_STRING_SIZE) {
-						memcpy(szTmp, (*currentStringValue)->str, (*currentStringValue)->cnt);
-						szTmp[(*currentStringValue)->cnt] = 0x0;
-					}
-					else {
-						szTmp[0] = 0x0;
-					}
-					if (nativeType != DBF_STRING && nativeType != DBF_ENUM) {
-						char* found = 0x0;
-						while ((found = strstr(szTmp, ",")) != 0x0)
-							*found = '.';
-					}
-					memcpy((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, szTmp, strlen(szTmp));
-					break;
-				case 1:
-					iPos = row * ValuesPerSet + col;
-					if (nativeType == DBF_STRING) {
-						epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%f", (float)(**(sDoubleArray2DHdl*)ValueArray2D)->elt[iPos]);
-					}
-					else {
-						((float*)writeValueArray)[col] = (float)(**(sDoubleArray2DHdl*)ValueArray2D)->elt[iPos];
-					}
-					break;
-				case 2:
-					iPos = row * ValuesPerSet + col;
-					if (nativeType == DBF_STRING) {
-						epicsSnprintf((char*)writeValueArray + (int64)col * (int64)MAX_STRING_SIZE, MAX_STRING_SIZE, "%f", (**(sDoubleArray2DHdl*)ValueArray2D)->elt[iPos]);
-					}
-					else {
-						((double*)writeValueArray)[col] = (**(sDoubleArray2DHdl*)ValueArray2D)->elt[iPos];
-					}
-					break;
-				case 3:
-					iPos = row * ValuesPerSet + col;
-					((char*)writeValueArray)[col] = (char)(**(sLongArray2DHdl*)ValueArray2D)->elt[iPos];
-					break;
-				case 4:
-					iPos = row * ValuesPerSet + col;
-					((short*)writeValueArray)[col] = (short)(**(sLongArray2DHdl*)ValueArray2D)->elt[iPos];
-					break;
-				case 5:
-				case 6:
-					iPos = row * ValuesPerSet + col;
-					((int*)writeValueArray)[col] = (int)(**(sLongArray2DHdl*)ValueArray2D)->elt[iPos];
-					break;
-				default:
-					;
-				}
-			}
-			switch (DataType) {
-			case 0:
-				if (Wait4Readback)
-					iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
-				else
-					iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
-				break;
-			case 1:
-				if (nativeType == DBF_STRING) {
-					if (Wait4Readback)
-						iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
-					else
-						iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
-				}
-				else {
-					if (Wait4Readback)
-						iResult = ca_array_put_callback(DBR_FLOAT, stringSize, caID, writeValueArray, putState, this);
-					else
-						iResult = ca_array_put(DBR_FLOAT, stringSize, caID, writeValueArray);
-				}
-				break;
-			case 2:
-				if (nativeType == DBF_STRING) {
-					if (Wait4Readback)
-						iResult = ca_array_put_callback(DBR_STRING, stringSize, caID, writeValueArray, putState, this);
-					else
-						iResult = ca_array_put(DBR_STRING, stringSize, caID, writeValueArray);
-				}
-				else {
-					if (Wait4Readback)
-						iResult = ca_array_put_callback(DBR_DOUBLE, stringSize, caID, writeValueArray, putState, this);
-					else
-						iResult = ca_array_put(DBR_DOUBLE, stringSize, caID, writeValueArray);
-				}
-				break;
-			case 3:
-				if (Wait4Readback)
-					iResult = ca_array_put_callback(DBR_CHAR, stringSize, caID, writeValueArray, putState, this);
-				else
-					iResult = ca_array_put(DBR_CHAR, stringSize, caID, writeValueArray);
-				break;
-			case 4:
-				if (Wait4Readback)
-					iResult = ca_array_put_callback(DBR_SHORT, stringSize, caID, writeValueArray, putState, this);
-				else
-					iResult = ca_array_put(DBR_SHORT, stringSize, caID, writeValueArray);
-				break;
-			case 5:
-			case 6:
-				if (Wait4Readback)
-					iResult = ca_array_put_callback(DBR_LONG, stringSize, caID, writeValueArray, putState, this);
-				else
-					iResult = ca_array_put(DBR_LONG, stringSize, caID, writeValueArray);
-				break;
-			default:
-				;
-			}
-			stringSize = (int32)strlen(ca_message(iResult));
-			if (!Error->source || (*Error->source)->cnt != stringSize) {
-				NumericArrayResize(uB, 1, (UHandle*)&Error->source, stringSize);
-				(*Error->source)->cnt = stringSize;
-			}
-			memcpy((*Error->source)->str, ca_message(iResult), stringSize);
-			if (iResult != ECA_NORMAL)
-				Error->code = ERROR_OFFSET + iResult;
-			else
-				Error->code = 0;
-			Error->status = 0;
-		}
-		catch (std::exception& ex) {
-			DbgTime(); CaLabDbgPrintf("%s", ex.what());
-			if (locked.load())
-				unlock();
-		}
-		tasks.fetch_sub(1);
-	}
-
-	// post LV user event
-	void postEvent() {
-		if (!reservedCounter || !isConnected) return; // no VIs ready to run
-#if defined _WIN32 || defined _WIN64
-		if (!dllStatus) return;		// DLL_PROCESS_DETACH
-#endif
-		int32 err = lock();
-		if (err) CaLabDbgPrintf("lock failed in postEvent");
-		tasks.fetch_add(1);
-		std::vector<LVUserEventRef>::iterator itRefNum;
-		std::vector<sResult*>::iterator itEventResultCluster;
-		try {
-			MgErr err = noErr;
-			itRefNum = RefNum.begin();
-			itEventResultCluster = eventResultCluster.begin();
-			while (itRefNum != RefNum.end() && itEventResultCluster != eventResultCluster.end()) {
-				if (*itRefNum) {
-					if (!*itEventResultCluster
-						|| DSCheckPtr(*itEventResultCluster) != noErr
-						|| !(*itEventResultCluster)->PVName) {
-						itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
-						itRefNum = RefNum.erase(itRefNum);
-						continue;
-					}
-					if (stringValueArray && *stringValueArray && (*stringValueArray)->dimSize && (*itEventResultCluster)->PVName) {
-						sStringArrayHdl resultStringArrayHdl = (*itEventResultCluster)->StringValueArray;
-						sDoubleArrayHdl resultNumberArrayHdl = (*itEventResultCluster)->ValueNumberArray;
-						if (!resultStringArrayHdl) {
-							(*itEventResultCluster)->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(LStrHandle[1]));
-							if ((*itEventResultCluster)->StringValueArray && *((*itEventResultCluster)->StringValueArray)) {
-								(*((*itEventResultCluster)->StringValueArray))->dimSize = (*stringValueArray)->dimSize;
-								resultStringArrayHdl = (*itEventResultCluster)->StringValueArray;
-							}
-						}
-						if (!resultNumberArrayHdl) {
-							(*itEventResultCluster)->ValueNumberArray = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (*stringValueArray)->dimSize * sizeof(double[1]));
-							if ((*itEventResultCluster)->ValueNumberArray && *((*itEventResultCluster)->ValueNumberArray)) {
-								(*((*itEventResultCluster)->ValueNumberArray))->dimSize = (*doubleValueArray)->dimSize;
-								resultNumberArrayHdl = (*itEventResultCluster)->ValueNumberArray;
-							}
-						}
-						if (resultStringArrayHdl) {
-							if ((*resultStringArrayHdl)->dimSize != (*stringValueArray)->dimSize) {
-								CaLabDbgPrintf("stringValueArray size mismatch %d vs. %d", (*resultStringArrayHdl)->dimSize, (*stringValueArray)->dimSize);
-								itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
-								itRefNum = RefNum.erase(itRefNum);
-								continue;
-							}
-							for (uInt32 j = 0; j < (*stringValueArray)->dimSize && j < (*resultStringArrayHdl)->dimSize; j++) {
-								if (!(*resultStringArrayHdl)->elt[j] || ((*stringValueArray)->elt[j] && ((*(*resultStringArrayHdl)->elt[j])->cnt != (*(*stringValueArray)->elt[j])->cnt))) {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*resultStringArrayHdl)->elt[j], (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1);
-									(*(*resultStringArrayHdl)->elt[j])->cnt = (*stringValueArray)->elt[j] ? (*(*stringValueArray)->elt[j])->cnt : 1;
-								}
-								if ((*stringValueArray)->elt[j])
-									memcpy((*(*resultStringArrayHdl)->elt[j])->str, (*(*stringValueArray)->elt[j])->str, (*(*stringValueArray)->elt[j])->cnt);
-								else
-									memcpy((*(*resultStringArrayHdl)->elt[j])->str, "\0", 1);
-								if (resultNumberArrayHdl) {
-									(*resultNumberArrayHdl)->elt[j] = (*doubleValueArray)->elt[j];
-								}
-							}
-							(*itEventResultCluster)->valueArraySize = (uInt32)(*stringValueArray)->dimSize;
-						}
-						else if (resultNumberArrayHdl) {
-							if ((*resultNumberArrayHdl)->dimSize != (*doubleValueArray)->dimSize) {
-								CaLabDbgPrintf("numberValueArray size mismatch %d vs. %d", (*resultNumberArrayHdl)->dimSize, (*doubleValueArray)->dimSize);
-								itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
-								itRefNum = RefNum.erase(itRefNum);
-								continue;
-							}
-							for (uInt32 j = 0; j < (*resultNumberArrayHdl)->dimSize; j++) {
-								(*resultNumberArrayHdl)->elt[j] = (*doubleValueArray)->elt[j];
-							}
-						}
-						size_t propertiesSize = properties.size();
-						if (propertiesSize && (*itEventResultCluster)->FieldNameArray && (*(*itEventResultCluster)->FieldNameArray)->dimSize && (*itEventResultCluster)->FieldValueArray && (*(*itEventResultCluster)->FieldValueArray)->dimSize && (*(*itEventResultCluster)->FieldNameArray)->dimSize == (*(*itEventResultCluster)->FieldValueArray)->dimSize) {
-							for (uInt32 l = 0; l < (*(*itEventResultCluster)->FieldNameArray)->dimSize; l++) {
-								propertyMapIterator nameIterator = properties.find(std::string((char*)(*(*(*itEventResultCluster)->FieldNameArray)->elt[l])->str, (size_t)(*(*(*itEventResultCluster)->FieldNameArray)->elt[l])->cnt));
-								if (nameIterator != properties.end()) {
-									std::string fieldValue = nameIterator->second;
-									size_t fieldValueLength = fieldValue.size();
-									if (fieldValueLength) {
-										if (!(*(*itEventResultCluster)->FieldValueArray)->elt[l] || ((size_t)(*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt != fieldValueLength)) {
-											err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[l], fieldValueLength);
-											(*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
-										}
-										memcpy((*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
-									}
-									else {
-										err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[l], 0);
-										(*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt = 0;
-									}
+							auto numValues = pvItem->dbrValue2Double();
+							if (!numValues.empty()) {
+								// Store numeric field as a plain integer-like string if it's close to an integer.
+								double value = numValues[0];
+								long longValue = static_cast<long>(value);
+								if (std::fabs(value - static_cast<double>(longValue)) < 0.0005 && std::fabs(value) < 32768.0) {
+									fieldString = std::to_string(longValue);
 								}
 								else {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*(*itEventResultCluster)->FieldValueArray)->elt[l], 0);
-									(*(*(*itEventResultCluster)->FieldValueArray)->elt[l])->cnt = 0;
+									fieldString = std::to_string(value);
 								}
 							}
 						}
-						(*itEventResultCluster)->TimeStampNumber = TimeStampNumber;
-						if (TimeStampString) {
-							if (!(*itEventResultCluster)->TimeStampString || (*(*itEventResultCluster)->TimeStampString)->cnt != (*TimeStampString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->TimeStampString, (*TimeStampString)->cnt);
-								(*(*itEventResultCluster)->TimeStampString)->cnt = (*TimeStampString)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->TimeStampString)->str, (*TimeStampString)->str, (*TimeStampString)->cnt);
-						}
-						if (StatusString) {
-							if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != (*StatusString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, (*StatusString)->cnt);
-								(*(*itEventResultCluster)->StatusString)->cnt = (*StatusString)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->StatusString)->str, (*StatusString)->str, (*StatusString)->cnt);
-						}
-						if (SeverityString) {
-							if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != (*SeverityString)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, (*SeverityString)->cnt);
-								(*(*itEventResultCluster)->SeverityString)->cnt = (*SeverityString)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->SeverityString)->str, (*SeverityString)->str, (*SeverityString)->cnt);
-						}
-						if (ErrorIO.source) {
-							if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
-								(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
-							}
-							memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, (*ErrorIO.source)->str, (*ErrorIO.source)->cnt);
-						}
-						(*itEventResultCluster)->StatusNumber = StatusNumber;
-						(*itEventResultCluster)->SeverityNumber = SeverityNumber;
-						(*itEventResultCluster)->ErrorIO.code = ErrorIO.code;
-						(*itEventResultCluster)->ErrorIO.status = ErrorIO.status;
-						// Post it!
-						MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
-						if (posterr != mgNoErr) {
-							itRefNum = RefNum.erase(itRefNum);
-							CaLabDbgPrintf("PostLVUserEvent failed with error %d", posterr);
-							itEventResultCluster = eventResultCluster.erase((itEventResultCluster));
-							continue;
+					}
+					if (!fieldName.empty() && !fieldString.empty()) {
+						// `setFieldString` performs its own locking; avoid double-locking the same mutex.
+						parentPvItem->setFieldString(fieldName, fieldString);
+					}
+				}
+			}
+		}
+
+		g.removePendingConnection(pvItem);
+
+		// Notify subscribers about the update for this PV and its parent (for field changes).
+		postEventForPv(task.pvName);
+		if (pvItem && pvItem->parent) {
+			postEventForPv(pvItem->parent->getName());
+		}
+		g.notify();
+	}
+
+	// Main loop for the background worker thread.
+	void workerLoop() {
+		while (!g_vcStop.load()) {
+			ValueChangeTask task;
+			{
+				std::unique_lock<std::mutex> lock(g_vcMutex);
+				g_vcCv.wait(lock, [] { return g_vcStop.load() || !g_vcQueue.empty(); });
+				if (g_vcStop.load()) break;
+				task = std::move(g_vcQueue.front());
+				g_vcQueue.pop_front();
+			}
+			processValueChangeTask(task);
+			if (task.dataCopy) { // In case processing failed before ownership transfer.
+				try {
+					free(task.dataCopy);
+				}
+				catch (...) {
+					CaLabDbgPrintf("Error: Exception #4 during free() of dataCopy for PV %s", task.pvName.c_str());
+				}
+				task.dataCopy = nullptr;
+			}
+		}
+
+		// Drain any remaining tasks on stop.
+		for (;;) {
+			ValueChangeTask task;
+			{
+				std::lock_guard<std::mutex> lock(g_vcMutex);
+				if (g_vcQueue.empty()) break;
+				task = std::move(g_vcQueue.front());
+				g_vcQueue.pop_front();
+			}
+			processValueChangeTask(task);
+			if (task.dataCopy) {
+				try {
+					free(task.dataCopy);
+				}
+				catch (...) {
+					CaLabDbgPrintf("Error: Exception #5 during free() of dataCopy for PV %s", task.pvName.c_str());
+				}
+				task.dataCopy = nullptr;
+			}
+		}
+	}
+
+	// Ensures the background worker thread is started, creating it if necessary.
+	void ensureWorkerStarted() {
+		if (g_vcStarted.load()) return;
+		std::lock_guard<std::mutex> lock(g_vcStartMtx);
+		if (g_vcStarted.load()) return;
+		g_vcStop.store(false);
+		g_vcThread = std::thread(workerLoop);
+		g_vcStarted.store(true);
+		// Register a stop hook with Globals to ensure clean teardown.
+		Globals::getInstance().registerBackgroundWorker("valueChangedWorker", [] { stopWorker(); });
+	}
+
+	// Enqueues a new task for the background worker.
+	void enqueueTask(ValueChangeTask&& task) {
+		ensureWorkerStarted();
+		{
+			std::lock_guard<std::mutex> lock(g_vcMutex);
+			g_vcQueue.emplace_back(std::move(task));
+		}
+		g_vcCv.notify_one();
+	}
+
+	// Manages LabVIEW User Event registrations for PVs.
+	struct EventRegistry {
+		std::mutex mtx;
+		std::unordered_map<std::string, std::vector<std::pair<LVUserEventRef, sResult*>>> map;
+	} g_eventRegistry;
+
+} // end anonymous namespace
+
+namespace {
+	// Associates LabVIEW array handles with a specific VI instance to prevent data corruption
+	// in multi-VI scenarios. This is crucial for reentrant VIs.
+	void bindArraysToInstance(const char* functionName,
+		sLongArrayHdl* PvIndexArray,
+		sResultArrayHdl* ResultArray,
+		sStringArrayHdl* FirstStringValue,
+		sDoubleArrayHdl* FirstDoubleValue,
+		sDoubleArray2DHdl* DoubleValueArray) {
+
+		Globals& g = Globals::getInstance();
+		MyInstanceData* instanceData = nullptr;
+
+		InstanceDataPtr* ownerPtr = nullptr;
+
+		// 1) Try to find the instance using the stable addresses of the LabVIEW handles.
+		auto tryResolve = [&](void* h) {
+			if (!ownerPtr && h) {
+				ownerPtr = g.getInstanceForArray(h);
+			}
+			};
+
+		if (PvIndexArray && *PvIndexArray)          tryResolve(static_cast<void*>(*PvIndexArray));
+		if (ResultArray && *ResultArray)            tryResolve(static_cast<void*>(*ResultArray));
+		if (FirstStringValue && *FirstStringValue)  tryResolve(static_cast<void*>(*FirstStringValue));
+		if (FirstDoubleValue && *FirstDoubleValue)  tryResolve(static_cast<void*>(*FirstDoubleValue));
+		if (DoubleValueArray && *DoubleValueArray)  tryResolve(static_cast<void*>(*DoubleValueArray));
+
+		// 2) Fallback: if no assignment exists, use the last known instance. This is less robust
+		//    but provides a fallback for initialization scenarios.
+		if (!ownerPtr && g.instances.size() == 1) {
+			ownerPtr = g.instances[0];
+		}
+		if (!ownerPtr) {
+			std::lock_guard<std::mutex> lock(g.instancesMutex);
+			if (!g.instances.empty()) {
+				ownerPtr = g.instances.back();
+			}
+		}
+
+		if (ownerPtr == nullptr || *ownerPtr == nullptr) {
+			CaLabDbgPrintf("Warning: bindArraysToInstance(%s): no valid instance found.", functionName);
+			return;
+		}
+
+		instanceData = static_cast<MyInstanceDataPtr>(*ownerPtr);
+
+		if (instanceData->firstFunctionName.empty()) {
+			instanceData->firstFunctionName = functionName;
+		}
+
+		// 3) Update array pointers in instance memory and register the associated LV handles as keys.
+		std::lock_guard<std::mutex> lock(instanceData->arrayMutex);
+		if (PvIndexArray && *PvIndexArray && instanceData->PvIndexArray != *PvIndexArray) {
+			// Debug: show previous and new PvIndexArray pointers
+			CaLabDbgPrintf("bindArraysToInstance: instance=%p firstFunction='%s' ownerPtr=%p Prev.PvIndexArray=%p New.PvIndexArray=%p",
+				static_cast<void*>(instanceData),
+				instanceData->firstFunctionName.c_str(),
+				static_cast<void*>(ownerPtr),
+				static_cast<void*>(instanceData->PvIndexArray),
+				static_cast<void*>(*PvIndexArray));
+			instanceData->PvIndexArray = *PvIndexArray;
+			g.registerArrayToInstance(static_cast<void*>(*PvIndexArray), ownerPtr);
+		}
+		if (ResultArray && *ResultArray && instanceData->ResultArray != *ResultArray) {
+			instanceData->ResultArray = *ResultArray;
+			g.registerArrayToInstance(static_cast<void*>(*ResultArray), ownerPtr);
+		}
+		if (FirstStringValue && *FirstStringValue && instanceData->FirstStringValue != *FirstStringValue) {
+			instanceData->FirstStringValue = *FirstStringValue;
+			g.registerArrayToInstance(static_cast<void*>(*FirstStringValue), ownerPtr);
+		}
+		if (FirstDoubleValue && *FirstDoubleValue && instanceData->FirstDoubleValue != *FirstDoubleValue) {
+			instanceData->FirstDoubleValue = *FirstDoubleValue;
+			g.registerArrayToInstance(static_cast<void*>(*FirstDoubleValue), ownerPtr);
+		}
+		if (DoubleValueArray && *DoubleValueArray && instanceData->DoubleValueArray != *DoubleValueArray) {
+			instanceData->DoubleValueArray = *DoubleValueArray;
+			g.registerArrayToInstance(static_cast<void*>(*DoubleValueArray), ownerPtr);
+		}
+	}
+}
+
+// =================================================================================
+// Public API Implementation (Exported Functions)
+// =================================================================================
+extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* FieldNameArray, sLongArrayHdl* PvIndexArray, double Timeout, sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, LVBoolean* CommunicationStatus, LVBoolean* FirstCall, LVBoolean* NoMDEL, LVBoolean* IsInitialized, int filter)
+{
+	if (PvIndexArray == nullptr || PvNameArray == nullptr || *PvNameArray == nullptr || DSCheckHandle(*PvNameArray) != noErr || (**PvNameArray)->dimSize == 0) {
+		*CommunicationStatus = 1;
+		return;
+	}
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) {
+		*CommunicationStatus = 1;
+		return;
+	}
+	if (g.bCaLabPolling) {
+		*NoMDEL = true;
+	}
+	CaContextGuard _caThreadAttach;
+	*CommunicationStatus = 0;
+
+	// === PHASE 1: Resolve or create instance binding ===
+	MyInstanceData* boundInstance = nullptr;
+	InstanceDataPtr* ownerPtr = nullptr;
+	{
+		std::lock_guard<std::mutex> instLock(g.instancesMutex);
+
+		// Try to find existing instance from array handles
+		auto tryResolve = [&](void* h) {
+			if (!ownerPtr && h) {
+				ownerPtr = g.getInstanceForArray(h);
+			}
+			};
+
+		if (PvIndexArray && *PvIndexArray)          tryResolve(static_cast<void*>(*PvIndexArray));
+		if (!ownerPtr && ResultArray && *ResultArray)          tryResolve(static_cast<void*>(*ResultArray));
+		if (!ownerPtr && FirstStringValue && *FirstStringValue) tryResolve(static_cast<void*>(*FirstStringValue));
+		if (!ownerPtr && FirstDoubleValue && *FirstDoubleValue) tryResolve(static_cast<void*>(*FirstDoubleValue));
+		if (!ownerPtr && DoubleValueArray && *DoubleValueArray) tryResolve(static_cast<void*>(*DoubleValueArray));
+
+		// Fallback: find a suitable instance
+		if (!ownerPtr && !g.instances.empty()) {
+			for (auto it = g.instances.rbegin(); it != g.instances.rend(); ++it) {
+				if (*it && **it) {
+					MyInstanceData* candidate = static_cast<MyInstanceData*>(**it);
+					if (candidate && !candidate->isUnreserving.load(std::memory_order_acquire)
+						&& candidate->firstFunctionName.empty()) {
+						ownerPtr = *it;
+						break;
+					}
+				}
+			}
+			if (!ownerPtr) {
+				for (auto it = g.instances.rbegin(); it != g.instances.rend(); ++it) {
+					if (*it && **it) {
+						MyInstanceData* candidate = static_cast<MyInstanceData*>(**it);
+						if (candidate && !candidate->isUnreserving.load(std::memory_order_acquire)
+							&& candidate->firstFunctionName == "getValue") {
+							ownerPtr = *it;
+							break;
 						}
 					}
-					else {
-						int32 size = (int32)strlen(alarmStatusString[epicsAlarmComm]);
-						if (!(*itEventResultCluster)->StatusString || (*(*itEventResultCluster)->StatusString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->StatusString, size);
-							(*(*itEventResultCluster)->StatusString)->cnt = size;
-						}
-						memcpy((*(*itEventResultCluster)->StatusString)->str, alarmStatusString[epicsAlarmComm], size);
-						size = (int32)strlen(alarmSeverityString[epicsSevInvalid]);
-						if (!(*itEventResultCluster)->SeverityString || (*(*itEventResultCluster)->SeverityString)->cnt != size) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->SeverityString, size);
-							(*(*itEventResultCluster)->SeverityString)->cnt = size;
-						}
-						memcpy((*(*itEventResultCluster)->SeverityString)->str, alarmSeverityString[epicsSevInvalid], size);
-						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (*ErrorIO.source)->cnt) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, (*ErrorIO.source)->cnt);
-							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (*ErrorIO.source)->cnt;
-						}
-						if (!(*itEventResultCluster)->ErrorIO.source || (*(*itEventResultCluster)->ErrorIO.source)->cnt != (int32)strlen(ca_message(ECA_DISCONN))) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*itEventResultCluster)->ErrorIO.source, strlen(ca_message(ECA_DISCONN)));
-							(*(*itEventResultCluster)->ErrorIO.source)->cnt = (int32)strlen(ca_message(ECA_DISCONN));
-						}
-						memcpy((*(*itEventResultCluster)->ErrorIO.source)->str, ca_message(ECA_DISCONN), strlen(ca_message(ECA_DISCONN)));
-						(*itEventResultCluster)->StatusNumber = epicsAlarmComm;
-						(*itEventResultCluster)->SeverityNumber = epicsSevInvalid;
-						(*itEventResultCluster)->ErrorIO.code = ERROR_OFFSET + epicsSevInvalid;
-						(*itEventResultCluster)->ErrorIO.status = 0;
-						// Post it!
-						MgErr posterr = PostLVUserEvent(*itRefNum, *itEventResultCluster);
-						if (posterr != mgNoErr) {
-							CaLabDbgPrintf("PostLVUserEvent failed with error %d", posterr);
-							itRefNum = RefNum.erase(itRefNum);
-							itEventResultCluster = eventResultCluster.erase((itEventResultCluster));
-							continue;
-						}
+				}
+			}
+		}
+
+		if (ownerPtr && *ownerPtr) {
+			boundInstance = static_cast<MyInstanceData*>(*ownerPtr);
+			if (boundInstance && boundInstance->firstFunctionName.empty()) {
+				boundInstance->firstFunctionName = "getValue";
+			}
+		}
+	}
+
+	if (!boundInstance) {
+		CaLabDbgPrintf("getValue: No instance available, proceeding without instance tracking");
+	}
+
+	if (boundInstance && boundInstance->isUnreserving.load(std::memory_order_acquire)) {
+		*CommunicationStatus = 1;
+		return;
+	}
+
+	// === PHASE 2: Activate call guard ===
+	struct _CallGuard {
+		MyInstanceData* d;
+		bool active = false;
+		_CallGuard(MyInstanceData* d) : d(d) {
+			if (d && !d->isUnreserving.load(std::memory_order_acquire)) {
+				d->activeCalls.fetch_add(1, std::memory_order_acq_rel);
+				active = true;
+			}
+		}
+		~_CallGuard() {
+			if (d && active) {
+				d->activeCalls.fetch_sub(1, std::memory_order_acq_rel);
+				Globals::getInstance().notify();
+			}
+		}
+		bool isActive() const { return active; }
+	} callGuard(boundInstance);
+
+	if (boundInstance && !callGuard.isActive()) {
+		*CommunicationStatus = 1;
+		return;
+	}
+
+	// === PHASE 3: Main processing ===
+	if (filter == 0) {
+		filter = out_filter::defaultFilter;
+	}
+	uInt32 nameCount = static_cast<uInt32>((**PvNameArray)->dimSize);
+	uInt32 maxNumberOfValues = 0;
+	const std::chrono::steady_clock::time_point hardDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(static_cast<long long>((Timeout > 0.0 ? Timeout : 0.0) * 1000.0));
+
+	// Determine if this is the first call or if the input arrays have changed
+	bool needsReinit = *NoMDEL || *FirstCall || !*IsInitialized || !*PvIndexArray || !**PvIndexArray || (**PvIndexArray)->dimSize != nameCount;
+	if (needsReinit) {
+		std::unordered_set<std::string> uninitializedPvNames;
+		if (!setupPvIndexAndRegistry(PvNameArray, FieldNameArray, PvIndexArray, CommunicationStatus, &uninitializedPvNames)) {
+			CaLabDbgPrintf("Error initializing getValue.");
+			bindArraysToInstance("getValue", PvIndexArray, ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray);
+			return;
+		}
+
+		// === CRITICAL: Bind PvIndexArray IMMEDIATELY after it's created ===
+		// Only log if actually binding for the first time
+		if (boundInstance && PvIndexArray && *PvIndexArray) {
+			std::lock_guard<std::mutex> instLock(g.instancesMutex);
+			InstanceDataPtr* myOwnerPtr = nullptr;
+			for (auto* ptr : g.instances) {
+				if (ptr && *ptr == boundInstance) {
+					myOwnerPtr = ptr;
+					break;
+				}
+			}
+			if (myOwnerPtr) {
+				std::lock_guard<std::mutex> arrLock(boundInstance->arrayMutex);
+				if (boundInstance->PvIndexArray != *PvIndexArray) {
+					boundInstance->PvIndexArray = *PvIndexArray;
+					g.registerArrayToInstance(static_cast<void*>(*PvIndexArray), myOwnerPtr);
+					//CaLabDbgPrintf("getValue: Bound PvIndexArray to instance (firstFunction=%s) owner pointer %x.", boundInstance->firstFunctionName.c_str(), myOwnerPtr);
+				}
+			}
+		}
+
+		if (*FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize > 0 && (filter & out_filter::pviFieldValues || (filter & out_filter::pviFieldNames))) {
+			for (uInt32 i = 0; i < nameCount; ++i) {
+				PvEntryHandle entry{ PvIndexArray, i };
+				if (!entry || !entry->pvItem) continue;
+				std::lock_guard<std::mutex> lock(entry->pvItem->ioMutex());
+				if (!entry->pvItem->getFields().empty()) {
+					uninitializedPvNames.insert(entry->pvItem->getName());
+				}
+			}
+		}
+		else {
+			for (uInt32 i = 0; i < nameCount; ++i) {
+				PvEntryHandle entry{ PvIndexArray, i };
+				if (entry && entry->pvItem) {
+					std::lock_guard<std::mutex> lock(entry->pvItem->ioMutex());
+					if (entry->pvItem->channelId == nullptr || entry->pvItem->getRecordType().empty()) {
+						uninitializedPvNames.insert(entry->pvItem->getName());
 					}
-					itRefNum++;
-					itEventResultCluster++;
+				}
+			}
+		}
+		subscribeBasePVs(uninitializedPvNames, Timeout, hardDeadline, NoMDEL);
+		connectPVs(uninitializedPvNames, Timeout, hardDeadline);
+		if (filter & out_filter::pviFieldValues) {
+			waitForUninitializedPvs(uninitializedPvNames, Timeout, hardDeadline);
+		}
+		*FirstCall = false;
+		*IsInitialized = true;
+	}
+
+	// Bind arrays to ensure instance tracking (also updates if arrays changed)
+	bindArraysToInstance("getValue", PvIndexArray, ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray);
+
+	// Check for changes
+	std::vector<uInt32> changedIndexList = getChangedPvIndices(PvIndexArray, Timeout, hardDeadline, NoMDEL);
+	bool hasChanges = !changedIndexList.empty();
+	if (!hasChanges && FieldNameArray && *FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize > 0) {
+		hasChanges = true;
+	}
+	if (!hasChanges && !needsReinit) {
+		if (CommunicationStatus) {
+			const int globalErrors = g.pvErrorCount.load(std::memory_order_relaxed);
+			if (globalErrors == 0) {
+				*CommunicationStatus = 0;
+			}
+			else {
+				bool anyPvError = false;
+				for (uInt32 i = 0; i < nameCount; ++i) {
+					PvEntryHandle entry{ PvIndexArray, i };
+					if (!entry || !entry->pvItem) continue;
+					if (entry->pvItem->getErrorCode() > (int)ECA_NORMAL) { anyPvError = true; break; }
+				}
+				*CommunicationStatus = anyPvError ? 1 : 0;
+			}
+		}
+		return;
+	}
+
+	// Acquire processing lock
+	TimeoutUniqueLock<std::shared_timed_mutex> getLockGuard(g.getLock, "getValue");
+	if (!getLockGuard.isLocked()) {
+		CaLabDbgPrintf("Warning: Could not acquire an exclusive lock for getValue");
+		*CommunicationStatus = 1;
+		return;
+	}
+	{
+		TimeoutSharedLock<std::shared_timed_mutex> rlock(g.pvRegistryLock, "getValue-check", std::chrono::milliseconds(30000));
+		if (!rlock.isLocked()) {
+			CaLabDbgPrintf("Error: Failed to acquire shared lock for getValue (check).");
+			return;
+		}
+
+		// Determine maxNumberOfValues
+		if (DoubleValueArray && *DoubleValueArray && **DoubleValueArray) {
+			maxNumberOfValues = (**DoubleValueArray)->dimSizes[1];
+		}
+		if (!maxNumberOfValues &&
+			ResultArray && *ResultArray && **ResultArray &&
+			(**ResultArray)->dimSize > 0) {
+			auto valueNumHandle = (**ResultArray)->result[0].ValueNumberArray;
+			if (valueNumHandle && *valueNumHandle) {
+				maxNumberOfValues = static_cast<uInt32>((*valueNumHandle)->dimSize);
+			}
+		}
+		if (!maxNumberOfValues) {
+			for (uInt32 i = 0; i < nameCount; ++i) {
+				PvEntryHandle entry{ PvIndexArray, i };
+				if (!entry || !entry->pvItem) continue;
+				std::lock_guard<std::mutex> lock(entry->pvItem->ioMutex());
+				maxNumberOfValues = std::max(maxNumberOfValues, entry->pvItem->getNumberOfValues());
+			}
+		}
+
+		if (hasChanges || needsReinit) {
+			cleanupMemory(ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray, PvNameArray,
+				needsReinit ? std::vector<uInt32>() : changedIndexList);
+
+			MgErr err = prepareOutputArrays(nameCount, maxNumberOfValues, filter,
+				ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray, PvNameArray,
+				needsReinit ? std::vector<uInt32>() : changedIndexList);
+			if (err != noErr) {
+				CaLabDbgPrintf("Error preparing output arrays: %d", err);
+				*CommunicationStatus = 1;
+				return;
+			}
+
+			populateOutputArrays(nameCount, maxNumberOfValues, filter, PvIndexArray,
+				ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray,
+				needsReinit ? std::vector<uInt32>() : changedIndexList);
+
+			if (CommunicationStatus) {
+				const int globalErrors = g.pvErrorCount.load(std::memory_order_relaxed);
+				if (globalErrors == 0) {
+					*CommunicationStatus = 0;
 				}
 				else {
-					itRefNum++;
-					itEventResultCluster++;
-					CaLabDbgPrintf("post event of %s has no reference number", szName);
+					bool anyPvError = false;
+					for (uInt32 i = 0; i < nameCount; ++i) {
+						PvEntryHandle entry{ PvIndexArray, i };
+						if (!entry || !entry->pvItem) continue;
+						if (entry->pvItem->getErrorCode() > (int)ECA_NORMAL) { anyPvError = true; break; }
+					}
+					*CommunicationStatus = anyPvError ? 1 : 0;
 				}
 			}
 		}
-		catch (std::exception& ex) {
-			DbgTime(); CaLabDbgPrintf("%s", ex.what());
-			itRefNum = RefNum.begin();
-			while (itRefNum != RefNum.end()) {
-				itRefNum = RefNum.erase(itRefNum);
-			}
-			itEventResultCluster = eventResultCluster.begin();
-			while (itEventResultCluster != eventResultCluster.end()) {
-				itEventResultCluster = eventResultCluster.erase(itEventResultCluster);
+	}
+
+	updatePvIndexArray(PvIndexArray, changedIndexList);
+
+	if (*NoMDEL) {
+		for (uInt32 i = 0; i < nameCount; ++i) {
+			PvEntryHandle entry{ PvIndexArray, i };
+			if (entry && entry->pvItem && entry->pvItem->eventId) {
+				std::lock_guard<std::mutex> lock(entry->pvItem->ioMutex());
+				ca_clear_subscription(entry->pvItem->eventId);
+				entry->pvItem->eventId = nullptr;
 			}
 		}
-		tasks.fetch_sub(1);
-		unlock();
-		return;
 	}
-};
-
-typedef std::unordered_map<std::string, calabItem*> pvMap;
-typedef pvMap::iterator pvMapIterator;
-pvMap myItems;
-
-std::string myItemsFindEnum(std::string name, dbr_enum_t enumValue) {
-	std::string enumString = "";
-	pvMapIterator fieldItemIterator = myItems.find(name);
-	if (fieldItemIterator != myItems.end()) {
-		if (enumValue < fieldItemIterator->second->sEnum.no_str)
-			enumString = fieldItemIterator->second->sEnum.strs[enumValue];
-		else
-			enumString = "Illegal Value";
-	}
-	return enumString;
 }
 
-// Class used to store globals and ensure library is initialized.
-class globals {
-public:
-	mutable std::shared_mutex mapLock;	// map mutex
-
-	globals() {
-		// caLabLoad(); // since EPICS 7.0.7 we have to create THE EPICS context in a separate thread
-		epicsThreadCreate("createCaContext",
-			epicsThreadPriorityBaseMax,
-			epicsThreadGetStackSize(epicsThreadStackBig),
-			(EPICSTHREADFUNC)caLabLoad, 0x0);
-		getLock = epicsMutexCreate();
-		putLock = epicsMutexCreate();
+extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvIndexArray, sStringArray2DHdl* StringValueArray2D, sDoubleArray2DHdl* DoubleValueArray2D, sLongArray2DHdl* LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean* wait4readback, sErrorArrayHdl* ErrorArray, LVBoolean* CommunicationStatus, LVBoolean* FirstCall) {
+	if (PvIndexArray == nullptr || PvNameArray == nullptr || *PvNameArray == nullptr || DSCheckHandle(*PvNameArray) != noErr || (**PvNameArray)->dimSize == 0) {
+		if (CommunicationStatus) *CommunicationStatus = 1;
+		return;
 	}
 
-	~globals() {
-#if defined _WIN32 || defined _WIN64
-		if (!dllStatus) return; // DLL_PROCESS_DETACH
-#endif
-		uInt32 timeout = 1000;
-		stopped = true;
-		while (timeout > 0 && tasks.load() > 0) {
-			epicsThreadSleep(.01);
-			timeout--;
-		}
-		if (timeout <= 0)
-			CaLabDbgPrintf("Error: Could not terminate all running tasks of CA Lab.");
-		for (auto& iter : myItems)
-			delete iter.second;
-		epicsMutexDestroy(putLock);
-		epicsMutexDestroy(getLock);
-		ca_context_destroy();
-		caLabUnload();
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) { if (CommunicationStatus) *CommunicationStatus = 1; return; }
+
+	// Ensure this thread is attached to the CA context while using CA APIs.
+	CaContextGuard _caThreadAttach;
+
+	// Validate PV names.
+	if (!PvNameArray || !*PvNameArray || DSCheckHandle(*PvNameArray) != noErr || (**PvNameArray)->dimSize == 0) {
+		if (CommunicationStatus) *CommunicationStatus = 1;
+		return;
 	}
+	const uInt32 nameCount = static_cast<uInt32>((**PvNameArray)->dimSize);
 
-	// Insert into global list of pv names
-	calabItem* insert(std::string name, calabItem* item) {
-		mapLock.lock();		// exclusive lock
-		auto search = myItems.find(name);
-		if (search != myItems.end()) {
-#ifdef _DEBUG
-			CaLabDbgPrintf("%s is already in the map myItems", name.c_str());
-#endif
-			delete item;
-			item = search->second;
+	// Determine which value array to use based on DataType.
+	const bool isString = (DataType == DT_STRING);
+	const bool isDouble = (DataType == DT_SINGLE || DataType == DT_DOUBLE);
+	const bool isChar = (DataType == DT_CHAR);
+	const bool isShort = (DataType == DT_SHORT);
+	const bool isLong32 = (DataType == DT_LONG);
+	const bool isQuad64 = (DataType == DT_QUAD);
+
+	// === Resolve instance binding early (similar to getValue) ===
+	MyInstanceData* instanceData = nullptr;
+	InstanceDataPtr* ownerPtr = nullptr;
+	{
+		std::lock_guard<std::mutex> instLock(g.instancesMutex);
+
+		// Try to find existing instance from array handles
+		if (PvIndexArray && *PvIndexArray) {
+			ownerPtr = g.getInstanceForArray(static_cast<void*>(*PvIndexArray));
 		}
-		else {
-			myItems.insert({ name, item });
-		}
-		mapLock.unlock();
-		return item;
-	}
 
-	// add new data object if not exists
-	//    name: EPICS variable name
-	//    FieldNameArray: field names of interest of current EPICS variable
-	//    return: pointer to added / 'found in list' data object
-	calabItem* add(void* currentInstance, LStrHandle name, sStringArrayHdl FieldNameArray = 0x0, uInt32 filter = 0) {
-		unsigned char cName[MAX_NAME_SIZE];
-		std::string sName;
-		calabItem* currentItem;
-
-		_LToCStrN(*name, cName, sizeof(cName));
-		sName = (char*)cName;
-		mapLock.lock_shared();
-		pvMapIterator itemIterator = myItems.find(sName);
-		if (itemIterator != myItems.end()) {
-			currentItem = itemIterator->second;
-			if (currentItem && FieldNameArray && *FieldNameArray) {
-				calabItem* fieldItem;
-				std::string fieldName = "";
-				LStrHandle fullFieldName = nullptr;
-				propertyMapIterator nameIterator;
-				int32 fullsize = 0;
-				for (uInt32 i = 0; i < (*FieldNameArray)->dimSize; i++) {
-					if ((*FieldNameArray)->elt[i] && *(*FieldNameArray)->elt[i] && (*(*FieldNameArray)->elt[i])->cnt) {
-						fieldName = std::string((char*)(*(*FieldNameArray)->elt[i])->str, (size_t)(*(*FieldNameArray)->elt[i])->cnt);
-						fieldName = trim(fieldName);
-						nameIterator = currentItem->properties.find(fieldName);
-						if (nameIterator == currentItem->properties.end()) {
-							fullsize = (*currentItem->name)->cnt + 1 + (int32)fieldName.size();
-							NumericArrayResize(uB, 1, (UHandle*)&fullFieldName, fullsize);
-							memcpy(LStrBuf(*fullFieldName), LStrBuf(*currentItem->name), LStrLen(*currentItem->name));
-							memcpy(LStrBuf(*fullFieldName) + LStrLen(*currentItem->name), ".", 1);
-							memcpy(LStrBuf(*fullFieldName) + LStrLen(*currentItem->name) + 1, fieldName.c_str(), fieldName.size());
-							LStrLen(*fullFieldName) = fullsize;
-							fieldItem = new calabItem(currentInstance, fullFieldName, 0x0);
-							fieldItem->parent = currentItem;
-							mapLock.unlock_shared();
-							fieldItem = insert(std::string((char*)(*fullFieldName)->str, (size_t)(*fullFieldName)->cnt).c_str(), fieldItem);
-							mapLock.lock_shared();
+		// Fallback: find a suitable instance
+		if (!ownerPtr && !g.instances.empty()) {
+			// Priority 1: Find an unused instance (no function name set yet)
+			for (auto it = g.instances.rbegin(); it != g.instances.rend(); ++it) {
+				if (*it && **it) {
+					MyInstanceData* candidate = static_cast<MyInstanceData*>(**it);
+					if (candidate && !candidate->isUnreserving.load(std::memory_order_acquire)
+						&& candidate->firstFunctionName.empty()) {
+						ownerPtr = *it;
+						break;
+					}
+				}
+			}
+			// Priority 2: Find an instance already assigned to putValue
+			if (!ownerPtr) {
+				for (auto it = g.instances.rbegin(); it != g.instances.rend(); ++it) {
+					if (*it && **it) {
+						MyInstanceData* candidate = static_cast<MyInstanceData*>(**it);
+						if (candidate && !candidate->isUnreserving.load(std::memory_order_acquire)
+							&& candidate->firstFunctionName == "putValue") {
+							ownerPtr = *it;
+							break;
 						}
 					}
 				}
-				if (fullFieldName) {
-					DSDisposeHandle(fullFieldName);
+			}
+		}
+
+		if (ownerPtr && *ownerPtr) {
+			instanceData = static_cast<MyInstanceData*>(*ownerPtr);
+			// Set function name immediately if not already set
+			if (instanceData && instanceData->firstFunctionName.empty()) {
+				instanceData->firstFunctionName = "putValue";
+			}
+
+			// === CRITICAL: Bind PvIndexArray to this instance immediately ===
+			if (PvIndexArray && *PvIndexArray) {
+				std::lock_guard<std::mutex> arrLock(instanceData->arrayMutex);
+				if (instanceData->PvIndexArray != *PvIndexArray) {
+					instanceData->PvIndexArray = *PvIndexArray;
+					g.registerArrayToInstance(static_cast<void*>(*PvIndexArray), ownerPtr);
+					//CaLabDbgPrintf("putValue: Bound PvIndexArray to instance (firstFunction=%s) owner pointer %x.", instanceData->firstFunctionName.c_str(), ownerPtr);
 				}
 			}
-			mapLock.unlock_shared();
+		}
+	}
+
+	// If no instance found, log warning but continue
+	if (!instanceData) {
+		CaLabDbgPrintf("putValue: No instance available, proceeding without instance tracking");
+	}
+
+	if (instanceData && instanceData->isUnreserving.load(std::memory_order_acquire)) {
+		if (CommunicationStatus) *CommunicationStatus = 1;
+		return;
+	}
+
+	// === Activate call guard ===
+	struct _CallGuard {
+		MyInstanceData* d;
+		bool active = false;
+		_CallGuard(MyInstanceData* d) : d(d) {
+			if (d && !d->isUnreserving.load(std::memory_order_acquire)) {
+				d->activeCalls.fetch_add(1, std::memory_order_acq_rel);
+				active = true;
+			}
+		}
+		~_CallGuard() {
+			if (d && active) {
+				d->activeCalls.fetch_sub(1, std::memory_order_acq_rel);
+				Globals::getInstance().notify();
+			}
+		}
+		bool isActive() const { return active; }
+	} __cg(instanceData);
+
+	// If we couldn't activate the guard (instance is unreserving), abort
+	if (instanceData && !__cg.isActive()) {
+		if (CommunicationStatus) *CommunicationStatus = 1;
+		return;
+	}
+
+	// Local context to encapsulate helpers and shared state for this put operation.
+	struct PutValueCtx {
+		Globals& globals;
+		sStringArrayHdl* PvNameArray;
+		sLongArrayHdl* PvIndexArray;
+		sStringArray2DHdl* StringValueArray2D;
+		sDoubleArray2DHdl* DoubleValueArray2D;
+		sLongArray2DHdl* LongValueArray2D;
+		sErrorArrayHdl* ErrorArray;
+		bool isString;
+		bool isDouble;
+		bool isChar;
+		bool isShort;
+		bool isLong32;
+		bool isQuad64;
+
+		static std::string getLVString(LStrHandle h) {
+			if (!h) return std::string();
+			const size_t len = static_cast<size_t>((*h)->cnt);
+			const char* s = reinterpret_cast<const char*>((*h)->str);
+			return std::string(s, len);
+		}
+
+		void ensureErrorArray(uInt32 n) {
+			if (!ErrorArray || n < 1) return;
+			if (!*ErrorArray || (**ErrorArray)->dimSize != n) {
+				if (*ErrorArray && DSCheckHandle(*ErrorArray) == noErr) 
+					DSDisposeHandle(*ErrorArray);
+				*ErrorArray = nullptr;
+				const size_t sz =
+					sizeof(sErrorArray) +            // dimSize + 1 element
+					(static_cast<size_t>(n) - 1) * sizeof(sError);   // remaining n-1 elements
+				*ErrorArray = reinterpret_cast<sErrorArrayHdl>(DSNewHClr(static_cast<uInt32>(sz)));
+				if (*ErrorArray) { (**ErrorArray)->dimSize = n; }
+			}
+			if (*ErrorArray) {
+				for (uInt32 i = 0; i < n; ++i) {
+					(**ErrorArray)->result[i].status = 0;
+					(**ErrorArray)->result[i].code = 0;
+				}
+			}
+		}
+
+		void setErrorAt(uInt32 idx, uInt32 err, const std::string& msg) {
+			if (!ErrorArray || !*ErrorArray) {
+				return;
+			}
+			sError& e = (**ErrorArray)->result[idx];
+			const uInt32 lvCode = (err <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(err) + ERROR_OFFSET;
+
+			if (lvCode != 0u && e.code == lvCode && e.source && *e.source && (*e.source)->cnt) {
+				return;
+			}
+			e.status = 0;
+			e.code = lvCode;
+			setLVString(e.source, msg);
+		}
+
+		void getDimensions(uInt32& rows, uInt32& cols) const {
+			rows = cols = 0;
+			if (isDouble && DoubleValueArray2D && *DoubleValueArray2D) { rows = (**DoubleValueArray2D)->dimSizes[0]; cols = (**DoubleValueArray2D)->dimSizes[1]; }
+			else if ((isChar || isShort || isLong32 || isQuad64) && LongValueArray2D && *LongValueArray2D) { rows = (**LongValueArray2D)->dimSizes[0]; cols = (**LongValueArray2D)->dimSizes[1]; }
+			else if (isString && StringValueArray2D && *StringValueArray2D) { rows = (**StringValueArray2D)->dimSizes[0]; cols = (**StringValueArray2D)->dimSizes[1]; }
+		}
+
+		PVItem* getPvItemForIndex(uInt32 i) {
+			if (!PvNameArray || !*PvNameArray || i >= (**PvNameArray)->dimSize) {
+				return nullptr;
+			}
+
+			LStrHandle h = (**PvNameArray)->elt[i];
+			if (!h || !*h) {
+				return nullptr;
+			}
+
+			std::string pvName(reinterpret_cast<const char*>((*h)->str), (*h)->cnt);
+			if (pvName.empty()) {
+				return nullptr;
+			}
+
+			// ---- atomischer Leseversuch mit schneller Validierung ----
+			if (PvIndexArray && *PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize > i) {
+				PvEntryHandle entry{ PvIndexArray, i};
+				if (entry) {
+					PVItem* result = entry->pvItem;
+					if (result) {
+						// Note: caller must still handle nullptr result.
+						return result;
+					}
+				}
+				// If we couldn't obtain PV from index array, fall through to registry lookup below.
+			}
+
+			// Lookup in registry (shared lock)
+			{
+				TimeoutSharedLock<std::shared_timed_mutex> sharedLock(
+					globals.pvRegistryLock, "putValue-lookup", std::chrono::milliseconds(50));
+				if (sharedLock.isLocked()) {
+					auto it = globals.pvRegistry.find(pvName);
+					if (it != globals.pvRegistry.end()) {
+						PVItem* item = it->second.get();
+						if (!item->isConnected()) {
+							connectPv(item, false);
+						}
+						return item;
+					}
+				}
+				else {
+					CaLabDbgPrintf("putValue: Shared lock timeout for %s", pvName.c_str());
+					return nullptr;
+				}
+			}
+
+			// Wenn nicht vorhanden, lege neu an (mit registry-unique-lock)
+			for (int retry = 0; retry < 2; ++retry) {
+				TimeoutUniqueLock<std::shared_timed_mutex> uniqueLock(
+					globals.pvRegistryLock,
+					"putValue-add-missing",
+					std::chrono::milliseconds(100 + retry * 100)
+				);
+				if (!uniqueLock.isLocked()) {
+					if (retry == 1) {
+						CaLabDbgPrintf("putValue: Unique lock timeout after retries for %s", pvName.c_str());
+						return nullptr;
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(10));
+					continue;
+				}
+
+				auto it = globals.pvRegistry.find(pvName);
+				if (it != globals.pvRegistry.end()) {
+					return it->second.get();
+				}
+
+				auto newPv = std::make_unique<PVItem>(pvName);
+				PVItem* pvItem = newPv.get();
+				globals.pvRegistry[pvName] = std::move(newPv);
+
+				// Atomisch altes Element claimen und löschen (falls vorhanden)
+				if (PvIndexArray && *PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize > i) {
+					tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
+				}
+
+				PVMetaInfo* metaInfo = new PVMetaInfo(pvItem);
+				metaInfo->functionName = "putValue";
+				PvIndexEntry* entry = new PvIndexEntry(pvItem, metaInfo);
+
+				auto atomicElt = reinterpret_cast<atomic_ptr_t*>(&(**PvIndexArray)->elt[i]);
+				atomicElt->store(reinterpret_cast<uintptr_t>(entry), std::memory_order_release);
+
+				connectPv(pvItem, false);
+				return pvItem;
+			}
+
+			return nullptr;
+		}
+
+		struct PutCtx {
+			std::atomic<uInt32> completed{ 0 };
+			std::atomic<uInt32> refs{ 1 };
+		};
+
+		int doPut(chtype type, unsigned long count, chid ch, const void* data,
+			bool doWaitRequested, PutCtx* putCtx, uInt32& totalWrites) {
+			if (ca_state(ch) != cs_conn) {
+				return ECA_DISCONN;
+			}
+			if (doWaitRequested) {
+				putCtx->refs.fetch_add(1, std::memory_order_relaxed);
+				auto putCallback = [](struct event_handler_args args) {
+					PutCtx* ctx = static_cast<PutCtx*>(args.usr);
+					if (!ctx) {
+						return;
+					}
+					ctx->completed.fetch_add(1, std::memory_order_relaxed);
+					Globals::getInstance().notify();
+					if (ctx->refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+						delete ctx;
+						ctx = nullptr;
+					}
+					};
+				int rc = ca_array_put_callback(type, count, ch, data, putCallback, putCtx);
+				if (rc == ECA_NORMAL) {
+					totalWrites++;
+				}
+				else {
+					putCtx->refs.fetch_sub(1, std::memory_order_acq_rel);
+				}
+				return rc;
+			}
+			else {
+				return ca_array_put(type, count, ch, data);
+			}
+		}
+	};
+
+	PutValueCtx ctx{ g, PvNameArray, PvIndexArray, StringValueArray2D, DoubleValueArray2D, LongValueArray2D, ErrorArray,
+					 isString, isDouble, isChar, isShort, isLong32, isQuad64 };
+	ctx.ensureErrorArray(nameCount);
+
+	const bool doWaitRequested = (wait4readback && *wait4readback);
+
+	// Ensure PvIndexArray can hold all PVs.
+	if (PvIndexArray) {
+		bool needsResize = !*PvIndexArray || (**PvIndexArray) == nullptr || (**PvIndexArray)->dimSize != nameCount;
+		if (needsResize) {
+			if (NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, nameCount) != noErr || !*PvIndexArray || !**PvIndexArray) {
+				const size_t headerSize = sizeof(sLongArray);  // dimSize + 1 element
+				const size_t elemSize = sizeof(uint64_t);   // sizeof(uint64_t)
+				const size_t totalSize = headerSize + (static_cast<size_t>(nameCount) - 1) * elemSize;
+				*PvIndexArray = reinterpret_cast<sLongArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+				if (*PvIndexArray && **PvIndexArray) { (**PvIndexArray)->dimSize = nameCount; }
+			}
+			else {
+				(**PvIndexArray)->dimSize = nameCount;
+			}
+
+			// Sanity check element size
+			if (*PvIndexArray && **PvIndexArray && sizeof((**PvIndexArray)->elt[0]) < sizeof(uintptr_t)) {
+				CaLabDbgPrintf("Error: PvIndexArray element size mismatch in putValue (%zu != %zu).",
+					sizeof((**PvIndexArray)->elt[0]), sizeof(uintptr_t));
+				if (instanceData && instanceData->PvIndexArray == *PvIndexArray) {
+					// undo binding to prevent later UB
+					instanceData->PvIndexArray = nullptr;
+				}
+			}
+			if (*PvIndexArray && **PvIndexArray && sizeof((**PvIndexArray)->elt[0]) >= sizeof(uintptr_t)) {
+				sanitizePvIndexArray(**PvIndexArray, static_cast<size_t>(nameCount));
+			}
+
+			// === Only bind when array was actually created/resized ===
+			if (instanceData && *PvIndexArray) {
+				std::lock_guard<std::mutex> instLock(g.instancesMutex);
+				InstanceDataPtr* myOwnerPtr = nullptr;
+				for (auto* ptr : g.instances) {
+					if (ptr && *ptr == instanceData) {
+						myOwnerPtr = ptr;
+						break;
+					}
+				}
+				if (myOwnerPtr) {
+					std::lock_guard<std::mutex> arrLock(instanceData->arrayMutex);
+					if (instanceData->PvIndexArray != *PvIndexArray) {
+						instanceData->PvIndexArray = *PvIndexArray;
+						g.registerArrayToInstance(static_cast<void*>(*PvIndexArray), myOwnerPtr);
+					}
+				}
+			}
+		}
+	}
+
+	if (!isString && !isDouble && !isChar && !isShort && !isLong32 && !isQuad64) {
+		if (CommunicationStatus) *CommunicationStatus = 1;
+		if (ErrorArray && *ErrorArray) {
+			for (uInt32 i = 0; i < nameCount; ++i) ctx.setErrorAt(i, (uInt32)ECA_BADTYPE, "Unsupported DataType");
+		}
+		return;
+	}
+
+	uInt32 rows = 0, cols = 0;
+	ctx.getDimensions(rows, cols);
+	if (rows && rows != nameCount && rows != 1) {
+		if (CommunicationStatus) *CommunicationStatus = 1;
+		for (uInt32 i = 0; i < nameCount; ++i) ctx.setErrorAt(i, (uInt32)ECA_BADCOUNT, "Value array rows must match PV count or be 1");
+		return;
+	}
+
+	// Stage A: Ensure all PVs exist in the index and initiate connection if needed.
+	std::vector<PVItem*> items(nameCount, nullptr);
+	if (FirstCall && *FirstCall) {
+		std::vector<uInt32> toConnect;
+		toConnect.reserve(nameCount);
+		for (uInt32 i = 0; i < nameCount; ++i) {
+			PVItem* item = ctx.getPvItemForIndex(i);
+			items[i] = item;
+			if (!item) continue;
+			if (item->channelId != nullptr && ca_state(item->channelId) != cs_conn && item->isConnected()) {
+				CaLabDbgPrintf("putValue: PV %s with chanID %p has inconsistent channel state %d; resetting connection", item->getName().c_str(), item->channelId, ca_state(item->channelId));
+			}
+			const bool needsConnect = (item->channelId == nullptr || !item->isConnected());
+			if (needsConnect) {
+				toConnect.push_back(i);
+			}
+		}
+		ca_flush_io();
+
+		if (!toConnect.empty()) {
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(static_cast<int>(Timeout * 1000.0));
+			while (true) {
+				bool allConnected = true;
+				for (uInt32 idx : toConnect) {
+					PVItem* p = items[idx];
+					if (!p || !p->channelId || !p->isConnected()) { allConnected = false; break; }
+				}
+				if (allConnected) break;
+
+				const auto now = std::chrono::steady_clock::now();
+				if (now >= deadline) {
+					uInt32 notConnected = 0;
+					for (uInt32 idx : toConnect) {
+						PVItem* p = items[idx];
+						if (!p || !p->channelId || !p->isConnected()) { ++notConnected; }
+					}
+					if (CommunicationStatus) *CommunicationStatus = 1;
+					break;
+				}
+
+				const double remainingSec = std::chrono::duration<double>(deadline - now).count();
+				const double slice = remainingSec > 0.05 ? 0.05 : (remainingSec > 0.0 ? remainingSec : 0.0);
+				ca_pend_event(static_cast<double>(slice));
+				Globals::getInstance().waitForNotification(std::chrono::milliseconds(10));
+			}
+		}
+	}
+	else {
+		for (uInt32 i = 0; i < nameCount; ++i) {
+			PVItem* item = ctx.getPvItemForIndex(i);
+			items[i] = item;
+		}
+	}
+
+	// Stage B: If `doWaitRequested`, subscribe and wait for initial values.
+	if (doWaitRequested) {
+		std::vector<uInt32> toSubscribe;
+		toSubscribe.reserve(nameCount);
+		for (uInt32 i = 0; i < nameCount; ++i) {
+			PVItem* p = items[i];
+			if (!p) continue;
+			bool needsSubscription = false;
+			{
+				std::lock_guard<std::mutex> lk(p->ioMutex());
+				needsSubscription = (p->channelId != nullptr && p->isConnected() && p->eventId == nullptr);
+			}
+			if (needsSubscription) { subscribePv(p); toSubscribe.push_back(i); }
+		}
+		ca_flush_io();
+
+		if (!toSubscribe.empty()) {
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(static_cast<int>(Timeout * 1000.0));
+			while (std::chrono::steady_clock::now() < deadline) {
+				bool allHaveValue = true;
+				for (uInt32 idx : toSubscribe) {
+					PVItem* p = items[idx];
+					if (!p || !p->hasValue()) { allHaveValue = false; break; }
+				}
+				if (allHaveValue) break;
+				ca_poll();
+				Globals::getInstance().waitForNotification(std::chrono::milliseconds(20));
+			}
+		}
+	}
+
+	// Stage C: Perform the writes.
+	std::vector<int> caStatus(nameCount, ECA_NORMAL);
+	uInt32 totalWrites = 0;
+	bool putCallbacksTimedOut = false;
+
+	PutValueCtx::PutCtx* putCtx = doWaitRequested ? new PutValueCtx::PutCtx() : nullptr;
+
+	for (uInt32 i = 0; i < nameCount; ++i) {
+		PVItem* item = items[i];
+		if (!item || !item->isConnected() || !item->channelId) {
+			caStatus[i] = ECA_DISCONNCHID;
+			ctx.setErrorAt(i, (uInt32)ECA_DISCONNCHID, "PV not connected");
+			continue;
+		}
+		const chid channelID = item->channelId;
+		const unsigned elementCapacity = ca_element_count(channelID);
+		const short nativeType = item->getDbrType();
+
+		uInt32 availableCount = 1;
+		size_t startIndex = 0;
+		if (rows == nameCount) {
+			availableCount = (cols ? cols : 1u);
+			startIndex = static_cast<size_t>(i) * (cols ? cols : 1u);
 		}
 		else {
-			mapLock.unlock_shared();
-			currentItem = new calabItem(currentInstance, name, FieldNameArray);
-			if (currentItem) {
-				currentItem = insert(sName, currentItem);
-				if (FieldNameArray && *FieldNameArray) {
-					LStrHandle fullFieldName = nullptr;
-					int32 fullsize = 0;
-					for (uInt32 i = 0; i < (*FieldNameArray)->dimSize; i++) {
-						if ((*FieldNameArray)->elt[i] && *(*FieldNameArray)->elt[i]) {
-							std::string fieldName = std::string((char*)(*(*FieldNameArray)->elt[i])->str, (size_t)(*(*FieldNameArray)->elt[i])->cnt);
-							fieldName = trim(fieldName);
-							fullsize = LStrLen(*name) + 1 + LStrLen(*((*FieldNameArray)->elt[i]));
-							NumericArrayResize(uB, 1, (UHandle*)&fullFieldName, fullsize);
-							memcpy(LStrBuf(*fullFieldName), LStrBuf(*name), LStrLen(*name));
-							memcpy(LStrBuf(*fullFieldName) + LStrLen(*name), ".", 1);
-							memcpy(LStrBuf(*fullFieldName) + LStrLen(*name) + 1, LStrBuf(*((*FieldNameArray)->elt[i])), LStrLen(*((*FieldNameArray)->elt[i])));
-							LStrLen(*fullFieldName) = fullsize;
-							char* cFieldName = new char[fullsize + 1LL];
-							_LToCStrN(*fullFieldName, (CStr)cFieldName, fullsize + 1);
-							std::string sFieldName = (char*)cFieldName;
-							calabItem* fieldItem;
-							mapLock.lock_shared();
-							pvMapIterator itemIterator = myItems.find(sFieldName);
-							if (itemIterator == myItems.end()) {
-								mapLock.unlock_shared();
-								fieldItem = new calabItem(currentInstance, fullFieldName, 0x0);
-								fieldItem->parent = currentItem;
-								fieldItem = insert(sFieldName, fieldItem);
+			if (nameCount == 1) { availableCount = (cols ? cols : 1u); startIndex = 0; }
+			else {
+				if (cols == 1) { availableCount = 1; startIndex = 0; }
+				else if (cols == nameCount) { availableCount = 1; startIndex = i; }
+				else { availableCount = (cols ? cols : 1u); startIndex = 0; }
+			}
+		}
+
+		if (isDouble) {
+			if (!DoubleValueArray2D || !*DoubleValueArray2D) {
+				ctx.setErrorAt(i, (uInt32)ECA_BADCOUNT, "Missing DoubleValueArray2D"); caStatus[i] = ECA_BADCOUNT;
+				if (CommunicationStatus) *CommunicationStatus = 1;
+				continue;
+			}
+			const uInt32 nToWrite = std::min<unsigned>(availableCount, elementCapacity ? elementCapacity : availableCount);
+			const double* basePtr = &((**DoubleValueArray2D)->elt[startIndex]);
+			if (nativeType == DBF_STRING) {
+				std::vector<dbr_string_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) std::snprintf(temp[j], sizeof(dbr_string_t), "%.15g", basePtr[j]);
+				caStatus[i] = ctx.doPut(DBR_STRING, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_SHORT) {
+				std::vector<dbr_short_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_short_t>(std::max<long long>(std::numeric_limits<dbr_short_t>::min(), std::min<long long>(std::numeric_limits<dbr_short_t>::max(), static_cast<long long>(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_SHORT, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_FLOAT) {
+				std::vector<dbr_float_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_float_t>(basePtr[j]);
+				caStatus[i] = ctx.doPut(DBR_FLOAT, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_ENUM) {
+				std::vector<dbr_enum_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_enum_t>(std::max<long long>(0, std::min<long long>(std::numeric_limits<dbr_enum_t>::max(), static_cast<long long>(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_ENUM, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_CHAR) {
+				std::vector<dbr_char_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_char_t>(std::max<long long>(0, std::min<long long>(255, static_cast<long long>(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_CHAR, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_LONG) {
+				std::vector<dbr_long_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_long_t>(std::max<long long>(std::numeric_limits<dbr_long_t>::min(), std::min<long long>(std::numeric_limits<dbr_long_t>::max(), static_cast<long long>(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_LONG, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else {
+				caStatus[i] = ctx.doPut(DBR_DOUBLE, nToWrite, channelID, basePtr, doWaitRequested, putCtx, totalWrites);
+			}
+
+			auto updateError = [&]() {
+				const bool handleOk = (ErrorArray && *ErrorArray && (**ErrorArray) && i < (**ErrorArray)->dimSize);
+				bool needsUpdate = true;
+				if (handleOk) {
+					sError& e = (**ErrorArray)->result[i];
+					const uInt32 lvCode = (caStatus[i] <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(caStatus[i]) + ERROR_OFFSET;
+					if (e.code == lvCode && e.source && *e.source && (*e.source)->cnt > 0) {
+						needsUpdate = false;
+					}
+				}
+				if (caStatus[i] == ECA_NORMAL) {
+					ctx.setErrorAt(i, (uInt32)ECA_NORMAL, std::string(ca_message_safe(ECA_NORMAL)));
+				}
+				else if (needsUpdate) {
+					ctx.setErrorAt(i, (uInt32)caStatus[i], "ca_array_put failed. " + std::string(ca_message_safe(caStatus[i])));
+				}
+				};
+			if (instanceData) { std::lock_guard<std::mutex> lock(instanceData->arrayMutex); updateError(); }
+			else { updateError(); }
+
+			if (CommunicationStatus) {
+				*CommunicationStatus = (caStatus[i] != ECA_NORMAL);
+			}
+		}
+		else if (isChar || isShort || isLong32 || isQuad64) {
+			if (!LongValueArray2D || !*LongValueArray2D) {
+				ctx.setErrorAt(i, (uInt32)ECA_BADCOUNT, "Missing LongValueArray2D"); caStatus[i] = ECA_BADCOUNT;
+				if (CommunicationStatus) *CommunicationStatus = 1;
+				continue;
+			}
+			const uInt32 nToWrite = std::min<unsigned>(availableCount, elementCapacity ? elementCapacity : availableCount);
+			const uint64_t* basePtr = &((**LongValueArray2D)->elt[startIndex]);
+
+			auto decodeSigned = [&](uint64_t raw) -> int64_t {
+				if (isChar)   return static_cast<int64_t>(static_cast<int8_t>(raw & 0xFFu));
+				if (isShort)  return static_cast<int64_t>(static_cast<int16_t>(raw & 0xFFFFu));
+				if (isLong32) return static_cast<int64_t>(static_cast<int32_t>(raw & 0xFFFFFFFFu));
+				return static_cast<int64_t>(raw);
+				};
+
+			if (nativeType == DBF_STRING) {
+				std::vector<dbr_string_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) {
+					std::string s = std::to_string(decodeSigned(basePtr[j]));
+					strncpy(temp[j], s.c_str(), sizeof(dbr_string_t) - 1);
+					temp[j][sizeof(dbr_string_t) - 1] = '\0';
+				}
+				caStatus[i] = ctx.doPut(DBR_STRING, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_SHORT) {
+				std::vector<dbr_short_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_short_t>(std::max<int64_t>(std::numeric_limits<dbr_short_t>::min(), std::min<int64_t>(std::numeric_limits<dbr_short_t>::max(), decodeSigned(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_SHORT, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_FLOAT) {
+				std::vector<dbr_float_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_float_t>(decodeSigned(basePtr[j]));
+				caStatus[i] = ctx.doPut(DBR_FLOAT, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_ENUM) {
+				std::vector<dbr_enum_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_enum_t>(std::max<int64_t>(0, std::min<int64_t>(std::numeric_limits<dbr_enum_t>::max(), decodeSigned(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_ENUM, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_CHAR) {
+				std::vector<dbr_char_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_char_t>(static_cast<uint8_t>(decodeSigned(basePtr[j])));
+				caStatus[i] = ctx.doPut(DBR_CHAR, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_DOUBLE) {
+				std::vector<dbr_double_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_double_t>(decodeSigned(basePtr[j]));
+				caStatus[i] = ctx.doPut(DBR_DOUBLE, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else {
+				std::vector<dbr_long_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_long_t>(std::max<int64_t>(std::numeric_limits<dbr_long_t>::min(), std::min<int64_t>(std::numeric_limits<dbr_long_t>::max(), decodeSigned(basePtr[j]))));
+				caStatus[i] = ctx.doPut(DBR_LONG, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+
+			auto updateError = [&]() {
+				const bool handleOk = (ErrorArray && *ErrorArray && (**ErrorArray) && i < (**ErrorArray)->dimSize);
+				bool needsUpdate = true;
+				if (handleOk) {
+					sError& e = (**ErrorArray)->result[i];
+					const uInt32 lvCode = (caStatus[i] <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(caStatus[i]) + ERROR_OFFSET;
+					if (e.code == lvCode && e.source && *e.source && (*e.source)->cnt > 0) {
+						needsUpdate = false;
+					}
+				}
+				if (caStatus[i] == ECA_NORMAL) {
+					ctx.setErrorAt(i, (uInt32)ECA_NORMAL, std::string(ca_message_safe(ECA_NORMAL)));
+				}
+				else if (needsUpdate) {
+					ctx.setErrorAt(i, (uInt32)caStatus[i], "ca_array_put failed. " + std::string(ca_message_safe(caStatus[i])));
+				}
+				};
+			if (instanceData) { std::lock_guard<std::mutex> lock(instanceData->arrayMutex); updateError(); }
+			else { updateError(); }
+
+			if (CommunicationStatus) {
+				*CommunicationStatus = (caStatus[i] != ECA_NORMAL);
+			}
+		}
+		else if (isString) {
+			if (!StringValueArray2D || !*StringValueArray2D) {
+				ctx.setErrorAt(i, (uInt32)ECA_BADCOUNT, "Missing StringValueArray2D"); caStatus[i] = ECA_BADCOUNT;
+				if (CommunicationStatus) *CommunicationStatus = 1;
+				continue;
+			}
+			const uInt32 nToWrite = std::min<unsigned>(availableCount, elementCapacity ? elementCapacity : availableCount);
+
+			if (nativeType == DBF_STRING) {
+				std::vector<dbr_string_t> temp(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) {
+					std::string s = PutValueCtx::getLVString((**StringValueArray2D)->elt[startIndex + j]);
+					strncpy(temp[j], s.c_str(), sizeof(dbr_string_t) - 1);
+					temp[j][sizeof(dbr_string_t) - 1] = '\0';
+				}
+				caStatus[i] = ctx.doPut(DBR_STRING, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+			}
+			else if (nativeType == DBF_CHAR) {
+				std::string s = PutValueCtx::getLVString((**StringValueArray2D)->elt[startIndex]);
+				uInt32 count = (uInt32)std::min<size_t>(elementCapacity ? elementCapacity : s.size(), s.size());
+				if (count == 0) { dbr_char_t zero = 0; caStatus[i] = ctx.doPut(DBR_CHAR, 1, channelID, &zero, doWaitRequested, putCtx, totalWrites); }
+				else { caStatus[i] = ctx.doPut(DBR_CHAR, count, channelID, s.c_str(), doWaitRequested, putCtx, totalWrites); }
+			}
+			else {
+				auto parseDouble = [](const std::string& txt, double& out) -> bool {
+					std::stringstream ss(txt); ss.imbue(std::locale::classic()); ss >> out; return !ss.fail();
+					};
+				bool allOk = true;
+				std::vector<double> numericValues(nToWrite);
+				for (uInt32 j = 0; j < nToWrite; ++j) {
+					std::string s = PutValueCtx::getLVString((**StringValueArray2D)->elt[startIndex + j]);
+					if (!parseDouble(s, numericValues[j])) { allOk = false; break; }
+				}
+				if (!allOk) { ctx.setErrorAt(i, (uInt32)ECA_BADTYPE, "Invalid numeric string(s)"); caStatus[i] = ECA_BADTYPE; continue; }
+
+				if (nativeType == DBF_DOUBLE) {
+					std::vector<dbr_double_t> temp(nToWrite);
+					for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_double_t>(numericValues[j]);
+					caStatus[i] = ctx.doPut(DBR_DOUBLE, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+				}
+				else if (nativeType == DBF_FLOAT) {
+					std::vector<dbr_float_t> temp(nToWrite);
+					for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_float_t>(numericValues[j]);
+					caStatus[i] = ctx.doPut(DBR_FLOAT, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+				}
+				else if (nativeType == DBF_SHORT) {
+					std::vector<dbr_short_t> temp(nToWrite);
+					for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_short_t>(std::max<long long>(std::numeric_limits<dbr_short_t>::min(), std::min<long long>(std::numeric_limits<dbr_short_t>::max(), static_cast<long long>(numericValues[j]))));
+					caStatus[i] = ctx.doPut(DBR_SHORT, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+				}
+				else if (nativeType == DBF_ENUM) {
+					std::vector<dbr_enum_t> temp(nToWrite);
+					for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_enum_t>(std::max<long long>(0, std::min<long long>(std::numeric_limits<dbr_enum_t>::max(), static_cast<long long>(numericValues[j]))));
+					caStatus[i] = ctx.doPut(DBR_ENUM, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+				}
+				else if (nativeType == DBF_LONG) {
+					std::vector<dbr_long_t> temp(nToWrite);
+					for (uInt32 j = 0; j < nToWrite; ++j) temp[j] = static_cast<dbr_long_t>(std::max<long long>(std::numeric_limits<dbr_long_t>::min(), std::min<long long>(std::numeric_limits<dbr_long_t>::max(), static_cast<long long>(numericValues[j]))));
+					caStatus[i] = ctx.doPut(DBR_LONG, nToWrite, channelID, temp.data(), doWaitRequested, putCtx, totalWrites);
+				}
+			}
+
+			auto updateError = [&]() {
+				const bool handleOk = (ErrorArray && *ErrorArray && (**ErrorArray) && i < (**ErrorArray)->dimSize);
+				bool needsUpdate = true;
+				if (handleOk) {
+					sError& e = (**ErrorArray)->result[i];
+					const uInt32 lvCode = (caStatus[i] <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(caStatus[i]) + ERROR_OFFSET;
+					if (e.code == lvCode && e.source && *e.source && (*e.source)->cnt > 0) {
+						needsUpdate = false;
+					}
+				}
+				if (caStatus[i] == ECA_NORMAL) {
+					ctx.setErrorAt(i, (uInt32)ECA_NORMAL, std::string(ca_message_safe(ECA_NORMAL)));
+				}
+				else if (needsUpdate) {
+					ctx.setErrorAt(i, (uInt32)caStatus[i], "ca_array_put failed. " + std::string(ca_message_safe(caStatus[i])));
+				}
+				};
+			if (instanceData) { std::lock_guard<std::mutex> lock(instanceData->arrayMutex); updateError(); }
+			else { updateError(); }
+
+			if (CommunicationStatus) {
+				*CommunicationStatus = (caStatus[i] != ECA_NORMAL);
+			}
+		}
+	}
+	ca_poll();
+
+	// If using callbacks, wait for all write callbacks to complete.
+	if (doWaitRequested) {
+		bool callbacksTimedOut = false;
+		if (totalWrites > 0) {
+			const auto writeDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(static_cast<int>(Timeout * 1000.0));
+			while (std::chrono::steady_clock::now() < writeDeadline && putCtx->completed.load(std::memory_order_relaxed) < totalWrites) {
+				ca_pend_event(0.02);
+				Globals::getInstance().waitForNotification(std::chrono::milliseconds(10));
+			}
+			if (putCtx->completed.load(std::memory_order_relaxed) < totalWrites) {
+				callbacksTimedOut = true;
+			}
+		}
+		if (putCtx && putCtx->refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+			delete putCtx;
+			putCtx = nullptr;
+		}
+		putCtx = nullptr;
+		putCallbacksTimedOut = callbacksTimedOut;
+	}
+
+	// Finalize status.
+	int errorCount = 0;
+	for (uInt32 i = 0; i < nameCount; ++i) {
+		if (caStatus[i] == ECA_NORMAL) continue;
+		++errorCount;
+	}
+	if (putCallbacksTimedOut) {
+		++errorCount;
+	}
+	if (CommunicationStatus && errorCount) {
+		*CommunicationStatus = 1;
+	}
+	if (FirstCall && *FirstCall) *FirstCall = 0;
+}
+
+extern "C" EXPORT void info(sStringArray2DHdl* InfoStringArray2D, sResultArrayHdl* ResultArray, LVBoolean* FirstCall) {
+	// Don't enter if library is shutting down.
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+
+	// Collect and populate environment information
+	auto envInfo = collectEnvironmentInfo();
+	populateInfoStringArray(InfoStringArray2D, envInfo);
+
+	// Collect and populate PV information
+	populateAllResultArray(ResultArray);
+
+	if (FirstCall && *FirstCall) *FirstCall = 0;
+}
+
+extern "C" EXPORT void disconnectPVs(sStringArrayHdl* PvNameArray, bool All) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+
+	if (All) {
+		std::lock_guard<std::mutex> lock(g.instancesMutex);
+		if (g.instances.size() > 1) {
+			// name of instance
+			std::string instNames;
+			int numberOfNames = 0;
+			for (auto* instPtr : g.instances) {
+				if (instPtr && *instPtr) {
+					MyInstanceData* inst = static_cast<MyInstanceData*>(*instPtr);
+					if (inst && !inst->firstFunctionName.empty()) {
+						if (!instNames.empty()) instNames += ", ";
+						instNames += inst->firstFunctionName;
+						numberOfNames++;
+					}
+				}
+			}
+			if (numberOfNames > 1) {
+				return;
+			}
+		}
+	}
+
+	CaContextGuard _caThreadAttach;
+
+	// Collect list of items to be disconnected without holding the registry write lock for long.
+	std::vector<PVItem*> itemsToDisconnect;
+
+	if (All) {
+		TimeoutSharedLock<std::shared_timed_mutex> rlock(g.pvRegistryLock, "disconnectPVs-all", std::chrono::milliseconds(500));
+		if (!rlock.isLocked()) {
+			CaLabDbgPrintf("disconnectPVs: Failed to acquire pvRegistryLock (all)");
+			return;
+		}
+		itemsToDisconnect.reserve(g.pvRegistry.size());
+		for (auto& kv : g.pvRegistry) {
+			if (kv.second) itemsToDisconnect.push_back(kv.second.get());
+		}
+	}
+	else {
+		// Validate input.
+		if (!PvNameArray || !*PvNameArray || DSCheckHandle(*PvNameArray) != noErr || !(**PvNameArray) || (**PvNameArray)->dimSize == 0) {
+			return;
+		}
+		TimeoutSharedLock<std::shared_timed_mutex> rlock(g.pvRegistryLock, "disconnectPVs-some", std::chrono::milliseconds(500));
+		if (!rlock.isLocked()) {
+			CaLabDbgPrintf("disconnectPVs: Failed to acquire pvRegistryLock");
+			return;
+		}
+
+		auto getLVString = [](LStrHandle h) -> std::string {
+			if (!h) return {};
+			const char* s = reinterpret_cast<const char*>((*h)->str);
+			const size_t n = static_cast<size_t>((*h)->cnt);
+			return std::string(s, n);
+			};
+
+		// Deduplicate and collect potential parents in one pass.
+		std::unordered_set<PVItem*> uniq;
+		std::unordered_set<PVItem*> potentialParents;
+		uniq.reserve((**PvNameArray)->dimSize * 3);
+		potentialParents.reserve((**PvNameArray)->dimSize);
+
+		for (uInt32 i = 0; i < (**PvNameArray)->dimSize; ++i) {
+			std::string name = getLVString((**PvNameArray)->elt[i]);
+			if (name.empty()) continue;
+
+			// Direct item (can be base, field or .RTYP)
+			auto it = g.pvRegistry.find(name);
+			if (it != g.pvRegistry.end() && it->second) {
+				PVItem* item = it->second.get();
+				uniq.insert(item);
+				potentialParents.insert(item);
+			}
+		}
+
+		// If any of the requested items are base PVs, add all their children.
+		if (!potentialParents.empty()) {
+			for (auto& kv : g.pvRegistry) {
+				if (!kv.second) continue;
+				PVItem* child = kv.second.get();
+				PVItem* parentPtr = nullptr;
+				{
+					std::lock_guard<std::mutex> lk(child->ioMutex());
+					parentPtr = child->parent;
+				}
+				if (parentPtr && potentialParents.find(parentPtr) != potentialParents.end()) {
+					uniq.insert(child);
+				}
+			}
+		}
+
+		itemsToDisconnect.reserve(itemsToDisconnect.size() + uniq.size());
+		for (PVItem* p : uniq) itemsToDisconnect.push_back(p);
+	}
+
+	// Perform disconnection (outside registry lock), update internal PV status.
+	for (PVItem* item : itemsToDisconnect) {
+		if (!item) continue;
+
+		evid ev = nullptr;
+		chid ch = nullptr;
+		std::string itemName;
+		{
+			std::lock_guard<std::mutex> lk(item->ioMutex());
+			// Save CA handles, then set to null internally.
+			ev = item->eventId;
+			ch = item->channelId;
+			item->eventId = nullptr;
+			item->channelId = nullptr;
+
+			// Internal status: disconnected and data released.
+			item->setConnected(false);
+			item->setHasValue(false);
+			item->setStatus(epicsAlarmComm);
+			item->setSeverity(epicsSevInvalid);
+			item->setErrorCode(ECA_DISCONNCHID);
+			item->clearDbr();
+			item->clearFields();
+			item->updateChangeHash();
+			itemName = item->getName();
+		}
+
+		// Release CA resources.
+		if (ev) {
+			int st = ca_clear_subscription(ev);
+			if (st != ECA_NORMAL) {
+				CaLabDbgPrintf("disconnectPVs: ca_clear_subscription failed (%d) for %s", st, itemName.c_str());
+			}
+		}
+		if (ch) {
+			int st = ca_clear_channel(ch);
+			if (st != ECA_NORMAL) {
+				CaLabDbgPrintf("disconnectPVs: ca_clear_channel failed (%d) for %s", st, itemName.c_str());
+			}
+		}
+
+		// Remove from pending list (if it was there).
+		g.removePendingConnection(item);
+
+		// Post events for this PV (and parent if applicable).
+		postEventForPv(itemName);
+		{
+			PVItem* parentPtr = nullptr;
+			std::lock_guard<std::mutex> lk(item->ioMutex());
+			parentPtr = item->parent;
+			if (parentPtr) {
+				postEventForPv(parentPtr->getName());
+			}
+		}
+	}
+
+	// Process CA and wake up waiting threads.
+	ca_flush_io();
+	ca_poll();
+	g.notify();
+}
+
+extern "C" EXPORT uInt32 getCounter() {
+	return ++globalCounter;
+}
+
+// =================================================================================
+// LabVIEW VI Lifecycle Implementation
+// =================================================================================
+
+extern "C" EXPORT MgErr reserved(InstanceDataPtr* instanceState) {
+	MyInstanceData* data = new MyInstanceData();
+	*instanceState = data;
+	{
+		std::lock_guard<std::mutex> lock(Globals::getInstance().instancesMutex);
+		Globals::getInstance().instances.push_back(instanceState);
+	}
+	return 0;
+}
+
+extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
+	try {
+		if (!instanceState || !*instanceState) {
+			CaLabDbgPrintf("unreserved: Called with null instanceState");
+			return 0;
+		}
+		MyInstanceData* data = static_cast<MyInstanceData*>(*instanceState);
+		if (!data) {
+			CaLabDbgPrintf("unreserved: Instance data pointer is null");
+			return 0;
+		}
+
+		Globals& g = Globals::getInstance();
+
+		// get name
+		std::string funcName = data->firstFunctionName;
+		//CaLabDbgPrintf("unreserved: Unreserving instance for function '%s' (instanceState=%p data=%p PvIndexArray=%p)", funcName.c_str(), static_cast<void*>(instanceState), static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
+		// Early exit for unused instances (no function was ever called)
+		if (data->firstFunctionName.empty()) {
+			std::lock_guard<std::mutex> lock(g.instancesMutex);
+			g.instances.erase(
+				std::remove(g.instances.begin(), g.instances.end(), instanceState),
+				g.instances.end()
+			);
+			delete data;
+			*instanceState = nullptr;
+			return 0;
+		}
+
+		// Signal that we're unreserving - this prevents new calls from starting
+		data->isUnreserving.store(true, std::memory_order_release);
+
+		// Notify waiting threads immediately
+		g.notify();
+
+		// Wait for active calls with timeout and active polling
+		const auto waitDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		int iterations = 0;
+
+		while (data->activeCalls.load(std::memory_order_acquire) > 0) {
+			if (std::chrono::steady_clock::now() >= waitDeadline) {
+				break;
+			}
+			ca_poll();
+			g.waitForNotification(std::chrono::milliseconds(5));
+			++iterations;
+		}
+
+
+		MgErr err = noErr;
+
+		// Helper to check if array is shared by another instance
+		auto isArraySharedByOtherInstance = [&](void* arrayHandle) -> bool {
+			if (!arrayHandle)
+				return false;
+			std::lock_guard<std::mutex> lock(g.instancesMutex);
+			for (auto* instPtr : g.instances) {
+				if (instPtr == instanceState || !instPtr || !*instPtr)
+					continue;
+				auto* otherInst = static_cast<MyInstanceData*>(*instPtr);
+				if (!otherInst)
+					continue;
+
+				std::lock_guard<std::mutex> lk(otherInst->arrayMutex);
+
+				if ((otherInst->PvIndexArray && *otherInst->PvIndexArray == arrayHandle) ||
+					(otherInst->ResultArray && *otherInst->ResultArray == arrayHandle) ||
+					(otherInst->FirstStringValue && *otherInst->FirstStringValue == arrayHandle) ||
+					(otherInst->FirstDoubleValue && *otherInst->FirstDoubleValue == arrayHandle) ||
+					(otherInst->DoubleValueArray && *otherInst->DoubleValueArray == arrayHandle)) {
+					return true;
+				}
+			}
+			return false;
+		};
+
+
+
+		// === CRITICAL: Collect and reset PVs BEFORE cleaning up arrays ===
+		// This must happen for getValue AND putValue instances
+		std::vector<PVItem*> pvsToReset;
+		if (data->firstFunctionName == "getValue" || data->firstFunctionName == "putValue") {
+			// Phase 1: Collect base PVs from PvIndexArray BEFORE it gets cleared
+			std::vector<PVItem*> basePvs;
+			{
+				std::lock_guard<std::mutex> lk(data->arrayMutex);
+				//CaLabDbgPrintf("unreserved: collecting basePvs: data=%p PvIndexArray=%p", static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
+				if (data->PvIndexArray && *data->PvIndexArray) {
+					sLongArrayHdl hdl = data->PvIndexArray;
+					sLongArray* arr = *data->PvIndexArray;
+					//CaLabDbgPrintf("unreserved: PvIndexArray array handle=%p arr=%p dimSize=%u", static_cast<void*>(data->PvIndexArray), static_cast<void*>(arr), (arr ? static_cast<unsigned int>(arr->dimSize) : 0u));
+					try {
+						MgErr hErr = DSCheckHandle(hdl);
+						if (hErr != noErr) {
+							CaLabDbgPrintfD("unreserved: #1 DSCheckHandle failed for %s PvIndexArray=%p (err=%d)", funcName.c_str(),	static_cast<void*>(arr), hErr);
+						}
+						else {
+							const size_t dim = arr->dimSize;
+							if (dim > 1'000'000) { // Grenze nach deinem Bedarf
+								CaLabDbgPrintf("unreserved: #1 %s Implausible dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), static_cast<uint64_t>(dim), static_cast<void*>(arr));
 							}
 							else {
-								mapLock.unlock_shared();
+								basePvs.reserve(arr->dimSize);
+								for (size_t i = 0; i < arr->dimSize; ++i) {
+									PvEntryHandle entry{ &data->PvIndexArray, i };
+									if (!entry || !entry->pvItem) continue;
+									basePvs.push_back(entry->pvItem);
+								}
 							}
-							delete[] cFieldName;
 						}
 					}
-					if (fullFieldName) {
-						DSDisposeHandle(fullFieldName);
+					catch (...) {
+						CaLabDbgPrintf("unreserved: Exception while collecting base PVs");
+						CaLabDbgPrintf("You should terminated and restart LabVIEW to avoid memory leaks.");
+						basePvs.clear();
+						*data->PvIndexArray = nullptr;
+					}
+				}
+			}
+
+			// Phase 2: Collect child PVs (fields and .RTYP) while base PVs are still valid
+			if (!basePvs.empty()) {
+				TimeoutSharedLock<std::shared_timed_mutex> regLock(g.pvRegistryLock, "unreserved-collect-children", std::chrono::milliseconds(200));
+				if (regLock.isLocked()) {
+					std::unordered_set<PVItem*> baseSet(basePvs.begin(), basePvs.end());
+
+					for (auto& kv : g.pvRegistry) {
+						if (!kv.second) continue;
+						PVItem* pvItem = kv.second.get();
+
+						PVItem* parentPtr = nullptr;
+						{
+							std::lock_guard<std::mutex> pvLock(pvItem->ioMutex());
+							parentPtr = pvItem->parent;
+						}
+
+						if (parentPtr && baseSet.find(parentPtr) != baseSet.end()) {
+							pvsToReset.push_back(pvItem);
+						}
+					}
+				}
+			}
+
+			// Add base PVs to the reset list
+			pvsToReset.insert(pvsToReset.end(), basePvs.begin(), basePvs.end());
+		}
+
+		// Phase 3: Reset all collected PVs BEFORE cleaning up arrays
+		if (!pvsToReset.empty()) {
+			CaContextGuard _caThreadAttach;
+
+			struct ResetInfo {
+				PVItem* pvItem = nullptr;
+				evid ev = nullptr;
+				chid ch = nullptr;
+				std::string pvName;
+			};
+
+			std::vector<ResetInfo> resetInfos;
+			resetInfos.reserve(pvsToReset.size());
+
+			// Menge der zu resetenden PVs – schnelle O(1)-Nachschlagezeit
+			std::unordered_set<PVItem*> toResetSet(pvsToReset.begin(), pvsToReset.end());
+
+			// Einmaliger Shared-Lock auf die Registry
+			{
+				TimeoutSharedLock<std::shared_timed_mutex> regLock(
+					g.pvRegistryLock,
+					"unreserved-reset",
+					std::chrono::milliseconds(200)
+				);
+
+				if (!regLock.isLocked()) {
+					// Verhalten analog zu bisher: wenn Lock nicht zu bekommen ist,
+					// brechen wir das Reset hier ab (konservativ).
+					// Optional: Logging hinzufügen.
+				}
+				else {
+					// Einmaliger Scan durch die Registry
+					for (auto& kv : g.pvRegistry) {
+						if (!kv.second) continue;
+
+						PVItem* pvItem = kv.second.get();
+						if (!pvItem) continue;
+
+						// Nur PVs bearbeiten, die wir tatsächlich resetten wollen
+						if (toResetSet.find(pvItem) == toResetSet.end()) {
+							continue;
+						}
+
+						ResetInfo info;
+						info.pvItem = pvItem;
+
+						// Reihenfolge der Locks beibehalten: zuerst Registry (shared),
+						// dann PV-Mutex.
+						{
+							std::lock_guard<std::mutex> pvLock(pvItem->ioMutex());
+
+							info.ev = pvItem->eventId;
+							info.ch = pvItem->channelId;
+							info.pvName = pvItem->getName();  // nur für Logging/Debugging nötig
+
+							pvItem->eventId = nullptr;
+							pvItem->channelId = nullptr;
+							pvItem->setConnected(false);
+							pvItem->setHasValue(false);
+							pvItem->setRecordType("");
+							pvItem->clearEnumFetchRequested();
+						}
+
+						resetInfos.emplace_back(std::move(info));
+					}
+				} // regLock wird hier freigegeben
+			}
+
+			// CA-Cleanup und Pending-Removal weiterhin außerhalb der Locks
+			for (const auto& info : resetInfos) {
+				if (info.ev) {
+					ca_clear_subscription(info.ev);
+				}
+				if (info.ch) {
+					ca_clear_channel(info.ch);
+				}
+				if (info.pvItem) {
+					g.removePendingConnection(info.pvItem);
+				}
+			}
+
+			ca_flush_io();
+		}
+
+
+		// NOW clean up arrays owned by this instance (AFTER PV reset)
+		// Collect & atomically claim entries while the array buffer is still valid.
+		std::vector<PvIndexEntry*> entriesToDelete;
+		{
+			std::lock_guard<std::mutex> lk(data->arrayMutex);
+
+			if (data->PvIndexArray && *data->PvIndexArray && !isArraySharedByOtherInstance(static_cast<void*>(*data->PvIndexArray))) {
+				sLongArrayHdl hdl = data->PvIndexArray;
+				sLongArray* arr = *data->PvIndexArray;
+				try {
+					if (hdl && arr) {
+						MgErr hErr = DSCheckHandle(hdl);
+						if (hErr != noErr) {
+							CaLabDbgPrintfD("unreserved: #2 DSCheckHandle failed for %s PvIndexArray=%p (err=%d)", funcName.c_str(),
+								static_cast<void*>(arr), hErr);
+						}
+						else {
+							/*CaLabDbgPrintf("unreserved: #2 Collecting PvIndex entries from %s PvIndexArray=%p (arr=%p dimSize=%" PRIu64 ")", funcName.c_str(),
+								static_cast<void*>(hdl), static_cast<void*>(arr), arr->dimSize);*/
+							const uInt64 dim = arr->dimSize;
+							if (dim > 1'000'000) { // Grenze nach deinem Bedarf
+								CaLabDbgPrintf("unreserved: #2 Implausible %s dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), dim, static_cast<void*>(arr));
+							}
+							else {
+								entriesToDelete.reserve(arr->dimSize);
+								for (uInt64 i = 0; i < arr->dimSize; ++i) {
+									// Interpret the LabVIEW slot as an atomic pointer-sized integer.
+									atomic_ptr_t* atomicElt = reinterpret_cast<atomic_ptr_t*>(&arr->elt[i]);
+									uintptr_t raw = atomicElt->load(std::memory_order_acquire);
+									if (raw == 0) continue;
+
+									uintptr_t expected = raw;
+									// Claim the slot by CAS while the array memory is still valid.
+									if (atomicElt->compare_exchange_strong(expected, 0, std::memory_order_acq_rel, std::memory_order_acquire)) {
+										// Successfully claimed the slot; keep the entry pointer for later deletion.
+										PvIndexEntry* entry = reinterpret_cast<PvIndexEntry*>(raw);
+										if (entry) {
+											// Mark deleting to prevent further acquirers (defensive).
+											entry->mark_deleting();
+											entriesToDelete.push_back(entry);
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				catch (...) {
+					CaLabDbgPrintf("unreserved: Exception while collecting PvIndex entries");
+					CaLabDbgPrintf("You should terminated and restart LabVIEW to avoid memory leaks.");
+					entriesToDelete.clear();
+					*data->PvIndexArray = nullptr;
+				}
+			}
+
+			// Detach the array pointer while we do the actual deletions outside the lock
+			data->PvIndexArray = nullptr;
+		}
+
+		// Helper: plausibility check for pointer-like values.
+		auto isPlausiblePointer = [](uintptr_t p) -> bool {
+			// Reject very small addresses and misaligned pointers.
+			if (p < 0x10000) return false;
+#if (UINTPTR_MAX == 0xffffffff)
+			const uintptr_t align = 4;
+#else
+			const uintptr_t align = 8;
+#endif
+			if ((p & (align - 1)) != 0) return false;
+			return true;
+			};
+
+		// Perform wait + deletion for the claimed entries without holding data->arrayMutex.
+		if (!entriesToDelete.empty()) {
+			const auto hardTimeout = std::chrono::seconds(3);
+			std::vector<PvIndexEntry*> deferred;
+			for (PvIndexEntry* entry : entriesToDelete) {
+				if (!entry) continue;
+
+				const uintptr_t rawAddr = reinterpret_cast<uintptr_t>(entry);
+				if (!isPlausiblePointer(rawAddr)) {
+					CaLabDbgPrintf("unreserved: Implausible entry pointer 0x%016" PRIxPTR " - scheduling deferred deletion", rawAddr);
+					deferred.push_back(entry);
+					continue;
+				}
+
+				if (!tryReclaimAndDelete(entry, hardTimeout)) {
+					deferred.push_back(entry);
+				}
+			}
+			if (!deferred.empty()) {
+				CaLabDbgPrintf("unreserved: Starting deferred deletion worker for %zu entries", deferred.size());
+				std::thread(deferredDeletionWorker, std::move(deferred)).detach();
+				// Short pause to give CA callbacks some time
+				ca_pend_event(0.001);
+			}
+			entriesToDelete.clear();
+		}
+
+		if (data->ResultArray && *data->ResultArray) {
+			sResultArrayHdl resultHdl = data->ResultArray;
+			MgErr hErr = DSCheckHandle(resultHdl);
+			if (hErr == noErr) {		
+				for (uInt32 i = 0; i < (*resultHdl)->dimSize; i++) {
+					sResult* currentResult = &(*resultHdl)->result[i];
+					if (currentResult == nullptr) {
+						continue;
+					}
+					hErr = DSCheckHandle(currentResult->PVName);
+					if (hErr == noErr) {
+						err += CleanupResult(currentResult);
+					}
+				}
+			} 
+		}
+		data->ResultArray = nullptr;
+
+		if (data->FirstStringValue && *data->FirstStringValue) {
+			for (uInt32 j = 0; j < (*data->FirstStringValue)->dimSize; j++) {
+				if ((*data->FirstStringValue)->elt[j] && DSCheckHandle((*data->FirstStringValue)->elt[j]) == noErr)
+					err += DSDisposeHandle((*data->FirstStringValue)->elt[j]);
+				(*data->FirstStringValue)->elt[j] = nullptr;
+			}
+		}
+		data->FirstStringValue = nullptr;
+		data->FirstDoubleValue = nullptr;
+		data->DoubleValueArray = nullptr;
+
+
+		g.unregisterArraysForInstance(instanceState);
+
+		{
+			std::lock_guard<std::mutex> lock(g.instancesMutex);
+			g.instances.erase(
+				std::remove(g.instances.begin(), g.instances.end(), instanceState),
+				g.instances.end()
+			);
+		}
+
+		delete data;
+		*instanceState = nullptr;
+
+		if (err != noErr) {
+			CaLabDbgPrintf("unreserved: Error releasing handles: %d", err);
+		}
+
+		return 0;
+	} catch (const std::exception& ex) {
+		CaLabDbgPrintf("unreserved: Exception during unreserve: %s", ex.what());
+		return -1;
+	}
+	catch (...) {
+		CaLabDbgPrintf("unreserved: Unknown exception during unreserve");
+		return -1;
+	}
+}
+
+extern "C" EXPORT MgErr aborted(InstanceDataPtr* instanceState) {
+	return unreserved(instanceState);
+}
+
+
+// =================================================================================
+// LabVIEW User Event API Implementation
+// =================================================================================
+
+extern "C" EXPORT void addEvent(LVUserEventRef* RefNum, sResult* ResultPtr) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+
+	if (!RefNum || !ResultPtr || DSCheckPtr(ResultPtr) != noErr || !ResultPtr->PVName || DSCheckHandle(ResultPtr->PVName) != noErr) {
+		return;
+	}
+	std::string pvName;
+	LStrHandle h = ResultPtr->PVName;
+	if (h && *h) {
+		pvName.assign(reinterpret_cast<const char*>((*h)->str), (*h)->cnt);
+	}
+	if (pvName.empty()) return;
+
+	PVItem* pvItem = nullptr;
+	bool valueAlreadyExists = false;
+
+	// Ensure the PV exists in the registry.
+	{
+		TimeoutUniqueLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "addEvent:pvRegistryLock", std::chrono::milliseconds(500));
+		if (lock.isLocked()) {
+			auto it = g.pvRegistry.find(pvName);
+			if (it == g.pvRegistry.end()) {
+				auto newPvItem = std::make_unique<PVItem>(pvName);
+				pvItem = newPvItem.get();
+				g.pvRegistry.emplace(pvName, std::move(newPvItem));
+				valueAlreadyExists = false;
+			}
+			else {
+				pvItem = it->second.get();
+				if (pvItem) {
+					valueAlreadyExists = pvItem->hasValue();
+				}
+			}
+		}
+		else {
+			CaLabDbgPrintf("addEvent: lock timeout on pvRegistryLock");
+		}
+	}
+
+	// Register the (RefNum, ResultPtr) pair for this PV.
+	{
+		std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
+		g_eventRegistry.map[pvName].emplace_back(*RefNum, ResultPtr);
+	}
+
+	// If the PV already has a value, post an event immediately.
+	if (valueAlreadyExists) {
+		postEventForPv(pvName);
+	}
+	g.notify();
+}
+
+extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load() || !RefNum) return;
+
+	{
+		std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
+		for (auto it = g_eventRegistry.map.begin(); it != g_eventRegistry.map.end(); ) {
+			auto& vec = it->second;
+			vec.erase(std::remove_if(vec.begin(), vec.end(),
+				[&](const auto& pair) { return pair.first == *RefNum; }), vec.end());
+
+			if (vec.empty()) {
+				it = g_eventRegistry.map.erase(it);
+			}
+			else {
+				++it;
+			}
+		}
+	}
+	g.notify();
+}
+
+void postEventForPv(const std::string& pvName) {
+	if (pvName.empty()) return;
+
+	// Snapshot subscribers to avoid holding the lock during LV calls.
+	std::vector<std::pair<LVUserEventRef, sResult*>> subscribers;
+	{
+		std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
+		auto it = g_eventRegistry.map.find(pvName);
+		if (it == g_eventRegistry.map.end()) return;
+		subscribers = it->second;
+	}
+
+	// Locate the PVItem.
+	PVItem* pvItem = nullptr;
+	{
+		TimeoutSharedLock<std::shared_timed_mutex> rlock(Globals::getInstance().pvRegistryLock, "postEvent-lookup", std::chrono::milliseconds(200));
+		if (!rlock.isLocked()) return;
+		auto it = Globals::getInstance().pvRegistry.find(pvName);
+		if (it == Globals::getInstance().pvRegistry.end() || !it->second) return;
+		pvItem = it->second.get();
+	}
+
+	// Prepare and post an event for each subscriber.
+	for (auto& sub : subscribers) {
+		LVUserEventRef ref = sub.first;
+		sResult* target = sub.second;
+		if (!target) continue;
+
+		// Update the target cluster with the current PV state.
+		{
+			std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+			fillResultFromPv(pvItem, target);
+		}
+
+		// Fire the LabVIEW user event.
+		MgErr postErr = mgNoErr;
+		try {
+			postErr = PostLVUserEvent(ref, target);
+		} catch (...) {
+			CaLabDbgPrintf("postEventForPv: Exception while posting event for %s", pvName.c_str());
+			continue;
+		}
+		if (postErr != mgNoErr) {
+			// remove event from registry
+			try {
+				std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
+				auto it = g_eventRegistry.map.find(pvName);
+				if (it != g_eventRegistry.map.end()) {
+					auto& vec = it->second;
+					vec.erase(std::remove_if(vec.begin(), vec.end(),
+						[&](const auto& pair) { return pair.first == ref; }), vec.end());
+					if (vec.empty()) {
+						g_eventRegistry.map.erase(it);
+					}
+				}
+			}
+			catch (...) {
+				CaLabDbgPrintf("postEventForPv: Exception while removing failed event for %s", pvName.c_str());
+			}
+			CaLabDbgPrintf("PostLVUserEvent failed for %s with error %d", pvName.c_str(), postErr);
+		}
+	}
+}
+
+// =================================================================================
+// Core PV & Channel Access Logic
+// =================================================================================
+
+bool setupPvIndexAndRegistry(sStringArrayHdl* PvNameArray, sStringArrayHdl* FieldNameArray, sLongArrayHdl* PvIndexArray, LVBoolean* CommunicationStatus, std::unordered_set<std::string>* uninitializedPvNames)
+{
+	uInt32 nameCount = static_cast<uInt32>((**PvNameArray)->dimSize);
+
+	TimeoutUniqueLock<std::shared_timed_mutex> initializeGetValueGuard(
+		Globals::getInstance().pvRegistryLock, "initializeGetValue", std::chrono::milliseconds(500));
+
+	if (!initializeGetValueGuard.isLocked()) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		TimeoutUniqueLock<std::shared_timed_mutex> retryGuard(
+			Globals::getInstance().pvRegistryLock, "initializeGetValue-retry", std::chrono::milliseconds(1000));
+
+		if (!retryGuard.isLocked()) {
+			CaLabDbgPrintf("Error: Failed to acquire lock in initializeGetValue after retry.");
+			*CommunicationStatus = 1;
+			return false;
+		}
+		// ... (retry guard processing - same changes apply below)
+	}
+
+	// Clean up existing entries first
+	if (PvIndexArray && *PvIndexArray && **PvIndexArray) {
+		if (PvIndexArray && *PvIndexArray && **PvIndexArray) {
+			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; ++i) {
+				// atomisch claimen & löschen falls vorhanden
+				tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
+			}
+		}
+	}
+
+	// Resize PvIndexArray
+	if (PvIndexArray != nullptr && (*PvIndexArray == nullptr || **PvIndexArray == nullptr || (**PvIndexArray)->dimSize != nameCount)) {
+		if (NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, nameCount) != noErr) {
+			CaLabDbgPrintf("Error: Memory allocation failed for PvIndexArray in getValue.");
+			*CommunicationStatus = 1;
+			return false;
+		}
+		if (**PvIndexArray == nullptr) {
+			const size_t headerSize = sizeof(sLongArray);  // dimSize + 1 element
+			const size_t elemSize = sizeof(uint64_t);   // sizeof(uint64_t)
+			const size_t totalSize = headerSize + (static_cast<size_t>(nameCount) - 1) * elemSize;
+			*PvIndexArray = reinterpret_cast<sLongArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+			if (!*PvIndexArray) {
+				CaLabDbgPrintf("Error: Memory allocation failed for PvIndexArray in getValue.");
+				*CommunicationStatus = 1;
+				return false;
+			}
+		}
+		else {
+			(**PvIndexArray)->dimSize = nameCount;
+		}
+
+		// Sanity check: LabVIEW array element size must equal pointer size
+		if (sizeof((**PvIndexArray)->elt[0]) < sizeof(uintptr_t)) {
+			CaLabDbgPrintf("Error: PvIndexArray element size (%zu) != expected pointer size (%zu).",
+				sizeof((**PvIndexArray)->elt[0]), sizeof(uintptr_t));
+			*CommunicationStatus = 1;
+			return false;
+		}
+		if (*PvIndexArray && **PvIndexArray) {
+			sanitizePvIndexArray(**PvIndexArray, static_cast<size_t>(nameCount));
+		}
+	}
+
+	if (PvIndexArray != nullptr && *PvIndexArray != nullptr && **PvIndexArray != nullptr) {
+		for (uInt32 i = 0; i < nameCount; ++i) {
+			std::string pvName((char*)(*(**PvNameArray)->elt[i])->str, (size_t)(*(**PvNameArray)->elt[i])->cnt);
+
+			auto it = Globals::getInstance().pvRegistry.find(pvName);
+			PVItem* pvItem = nullptr;
+
+			if (it == Globals::getInstance().pvRegistry.end()) {
+				// New PV - create it
+				auto newPvItem = std::make_unique<PVItem>(pvName);
+				pvItem = newPvItem.get();
+				Globals::getInstance().pvRegistry[pvName] = std::move(newPvItem);
+				if (uninitializedPvNames) uninitializedPvNames->insert(pvItem->getName());
+			}
+			else {
+				// Existing PV - check if it needs reconnection
+				pvItem = it->second.get();
+				bool needsReconnect = false;
+				{
+					std::lock_guard<std::mutex> lk(pvItem->ioMutex());
+
+					// Check multiple conditions for stale connections
+					bool hasNoChannel = (pvItem->channelId == nullptr);
+					bool notConnected = !pvItem->isConnected();
+					bool hasNoValue = !pvItem->hasValue();
+					bool hasStaleChannel = false;
+
+					// Validate channel state if channel exists
+					if (pvItem->channelId != nullptr) {
+						channel_state state = ca_state(pvItem->channelId);
+						if (state != cs_conn) {
+							hasStaleChannel = true;
+							// Clear stale CA handles
+							pvItem->eventId = nullptr;
+							pvItem->channelId = nullptr;
+							pvItem->setConnected(false);
+							pvItem->setHasValue(false);
+							pvItem->setRecordType(""); // Clear record type to force RTYP fetch
+							pvItem->clearEnumFetchRequested();
+						}
+					}
+
+					needsReconnect = hasNoChannel || notConnected || hasNoValue || hasStaleChannel;
+
+				}
+
+				if (needsReconnect && uninitializedPvNames) {
+					uninitializedPvNames->insert(pvItem->getName());
+				}
+			}
+
+			// Set up fields if provided
+			if (FieldNameArray && *FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize > 0) {
+				std::vector<std::pair<std::string, chanId>> fields;
+				fields.reserve((**FieldNameArray)->dimSize);
+				for (uInt32 f = 0; f < (**FieldNameArray)->dimSize; ++f) {
+					LStrHandle fHandle = (**FieldNameArray)->elt[f];
+					if (!fHandle) continue;
+					const char* fStr = reinterpret_cast<const char*>((*fHandle)->str);
+					const size_t fLen = static_cast<size_t>((*fHandle)->cnt);
+					if (fLen == 0) continue;
+					std::string fieldName(fStr, fLen);
+					fields.emplace_back(fieldName, nullptr);
+				}
+				pvItem->setFields(fields);
+			}
+
+			// Erzeuge Meta & Entry und schreibe atomisch in das Array
+			auto metaInfo = new PVMetaInfo(pvItem);
+			PvIndexEntry* entry = new PvIndexEntry(pvItem, metaInfo);
+
+			// Verwende pointer-sized atomic für Portabilität
+			auto atomicElt = reinterpret_cast<atomic_ptr_t*>(&(**PvIndexArray)->elt[i]);
+			atomicElt->store(reinterpret_cast<uintptr_t>(entry), std::memory_order_release);
+		}
+	}
+	else {
+		CaLabDbgPrintf("Error: PvIndexArray is null.");
+		return false;
+	}
+
+	return true;
+}
+
+void subscribePv(PVItem* pvItem) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+	short dbrType;
+	uInt32 numValues;
+	{
+		std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+		if (pvItem->eventId != nullptr) {
+			return;
+		}
+		if (pvItem->channelId == nullptr) {
+			pvItem->setErrorCode(ECA_DISCONNCHID);
+			/*CaLabDbgPrintf("Warning: Cannot subscribe %s - channelId is null (channel not properly connected)",
+				pvItem->getName().c_str());*/
+			return;
+		}
+		channel_state state = ca_state(pvItem->channelId);
+		if (state != cs_conn) {
+			pvItem->setErrorCode(ECA_DISCONN);
+			/*CaLabDbgPrintf("Warning: Cannot subscribe %s - channel state is %d (not connected)",
+				pvItem->getName().c_str(), state);*/
+			return;
+		}
+		dbrType = pvItem->getDbrType();
+		numValues = pvItem->getNumberOfValues();
+	}
+	g.addPendingConnection(pvItem);
+
+	int requestedDbrType = dbf_type_to_DBR_TIME(dbrType);
+
+	int rc = ca_create_subscription(requestedDbrType, numValues, pvItem->channelId, DBE_VALUE | DBE_ALARM, valueChanged, pvItem, &pvItem->eventId);
+	if (rc != ECA_NORMAL) {
+		{
+			std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+			pvItem->setErrorCode(rc);
+			if (rc != ECA_NORMAL) pvItem->eventId = nullptr;
+		}
+		CaLabDbgPrintf("Warning: Could not create subscription for %s. %s", pvItem->getName().c_str(), ca_message_safe(rc));
+	}
+}
+
+void connectPVs(const std::unordered_set<std::string>& basePvNames, double Timeout, std::chrono::steady_clock::time_point endBy) {
+	Globals& g = Globals::getInstance();
+	if (basePvNames.empty()) return;
+	const size_t count = basePvNames.size();
+	long offset = 1;
+	long long timeoutMs = static_cast<long long>(Timeout * 1000.0 * offset);
+	auto ownDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+	auto deadline = std::min(ownDeadline, endBy);
+
+	struct ParentRef {
+        std::string baseName;
+        PVItem* parent = nullptr;
+    };
+
+	std::vector<ParentRef> parents;
+    parents.reserve(count);
+    {
+        TimeoutSharedLock<std::shared_timed_mutex> scanLock(g.pvRegistryLock, "connectPVs-scan", std::chrono::milliseconds(200));
+        if (!scanLock.isLocked()) return;
+
+        for (const auto& baseName : basePvNames) {
+            auto it = g.pvRegistry.find(baseName);
+            if (it == g.pvRegistry.end() || !it->second) continue;
+            parents.push_back({ baseName, it->second.get() });
+        }
+    }
+
+    auto waitForRecordType = [&](ParentRef& ref) -> bool {
+        if (!ref.parent) return false;
+        while (std::chrono::steady_clock::now() < deadline) {
+            {
+                std::lock_guard<std::mutex> lk(ref.parent->ioMutex());
+                if (!ref.parent->getRecordType().empty()) {
+                    return true;
+                }
+            }
+            g.waitForNotification(std::chrono::milliseconds(20));
+            ca_pend_event(0.001);
+        }
+        return false;
+    };
+
+    std::vector<ParentRef> readyParents;
+    readyParents.reserve(parents.size());
+    for (auto& ref : parents) {
+        if (!ref.parent) continue;
+        bool hasRecordType = false;
+        {
+            std::lock_guard<std::mutex> lk(ref.parent->ioMutex());
+            hasRecordType = !ref.parent->getRecordType().empty();
+        }
+        if (!hasRecordType && !waitForRecordType(ref)) {
+			//CaLabDbgPrintf("Warning: Record type for %s not available before timeout (%lldms); skipping field PV creation.", ref.baseName.c_str(), timeoutMs);
+            continue;
+        }
+        readyParents.push_back(ref);
+    }
+
+	// Build and connect field PV channels for approved fields only.
+	std::vector<PVItem*> fieldItems;
+    fieldItems.reserve(readyParents.size() * 4);
+
+    auto buildFieldChannels = [&](const std::vector<ParentRef>& refs) {
+        if (refs.empty()) return;
+
+        TimeoutUniqueLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "connectPVs-build", std::chrono::milliseconds(500));
+        if (!lock.isLocked()) return;
+
+        for (const auto& ref : refs) {
+            PVItem* parent = ref.parent;
+            if (!parent) continue;
+
+            std::string recordType;
+            std::vector<std::pair<std::string, chanId>> fields;
+            {
+                std::lock_guard<std::mutex> lk(parent->ioMutex());
+                recordType = parent->getRecordType();
+                fields = parent->getFields();
+            }
+			if (recordType.empty() || fields.empty()) {
+				continue;
+			}
+            for (const auto& fieldPair : fields) {
+                const std::string& fieldName = fieldPair.first;
+                bool isApproved = Globals::getInstance().recordFieldIsCommonField(fieldName) ||
+                    Globals::getInstance().recordFieldExists(recordType, fieldName);
+				if (!isApproved) {
+					continue;
+				}
+                std::string fieldPvName = ref.baseName + "." + fieldName;
+                PVItem* fieldItem = nullptr;
+                auto fit = g.pvRegistry.find(fieldPvName);
+                if (fit == g.pvRegistry.end()) {
+                    auto newFieldPv = std::make_unique<PVItem>(fieldPvName);
+                    fieldItem = newFieldPv.get();
+                    fieldItem->parent = parent;
+                    g.pvRegistry[fieldPvName] = std::move(newFieldPv);
+                }
+                else {
+                    fieldItem = fit->second.get();
+                    if (fieldItem && !fieldItem->parent) {
+                        fieldItem->parent = parent;
+                    }
+                }
+                if (!fieldItem) continue;
+
+                if (fieldItem->channelId == nullptr) {
+                    g.addPendingConnection(fieldItem);
+                    int result = ca_create_channel(fieldPvName.c_str(), connectionChanged, fieldItem, CA_PRIORITY_DEFAULT, &fieldItem->channelId);
+                    if (result != ECA_NORMAL) {
+                        CaLabDbgPrintf("Warning: Could not create channel for %s. %s", fieldPvName.c_str(), ca_message_safe(result));
+                        continue;
+                    }
+                }
+                else if (!fieldItem->isConnected()) {
+                    g.addPendingConnection(fieldItem);
+                }
+                fieldItems.push_back(fieldItem);
+            }
+        }
+    };
+
+    buildFieldChannels(readyParents);
+	// Let CA process initial connection handshakes.
+	ca_pend_io(0.001);
+
+	// Subscribe immediately to those already connected.
+	{
+		std::vector<PVItem*> toSubscribe;
+		TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "connectPVs-initial-sub", std::chrono::milliseconds(200));
+		if (lock.isLocked()) {
+			for (auto* item : fieldItems) {
+				if (item && item->isConnected()) {
+					std::lock_guard<std::mutex> lk(item->ioMutex());
+					if (item->eventId == nullptr) {
+						toSubscribe.push_back(item);
 					}
 				}
 			}
 		}
-		return currentItem;
+		for (auto* item : toSubscribe) { subscribePv(item); }
+		if (!toSubscribe.empty()) ca_poll();
 	}
 
-} globals;
-
-// error handler for segfault
-void signalHandler(int signum) {
-	switch (signum) {
-	case SIGABRT:
-		DbgTime(); CaLabDbgPrintf("Abnormal termination of CA Lab");
-		if (pCaLabDbgFile)
-			epicsThreadSleep(5);
-		signal(SIGABRT, 0x0);
-		break;
-	case SIGFPE:
-		DbgTime(); CaLabDbgPrintf("An erroneous arithmetic operation, such as a divide by zero or an operation resulting in overflow.");
-		if (pCaLabDbgFile)
-			epicsThreadSleep(5);
-		signal(SIGFPE, 0x0);
-		break;
-	case SIGILL:
-		DbgTime(); CaLabDbgPrintf("Detection of an illegal instruction.");
-		if (pCaLabDbgFile)
-			epicsThreadSleep(5);
-		signal(SIGILL, 0x0);
-		break;
-	case SIGINT:
-		DbgTime(); CaLabDbgPrintf("Receipt of an interactive attention signal.");
-		if (pCaLabDbgFile)
-			epicsThreadSleep(5);
-		signal(SIGINT, 0x0);
-		break;
-	case SIGSEGV:
-		DbgTime(); CaLabDbgPrintf("An invalid access to storage.");
-		if (pCaLabDbgFile)
-			epicsThreadSleep(5);
-		signal(SIGSEGV, 0x0);
-		break;
-	case SIGTERM:
-		DbgTime(); CaLabDbgPrintf("A termination request sent to the program.");
-		if (pCaLabDbgFile)
-			epicsThreadSleep(5);
-		signal(SIGTERM, 0x0);
-		break;
-	}
-}
-
-// callback for Channel Access warnings and errors
-void exceptionCallback(struct exception_handler_args args) {
-	// Don't enter if library terminates
-	if (stopped)
-		return;
-
-	if (args.chid) {
-		DbgTime(); CaLabDbgPrintf("%s: %s", ca_name(args.chid), ca_message(args.stat));
-		return;
-	}
-	if (args.stat == 200) {
-		if (!err200) {
-			err200 = true;
-			DbgTime(); CaLabDbgPrintf("%s (Please check your configuration of \"EPICS_CA_ADDR_LIST\" and \"EPICS_CA_AUTO_ADDR_LIST\")", ca_message(args.stat));
+	timeoutMs = static_cast<long long>(Timeout * 1000.0 * offset);
+	ownDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+	deadline = ownDeadline;
+	// Dynamically subscribe to fields as they connect, up to the deadline.
+	while (std::chrono::steady_clock::now() < deadline) {
+		std::vector<PVItem*> toSubscribeDynamic;
+		bool allDone = true; // All fields are either subscribed (eventId set) or no channel is pending.
+		{
+			TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "connectPVs-dyn", std::chrono::milliseconds(200));
+			if (!lock.isLocked()) break;
+			for (auto* item : fieldItems) {
+				if (!item) continue;
+				bool needsSubscription = false;
+				{
+					std::lock_guard<std::mutex> lk(item->ioMutex());
+					needsSubscription = (item->isConnected() && item->eventId == nullptr);
+					// If not connected yet, we are not done.
+					if (!item->isConnected()) allDone = false;
+				}
+				if (needsSubscription) toSubscribeDynamic.push_back(item);
+			}
 		}
-		return;
+		for (auto* item : toSubscribeDynamic) { subscribePv(item); }
+		if (!toSubscribeDynamic.empty()) ca_poll();
+		if (allDone) break;
+		g.waitForNotification(std::chrono::milliseconds(100));
+		ca_pend_event(0.001);
 	}
-	if (args.stat != 192) {
-		DbgTime(); CaLabDbgPrintf("Channel Access error: %s", ca_message(args.stat));
-		CaLabDbgPrintf("%s", args.ctx);
+
+	// Optional: warn on timeout for fields that are still not connected.
+	/*if (std::chrono::steady_clock::now() >= deadline) {
+		for (auto* item : fieldItems) {
+			if (item && !item->isConnected()) {
+				CaLabDbgPrintf("Warning: Field PV %s did not connect before timeout.", item->getName().c_str());
+			}
+		}
+	}*/
+}
+
+void waitForUninitializedPvs(const std::unordered_set<std::string>& basePvNames, double Timeout, std::chrono::steady_clock::time_point endBy) {
+	if (basePvNames.empty() || Timeout <= 0.0)
 		return;
+	Globals& g = Globals::getInstance();
+	long offset = 1;
+	const auto ownDeadline = std::chrono::steady_clock::now() + std::chrono::milliseconds((long long)((Timeout > 0.0 ? Timeout : 0.0) * 1000 * offset));
+	const auto deadline = std::min(ownDeadline, endBy);
+
+	while (std::chrono::steady_clock::now() < deadline) {
+		bool allFieldsReady = true;
+
+		// Collect parents and their field-name lists under a registry lock to minimize contention.
+		std::vector<std::pair<PVItem*, std::vector<std::string>>> parents;
+		{
+			TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "waitFieldValues-collect", std::chrono::milliseconds(200));
+			if (!lock.isLocked()) break;
+			parents.reserve(basePvNames.size());
+			for (const auto& baseName : basePvNames) {
+				auto it = g.pvRegistry.find(baseName);
+				if (it == g.pvRegistry.end() || !it->second) continue;
+				PVItem* parent = it->second.get();
+				std::vector<std::string> fieldNames;
+				{
+					std::lock_guard<std::mutex> lk(parent->ioMutex());
+					const auto& fieldsVector = parent->getFields();
+					fieldNames.reserve(fieldsVector.size());
+					for (const auto& f : fieldsVector) fieldNames.push_back(f.first);
+				}
+				if (!fieldNames.empty()) {
+					parents.emplace_back(parent, std::move(fieldNames));
+				}
+			}
+		}
+
+		// Fast path: if there are no parents with fields, we're done.
+		if (parents.empty()) return;
+
+		// Check if all listed fields have a value (string) set on their parent.
+		for (const auto& parentAndFields : parents) {
+			PVItem* parent = parentAndFields.first;
+			// Determine record type once per parent to validate fields.
+			std::string recordType;
+			{
+				std::lock_guard<std::mutex> lk(parent->ioMutex());
+				recordType = parent->getRecordType();
+			}
+			// If the record type is unknown here, skip waiting for fields of this parent.
+			if (recordType.empty()) continue;
+			for (const auto& fieldName : parentAndFields.second) {
+				// Only wait for approved fields or those actually present in the registry.
+				bool isApproved = Globals::getInstance().recordFieldIsCommonField(fieldName) ||
+					Globals::getInstance().recordFieldExists(recordType, fieldName);
+				bool fieldPvExists = false;
+				{
+					TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "waitFieldValues-exists", std::chrono::milliseconds(50));
+					if (lock.isLocked()) {
+						fieldPvExists = (g.pvRegistry.find(parent->getName() + "." + fieldName) != g.pvRegistry.end());
+					}
+				}
+				if (!isApproved && !fieldPvExists) {
+					// Not a valid/connected field for this record; don't wait on it.
+					continue;
+				}
+				std::string tempValue;
+				if (!parent->tryGetFieldString(fieldName, tempValue) || tempValue.empty()) {
+					// As a fallback, if the field PV has a value, the parent will be updated shortly.
+					bool fallbackHasValue = false;
+					{
+						TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "waitFieldValues-fallback", std::chrono::milliseconds(100));
+						if (lock.isLocked()) {
+							auto fit = g.pvRegistry.find(parent->getName() + "." + fieldName);
+							if (fit != g.pvRegistry.end() && fit->second && fit->second->hasValue()) {
+								fallbackHasValue = true;
+							}
+						}
+					}
+					if (!fallbackHasValue) { allFieldsReady = false; break; }
+				}
+			}
+			if (!allFieldsReady) break;
+		}
+
+		if (allFieldsReady) break;
+
+		// Process CA events and wait briefly for the next notifications.
+		g.waitForNotification(std::chrono::milliseconds(50));
+		ca_pend_event(0.001);
 	}
 }
 
-// clean up LV string array
+void connectPv(PVItem* pvItem, bool connectRtyp) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+	if (!pvItem) return;
+
+	// Check if channel needs to be created or recreated
+	bool needsNewChannel = false;
+	{
+		std::lock_guard<std::mutex> lk(pvItem->ioMutex());
+		if (pvItem->channelId == nullptr) {
+			needsNewChannel = true;
+		}
+		else if (ca_state(pvItem->channelId) != cs_conn) {
+			// Channel exists but is not connected - clear it and recreate			
+			pvItem->channelId = nullptr;
+			pvItem->eventId = nullptr;
+			pvItem->setConnected(false);
+			needsNewChannel = true;
+		}
+	}
+
+	if (needsNewChannel) {
+		g.addPendingConnection(pvItem);
+		int result = ca_create_channel(pvItem->getName().c_str(), connectionChanged, pvItem, CA_PRIORITY_DEFAULT, &pvItem->channelId);
+		if (result != ECA_NORMAL) {
+			CaLabDbgPrintf("Warning: Could not create channel for %s. %s", pvItem->getName().c_str(), ca_message_safe(result));
+			return;
+		}
+	}
+
+	if (connectRtyp) {
+		std::string rtypPvName = pvItem->getName() + ".RTYP";
+		auto it = g.pvRegistry.find(rtypPvName);
+		PVItem* rtypPvItem = nullptr;
+
+		if (it == g.pvRegistry.end()) {
+			auto newPvItem = std::make_unique<PVItem>(rtypPvName);
+			rtypPvItem = newPvItem.get();
+			rtypPvItem->parent = pvItem;
+			g.pvRegistry[rtypPvName] = std::move(newPvItem);
+		}
+		else {
+			rtypPvItem = it->second.get();
+			// Ensure parent is set
+			if (rtypPvItem && !rtypPvItem->parent) {
+				rtypPvItem->parent = pvItem;
+			}
+		}
+
+		if (rtypPvItem) {
+			{
+				std::lock_guard<std::mutex> lk(rtypPvItem->ioMutex());
+				rtypPvItem->toBeRemoved.store(true);
+			}
+
+			// Check if RTYP channel needs recreation
+			bool rtypNeedsChannel = false;
+			{
+				std::lock_guard<std::mutex> lk(rtypPvItem->ioMutex());
+				if (rtypPvItem->channelId == nullptr) {
+					rtypNeedsChannel = true;
+				}
+				else if (ca_state(rtypPvItem->channelId) != cs_conn) {
+					rtypPvItem->channelId = nullptr;
+					rtypPvItem->eventId = nullptr;
+					rtypPvItem->setConnected(false);
+					rtypPvItem->setHasValue(false);
+					rtypNeedsChannel = true;
+				}
+			}
+
+			if (rtypNeedsChannel) {
+				g.addPendingConnection(rtypPvItem);
+				int result = ca_create_channel(rtypPvName.c_str(), connectionChanged, rtypPvItem, CA_PRIORITY_DEFAULT, &rtypPvItem->channelId);
+				if (result != ECA_NORMAL) {
+					CaLabDbgPrintf("Warning: Could not create channel for %s. %s", rtypPvName.c_str(), ca_message_safe(result));
+				}
+			}
+		}
+	}
+}
+
+void subscribeBasePVs(const std::unordered_set<std::string>& basePvNames, double Timeout, std::chrono::steady_clock::time_point endBy, LVBoolean* NoMDEL) {
+	if (basePvNames.empty())
+		return;
+	Globals& g = Globals::getInstance();
+	long offset = 1;
+	const auto ownDeadline = std::chrono::steady_clock::now() +
+		std::chrono::milliseconds((long long)((Timeout > 0.0 ? Timeout : 0.0) * 1000 * offset));
+	const auto deadline = std::min(ownDeadline, endBy);
+
+	// Connect base and .RTYP channels.
+	{
+		TimeoutUniqueLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "subscribeBasePVs-connect");
+		if (!lock.isLocked())
+			return;
+		for (const auto& name : basePvNames) {
+			auto it = g.pvRegistry.find(name);
+			if (it != g.pvRegistry.end() && it->second) {
+				g.addPendingConnection(it->second.get());
+				connectPv(it->second.get(), /*connectRtyp=*/true);
+			}
+			else {
+				CaLabDbgPrintf("Warning: Base PV not found in registry: %s", name.c_str());
+			}
+		}
+	}
+
+	// Flush and process initial connections
+	ca_flush_io();
+	ca_pend_event(0.01); // Give CA time to process connection callbacks
+
+	// Wait for RTYP values up to the deadline and subscribe channels as they connect.
+	int loopCount = 0;
+	while (std::chrono::steady_clock::now() < deadline) {
+		std::vector<PVItem*> toSubscribeDynamic;
+		bool allDone = true;
+		{
+			TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "subscribeBasePVs-rtyp-check", std::chrono::milliseconds(200));
+			if (!lock.isLocked()) break;
+			for (const auto& name : basePvNames) {
+				// Subscribe base PV if it just connected and has no event yet.
+				auto bit = g.pvRegistry.find(name);
+				if (bit != g.pvRegistry.end() && bit->second) {
+					PVItem* baseItem = bit->second.get();
+					bool needsSubscription = false;
+					{
+						std::lock_guard<std::mutex> lk(baseItem->ioMutex());
+						needsSubscription = (NoMDEL == nullptr || !*NoMDEL) && (baseItem->isConnected() && baseItem->eventId == nullptr);
+						if (!baseItem->isConnected()) {
+							allDone = false;
+						}
+					}
+					if (needsSubscription) {
+						toSubscribeDynamic.push_back(baseItem);
+					}
+				}
+
+				// Subscribe .RTYP PV if it just connected and has no event yet.
+				auto rit = g.pvRegistry.find(name + ".RTYP");
+				if (rit != g.pvRegistry.end() && rit->second) {
+					PVItem* rtypItem = rit->second.get();
+					bool needsSubscriptionRtyp = false;
+					{
+						std::lock_guard<std::mutex> lk(rtypItem->ioMutex());
+						needsSubscriptionRtyp = (rtypItem->isConnected() && rtypItem->eventId == nullptr);
+						if (!rtypItem->isConnected()) allDone = false;
+					}
+					if (needsSubscriptionRtyp) {
+						toSubscribeDynamic.push_back(rtypItem);
+					}
+				}
+				else {
+					allDone = false;
+				}
+			}
+		}
+		// Perform subscriptions outside the registry lock.
+		for (auto* item : toSubscribeDynamic) {
+			subscribePv(item);
+		}
+		if (!toSubscribeDynamic.empty()) {
+			ca_flush_io();
+			ca_poll();
+		}
+		if (allDone) {
+			break;
+		}
+
+		// Use shorter wait intervals for faster reconnection
+		int waitMs = (loopCount < 5) ? 20 : 50;
+		g.waitForNotification(std::chrono::milliseconds(waitMs));
+		ca_pend_event(0.005);
+		++loopCount;
+	}
+
+	/*if (std::chrono::steady_clock::now() >= deadline) {
+		CaLabDbgPrintf("subscribeBasePVs: Timeout after %d iterations", loopCount);
+	}*/
+}
+
+std::vector<uInt32> getChangedPvIndices(sLongArrayHdl* PvIndexArray, double Timeout, std::chrono::steady_clock::time_point endBy, LVBoolean* NoMDEL /*= nullptr*/) {
+	std::vector<uInt32> changedIndices;
+	if (!PvIndexArray || !*PvIndexArray) return changedIndices;
+
+	const bool isNoMDEL = (NoMDEL != nullptr && *NoMDEL);
+	uInt32 count = (uInt32)(**PvIndexArray)->dimSize;
+
+	// In NoMDEL mode: ALL connected PVs should be fetched every time
+	if (isNoMDEL) {
+		// Add all connected PVs to changedIndices
+		for (uInt32 i = 0; i < count; ++i) {
+			PvEntryHandle entry{ PvIndexArray, i};
+			if (!entry) continue;
+			PVItem* pvItem = entry->pvItem;
+			if (pvItem && pvItem->isConnected() && pvItem->channelId) {
+				changedIndices.push_back(i);
+			}
+		}
+
+		// Fetch values synchronously with ca_get for ALL PVs (original logic unchanged)
+		if (!changedIndices.empty()) {
+			Globals& g = Globals::getInstance();
+
+			// Ensure we're attached to the CA context
+			bool wasAttached = (ca_current_context() != nullptr);
+			if (!wasAttached && g.pcac) {
+				ca_attach_context(g.pcac);
+			}
+
+			// Structure to hold pending get operations
+			struct PendingGet {
+				uInt32 idx{0};
+				PVItem* pvItem{nullptr};
+				int requestedDbrType{0};
+				uInt32 nElems{0};
+				size_t elemSize{0};
+				std::vector<char> buffer{};
+				int rc{ECA_NORMAL};
+			};
+
+			std::vector<PendingGet> pendingGets;
+			pendingGets.reserve(changedIndices.size());
+
+			// Phase 1: Issue all ca_array_get calls
+			for (uInt32 idx : changedIndices) {
+				PvEntryHandle entry{ PvIndexArray, idx };
+				if (!entry) continue;
+				PVItem* pvItem = entry->pvItem;
+				if (!pvItem) {continue; }
+
+				if (!pvItem->isConnected() || !pvItem->channelId) {continue; }
+
+				// Verify channel state
+				if (ca_state(pvItem->channelId) != cs_conn) {continue; }
+
+				short dbrType = pvItem->getDbrType();
+				uInt32 nElems = pvItem->getNumberOfValues();
+				int requestedDbrType = dbf_type_to_DBR_TIME(dbrType);
+
+				if (requestedDbrType < 0 ||
+					!dbr_size || !dbr_value_offset || !dbr_value_size ||
+					static_cast<unsigned short>(requestedDbrType) >= dbr_text_dim)
+				{
+					CaLabDbgPrintf(
+						"getChangedPvIndices: Unsupported or invalid DBR type %d (requested=%d) for PV '%s'; skipping synchronous get.",
+						static_cast<int>(dbrType),
+						requestedDbrType,
+						pvItem->getName().c_str());
+					continue;
+				}
+				// Calculate element size
+				size_t elemSize = 0;
+				switch (requestedDbrType) {
+				case DBR_TIME_CHAR:   elemSize = sizeof(dbr_char_t); break;
+				case DBR_TIME_SHORT:  elemSize = sizeof(dbr_short_t); break;
+				case DBR_TIME_LONG:   elemSize = sizeof(dbr_long_t); break;
+				case DBR_TIME_FLOAT:  elemSize = sizeof(dbr_float_t); break;
+				case DBR_TIME_DOUBLE: elemSize = sizeof(dbr_double_t); break;
+				case DBR_TIME_ENUM:   elemSize = sizeof(dbr_enum_t); break;
+				case DBR_TIME_STRING: elemSize = MAX_STRING_SIZE; break;
+				default: elemSize = sizeof(dbr_double_t); break;
+				}
+
+				size_t headerSize = dbr_size[requestedDbrType];
+				size_t bufSize = headerSize + elemSize * (nElems > 0 ? nElems - 1 : 0);
+
+				PendingGet pg;
+				pg.idx = idx;
+				pg.pvItem = pvItem;
+				pg.requestedDbrType = requestedDbrType;
+				pg.nElems = nElems;
+				pg.elemSize = elemSize;
+				pg.buffer.resize(bufSize);
+
+				// Issue the get request
+				pg.rc = ca_array_get(requestedDbrType, nElems, pvItem->channelId, pg.buffer.data());
+
+				if (pg.rc == ECA_NORMAL) {
+					pendingGets.push_back(std::move(pg));
+				}
+				else {
+					// Immediate error - set on PV
+					std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+					pvItem->setErrorCode(pg.rc);
+				}
+			}
+
+			// Phase 2: Wait for all pending gets with a single ca_pend_io
+			int pendIoResult = ECA_NORMAL;
+			if (!pendingGets.empty()) {
+				ca_flush_io();
+				pendIoResult = ca_pend_io(Timeout > 0.0 ? Timeout : 1.0);
+			}
+
+			// Phase 3: Collect all results
+			for (auto& pg : pendingGets) {
+				PVItem* pvItem = pg.pvItem;
+
+				if (pendIoResult == ECA_NORMAL) {
+					// Success - process received data
+					std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+
+					// Extract time metadata
+					const struct dbr_time_double* timePtr =
+						reinterpret_cast<const struct dbr_time_double*>(pg.buffer.data());
+					pvItem->setTimestamp(timePtr->stamp.secPastEpoch);
+					pvItem->setTimestampNSec(timePtr->stamp.nsec);
+					pvItem->setStatus(timePtr->status);
+					pvItem->setSeverity(timePtr->severity);
+
+					// Copy value data
+					size_t dataBytes = pg.elemSize * pg.nElems;
+					void* dataCopy = malloc(dataBytes);
+					if (dataCopy) {
+						memcpy(dataCopy, dbr_value_ptr(pg.buffer.data(), pg.requestedDbrType), dataBytes);
+						pvItem->clearDbr();
+						pvItem->setDbr(dataCopy);
+						pvItem->setHasValue(true);
+						pvItem->setErrorCode(ECA_NORMAL);
+					}
+				}
+				else {
+					// Timeout or error
+					std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+					pvItem->setErrorCode(pendIoResult);
+				}
+			}
+
+			// Detach context if we attached it
+			if (!wasAttached && g.pcac) {
+				ca_detach_context();
+			}
+		}
+
+		return changedIndices;
+	}
+
+	// Normal mode (with subscriptions): only return PVs that have changes
+	bool waitForSubscription = false;
+	for (uInt32 i = 0; i < count; ++i) {
+		PvEntryHandle entry{ PvIndexArray, i };
+		if (!entry) continue;
+		if (!entry->metaInfo || !entry->metaInfo->pvItem) { continue; }
+		PVItem* pvItem = entry->metaInfo->pvItem;
+
+		if (pvItem->isConnected() && !pvItem->hasValue()) {
+			// Normal mode: subscribe and wait for value
+			waitForSubscription = true;
+			subscribePv(pvItem);
+			changedIndices.push_back(i);
+		}
+		else if (entry->metaInfo->hasChanged()) {
+			changedIndices.push_back(i);
+		}
+	}
+
+	// Normal mode: Wait until all PVs in changedIndices have a value via subscription
+	if (waitForSubscription) {
+		long offset = 1;
+		auto startTime = std::chrono::steady_clock::now();
+
+		double effectiveTimeout = (Timeout > 0.0 ? Timeout : 0.0) * offset;
+		auto ownEndTime = startTime + std::chrono::milliseconds(static_cast<long long>(effectiveTimeout * 1000.0));
+		auto endTime = std::min(ownEndTime, endBy);
+
+		while (true) {
+			bool allHaveValues = true;
+			int currentHasValue = 0;
+
+			for (uInt32 idx : changedIndices) {
+				PvEntryHandle entry{ PvIndexArray, idx };
+				if (!entry) { allHaveValues = false; break; }
+				if (entry && entry->metaInfo && entry->metaInfo->pvItem->isConnected() &&
+					!entry->metaInfo->pvItem->hasValue()) {
+					allHaveValues = false;
+				}
+				else if (entry && entry->metaInfo && entry->metaInfo->pvItem->hasValue()) {
+					currentHasValue++;
+				}
+				if (!allHaveValues) break;
+			}
+
+			if (allHaveValues) {
+				break;
+			}
+
+			auto currentTime = std::chrono::steady_clock::now();
+			if (currentTime > endTime) {
+				break;
+			}
+
+			Globals::getInstance().waitForNotification(std::chrono::milliseconds(100));
+			ca_pend_event(0.001);
+		}
+	}
+
+	// After values have arrived, check for ENUM PVs that still need their labels.
+	std::vector<uInt32> enumPendingIndices;
+	for (uInt32 i = 0; i < count; ++i) {
+		PvEntryHandle entry{ PvIndexArray, i };
+		if (!entry) continue;
+		if (!entry->metaInfo || !entry->metaInfo->pvItem) {continue; }
+		PVItem* pvItem = entry->metaInfo->pvItem;
+
+		if (pvItem->isConnected() && pvItem->hasValue()) {
+			short dbrType = pvItem->getDbrType();
+			if (dbrType == DBR_ENUM || dbrType == DBR_TIME_ENUM) {
+				const auto& labels = pvItem->getEnumStrings();
+				if (labels.empty()) {
+					enumPendingIndices.push_back(i);
+				}
+			}
+		}
+	}
+
+	// Wait for ENUM labels to arrive
+	if (!enumPendingIndices.empty()) {
+		auto enumTimeout = std::chrono::milliseconds(500);
+		auto ownEndTime = std::chrono::steady_clock::now() + enumTimeout;
+		auto endTime = std::min(ownEndTime, endBy);
+
+		while (std::chrono::steady_clock::now() < endTime) {
+			bool allEnumsReady = true;
+			for (uInt32 idx : enumPendingIndices) {
+				PvEntryHandle entry{ PvIndexArray, idx };
+				if (!entry) { allEnumsReady = false; break; }
+				if (!entry->metaInfo || !entry->metaInfo->pvItem) { allEnumsReady = false; break; }
+				PVItem* pvItem = entry->metaInfo->pvItem;
+				const auto& labels = pvItem->getEnumStrings();
+				if (labels.empty()) {
+					allEnumsReady = false;
+					break;
+				}
+			}
+			if (allEnumsReady) break;
+
+			Globals::getInstance().waitForNotification(std::chrono::milliseconds(50));
+			ca_pend_event(0.001);
+		}
+
+		for (uInt32 idx : enumPendingIndices) {
+			if (std::find(changedIndices.begin(), changedIndices.end(), idx) == changedIndices.end()) {
+				changedIndices.push_back(idx);
+			}
+		}
+	}
+
+	return changedIndices;
+}
+
+void updatePvIndexArray(sLongArrayHdl* PvIndexArray, const std::vector<uInt32>& changedIndices /*= {}*/) {
+	if (!PvIndexArray || !*PvIndexArray) return;
+
+	if (changedIndices.empty()) {
+		// Fallback to a full update if no specific list is provided.
+		for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; ++i) {
+			PvEntryHandle entry{ PvIndexArray, i };
+			if (!entry) continue;
+			if (entry->metaInfo) {
+				entry->metaInfo->update();
+			}
+		}
+	}
+	else {
+		// Update only the changed entries.
+		for (uInt32 idx : changedIndices) {
+			if (idx < (**PvIndexArray)->dimSize) {
+				PvEntryHandle entry{ PvIndexArray, idx };
+				if (!entry) continue;
+				if (entry->metaInfo) {
+					entry->metaInfo->update();
+				}
+			}
+		}
+	}
+}
+
+void populateOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter, sLongArrayHdl* PvIndexArray, sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, const std::vector<uInt32>& changedIndices) {
+	// Determine the indices to update.
+	const std::vector<uInt32> indicesToUpdate = changedIndices.empty() ?
+		makeIndexRange(nameCount) : changedIndices;
+
+	// Update only the changed elements.
+	for (uInt32 idx : indicesToUpdate) {
+		if (idx >= nameCount) continue;
+
+		PvEntryHandle entry{ PvIndexArray, idx };
+		if (!entry || !entry->pvItem || !entry->metaInfo) {
+			continue;
+		}
+		PVItem* pvItem = entry->pvItem;
+		// Prepare a copy of field names while holding the PV lock, then allocate/fill outside.
+		std::vector<std::string> fieldNamesCopy;
+		std::vector<std::string> cachedStringValues;
+		std::vector<double> cachedNumericValues;
+		short dbrType = DBR_CHAR;
+		bool isNumericType = false;
+
+		// Hold the entry acquired for the duration we use metaInfo/pvItem.
+		{
+			std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+			const bool needsStringValues = (filter & (out_filter::firstValueAsString | out_filter::pviValuesAsString)) != 0;
+			const bool needsNumericValues = (filter & (out_filter::firstValueAsNumber | out_filter::pviValuesAsNumber | out_filter::valueArrayAsNumber)) != 0;
+
+			dbrType = pvItem->getDbrType();
+			isNumericType = (dbrType >= DBR_CHAR && dbrType <= DBR_DOUBLE) || (dbrType >= DBR_TIME_CHAR && dbrType <= DBR_TIME_DOUBLE);
+
+			if (needsNumericValues || (needsStringValues && isNumericType)) {
+				cachedNumericValues = pvItem->dbrValue2Double();
+			}
+
+			if (needsStringValues && !isNumericType) {
+				cachedStringValues = pvItem->dbrValue2String(); // Native Strings
+			}
+		}
+
+		if (!cachedNumericValues.empty() && isNumericType && (filter & (out_filter::firstValueAsString | out_filter::pviValuesAsString))) {
+			cachedStringValues.reserve(cachedNumericValues.size());
+			for (double val : cachedNumericValues) {
+				cachedStringValues.emplace_back(pvItem->FormatUnit(val, std::string()));
+			}
+		}
+
+		{
+			std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+
+			// Ensure ErrorIO reflects the current error state for all PVs, not just changed ones.
+			if ((filter & out_filter::pviError) && ResultArray && *ResultArray && PvIndexArray && *PvIndexArray && **PvIndexArray) {
+				// Fast skip if no PV currently has an error.
+				if (Globals::getInstance().pvErrorCount.load(std::memory_order_relaxed) > 0) {
+					for (uInt32 i = 0; i < nameCount; ++i) {
+						sResult* currentResult = &(**ResultArray)->result[i];
+						PvEntryHandle currentEntry{ PvIndexArray, i };
+						if (!currentEntry || !currentEntry->pvItem) {
+							continue;
+						}
+						const int err = currentEntry->pvItem->getErrorCode();
+						const uInt32 lvCode = (err <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(err) + ERROR_OFFSET;
+						if (currentResult->ErrorIO.code == lvCode && currentResult->ErrorIO.source && *currentResult->ErrorIO.source && (*currentResult->ErrorIO.source)->cnt) {
+							// No change; skip updating the string to avoid unnecessary memory operations.
+						}
+						else {
+							currentResult->ErrorIO.code = lvCode;
+							currentResult->ErrorIO.status = 0;
+							// Always provide a message; on success this will be "Normal successful completion".
+							setLVString(currentResult->ErrorIO.source, currentEntry->pvItem->getErrorAsString());
+						}
+					}
+				}
+			}
+
+			// Store the first value as a string.
+			if ((filter & out_filter::firstValueAsString) && FirstStringValue && *FirstStringValue && !cachedStringValues.empty()) {
+				setLVString((**FirstStringValue)->elt[idx], cachedStringValues[0]);
+			}
+			// Store the first value as a number.
+			if ((filter & out_filter::firstValueAsNumber) && FirstDoubleValue && *FirstDoubleValue && !cachedNumericValues.empty()) {
+				(**FirstDoubleValue)->elt[idx] = cachedNumericValues[0];
+			}
+
+			// Store the value array as numbers (LabVIEW 2D arrays are row-major: offset = row * cols + col).
+			if ((filter & out_filter::valueArrayAsNumber) && DoubleValueArray && *DoubleValueArray) {
+				const uInt32 rows = (**DoubleValueArray)->dimSizes[0]; // expected: = nameCount
+				const uInt32 cols = (**DoubleValueArray)->dimSizes[1]; // expected: = maxNumberOfValues
+				double* destination = (**DoubleValueArray)->elt;
+
+				if (!cachedNumericValues.empty() && rows == nameCount && cols == maxNumberOfValues) {
+					const uInt32 valuesSize = static_cast<uInt32>(cachedNumericValues.size());
+					const uInt32 copyCount = std::min(valuesSize, cols);
+
+					const uInt32 base = idx * cols; // row-major: write contiguous segment per row
+					for (uInt32 j = 0; j < copyCount; ++j) {
+						destination[base + j] = cachedNumericValues[j];
+					}
+					// Clear remaining columns in this row to avoid stale data
+					for (uInt32 j = copyCount; j < cols; ++j) {
+						destination[base + j] = 0.0;
+					}
+				}
+			}
+			// Populate the ResultArray.
+			if (filter & out_filter::pviAll && ResultArray && *ResultArray) {
+				sResult* currentResult = &(**ResultArray)->result[idx];
+				// Status and Severity as numbers.
+				if (filter & out_filter::pviStatusAsNumber) currentResult->StatusNumber = pvItem->getStatus();
+				if (filter & out_filter::pviSeverityAsNumber) currentResult->SeverityNumber = pvItem->getSeverity();
+				if (filter & out_filter::pviTimestampAsNumber) currentResult->TimeStampNumber = pvItem->getTimestamp();
+
+				// Status and Severity as strings.
+				if (filter & out_filter::pviStatusAsString) setLVString(currentResult->StatusString, pvItem->getStatusAsString());
+				if (filter & out_filter::pviSeverityAsString) setLVString(currentResult->SeverityString, pvItem->getSeverityAsString());
+				if (filter & out_filter::pviTimestampAsString) setLVString(currentResult->TimeStampString, pvItem->getTimestampAsString());
+
+				// Error cluster (status/code/source).
+				if (filter & out_filter::pviError) {
+					const int err = pvItem->getErrorCode();
+					const uInt32 lvCode = (err <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(err) + ERROR_OFFSET;
+					if (currentResult->ErrorIO.code == lvCode && currentResult->ErrorIO.source && *currentResult->ErrorIO.source && (*currentResult->ErrorIO.source)->cnt) {
+						// No change; skip updating the string to avoid unnecessary memory operations.
+					}
+					else {
+						currentResult->ErrorIO.code = lvCode;
+						currentResult->ErrorIO.status = 0;
+						setLVString(currentResult->ErrorIO.source, pvItem->getErrorAsString());
+					}
+				}
+
+				// Values as strings and numbers.
+				if (filter & out_filter::pviValuesAsString && currentResult->StringValueArray && !cachedStringValues.empty()) {
+					const std::vector<std::string>& values = cachedStringValues;
+					const uInt32 valuesSize = static_cast<uInt32>(values.size());
+					const uInt32 copyCount = std::min(valuesSize, maxNumberOfValues);
+					sStringArray* lvArray = (*currentResult->StringValueArray);
+					for (uInt32 j = 0; j < copyCount; ++j) {
+						LStrHandle& stringHandle = lvArray->elt[j];
+						const std::string& valueString = values[j];
+						// Determine effective length up to the first NUL character.
+						size_t effectiveLen = valueString.find('\0');
+						if (effectiveLen == std::string::npos) effectiveLen = valueString.size();
+						// Skip work if unchanged.
+						if (stringHandle && LStrLen(*stringHandle) == (int32)effectiveLen && (effectiveLen == 0 || memcmp(LStrBuf(*stringHandle), valueString.data(), effectiveLen) == 0)) {
+							continue;
+						}
+						//CaLabDbgPrintf("populateOutputArrays: Setting string value for PV '%s' index %u, value %u: '%s'", pvItem->getName().c_str(), idx, j, valueString.c_str());
+						setLVString(stringHandle, valueString);
+					}
+				}
+				if ((filter & out_filter::pviValuesAsNumber) && currentResult->ValueNumberArray && !cachedNumericValues.empty()) {
+					const std::vector<double>& values = cachedNumericValues;
+					const uInt32 valuesSize = static_cast<uInt32>(values.size());
+					const uInt32 copyCount = std::min(valuesSize, maxNumberOfValues);
+					double* destination = (*currentResult->ValueNumberArray)->elt;
+					if (copyCount > 0) {
+						memcpy(destination, values.data(), static_cast<size_t>(copyCount) * sizeof(double));
+					}
+					// Clear remaining elements to avoid stale data.
+					for (uInt32 j = copyCount; j < maxNumberOfValues; ++j) {
+						destination[j] = 0.0;
+					}
+					if (filter & out_filter::pviElements) currentResult->valueArraySize = copyCount;
+				}
+				else {
+					if (filter & out_filter::pviElements) currentResult->valueArraySize = pvItem->getNumberOfValues();
+				}
+				if ((filter & (out_filter::pviFieldNames | out_filter::pviFieldValues)) && pvItem->parent == nullptr) {
+					const auto& fields = pvItem->getFields();
+					const uInt32 fieldCount = (uInt32)fields.size();
+
+					if ((filter & out_filter::pviFieldNames) && fieldCount > 0) {
+						if (!currentResult->FieldNameArray || !*currentResult->FieldNameArray ||
+							(*currentResult->FieldNameArray)->dimSize != fieldCount) {
+							if (currentResult->FieldNameArray)
+								DeleteStringArray(currentResult->FieldNameArray);
+							const size_t totalSize =
+								sizeof(sStringArray) +                                    // header + 1 element
+								(static_cast<size_t>(fieldCount) - 1) * sizeof(LStrHandle); // remaining elements
+							currentResult->FieldNameArray =	reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+							if (currentResult->FieldNameArray)
+								(*currentResult->FieldNameArray)->dimSize = fieldCount;
+						}
+					}
+					if ((filter & out_filter::pviFieldValues) && fieldCount > 0) {
+						if (!currentResult->FieldValueArray || !*currentResult->FieldValueArray ||
+							(*currentResult->FieldValueArray)->dimSize != fieldCount) {
+							if (currentResult->FieldValueArray)
+								DeleteStringArray(currentResult->FieldValueArray);
+							const size_t totalSize =
+								sizeof(sStringArray) +                                    // header + 1 element
+								(static_cast<size_t>(fieldCount) - 1) * sizeof(LStrHandle); // remaining elements
+							currentResult->FieldNameArray = reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+							if (currentResult->FieldValueArray)
+								(*currentResult->FieldValueArray)->dimSize = fieldCount;
+						}
+					}
+
+					for (uInt32 f = 0; f < fieldCount; ++f) {
+						const std::string& fieldName = fields[f].first;
+						if ((filter & out_filter::pviFieldNames) && currentResult->FieldNameArray && *currentResult->FieldNameArray) {
+							setLVString((*currentResult->FieldNameArray)->elt[f], fieldName);
+						}
+						if ((filter & out_filter::pviFieldValues) && currentResult->FieldValueArray && *currentResult->FieldValueArray) {
+							std::string valueStr;
+							if (!pvItem->tryGetFieldString_callerLocked(fieldName, valueStr)) {
+								valueStr.clear();
+							}
+							setLVString((*currentResult->FieldValueArray)->elt[f], valueStr);
+						}
+					}
+
+					if (!(filter & out_filter::pviFieldNames) && currentResult->FieldNameArray) {
+						DeleteStringArray(currentResult->FieldNameArray);
+						currentResult->FieldNameArray = nullptr;
+					}
+					if (!(filter & out_filter::pviFieldValues) && currentResult->FieldValueArray) {
+						DeleteStringArray(currentResult->FieldValueArray);
+						currentResult->FieldValueArray = nullptr;
+					}
+
+					if (fields.empty()) {
+						if (currentResult->FieldNameArray) {
+							DeleteStringArray(currentResult->FieldNameArray);
+							currentResult->FieldNameArray = nullptr;
+						}
+						if (currentResult->FieldValueArray) {
+							DeleteStringArray(currentResult->FieldValueArray);
+							currentResult->FieldValueArray = nullptr;
+						}
+					}
+				}
+				else {
+					if (currentResult->FieldNameArray) {
+						DeleteStringArray(currentResult->FieldNameArray);
+						currentResult->FieldNameArray = nullptr;
+					}
+					if (currentResult->FieldValueArray) {
+						DeleteStringArray(currentResult->FieldValueArray);
+						currentResult->FieldValueArray = nullptr;
+					}
+				}
+			}
+		}
+		// Done with this entry
+	}
+}
+
+// =================================================================================
+// Channel Access Callbacks
+// =================================================================================
+
+void connectionChanged(connection_handler_args args) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+
+	std::string pvName(ca_name(args.chid));
+	PVItem* pvItem = static_cast<PVItem*>(ca_puser(args.chid));
+	if (!pvItem) {
+		{
+			std::shared_lock<std::shared_timed_mutex> rlock(g.pvRegistryLock);
+			auto it = g.pvRegistry.find(pvName);
+			if (it == g.pvRegistry.end()) {
+				// PV was likely cleared during unreserved - this is expected, not an error
+				return;
+			}
+			pvItem = it->second.get();
+		}
+	}
+	short dbrType = ca_field_type(args.chid);
+	uInt32 nElems = ca_element_count(args.chid);
+
+	{
+		std::lock_guard<std::mutex> lock(pvItem->ioMutex());
+		bool isConnecting = (args.op == CA_OP_CONN_UP);
+		bool wasConnected = pvItem->isConnected();
+		pvItem->setConnected(isConnecting);
+		if (!wasConnected && isConnecting) {
+			pvItem->setErrorCode(ECA_NORMAL);
+			pvItem->setDbrType(dbrType);
+			pvItem->setNumberOfValues(nElems);
+		}
+		if (args.op == CA_OP_CONN_DOWN) {
+			pvItem->setSeverity(epicsSevInvalid);
+			pvItem->setStatus(epicsAlarmComm);
+			pvItem->setErrorCode(ECA_DISCONNCHID);
+			pvItem->updateChangeHash();
+		}
+	}
+	g.removePendingConnection(pvItem);
+	g.notify();
+
+	// Notify subscribers about the connection state change.
+	postEventForPv(pvName);
+}
+
+void valueChanged(struct event_handler_args args) {
+	Globals& g = Globals::getInstance();
+	if (g.stopped.load()) return;
+
+	// Collect minimal information and enqueue the work for background processing.
+	const int type = args.type;
+	const unsigned nElems = args.count;
+	const int statusCode = args.status;
+	const char* name = ca_name(args.chid);
+	std::string pvName(name);
+	//CaLabDbgPrintf("valueChanged: PV=%s, type=%d, nElems=%u, status=%d", pvName.c_str(), type, nElems, statusCode);
+	ValueChangeTask task;
+	task.pvName = std::move(pvName);
+	task.type = type;
+	task.nElems = nElems;
+	task.errorCode = statusCode;
+
+	// Only copy data if the status is OK and the pointer is valid.
+	if (statusCode == ECA_NORMAL && args.dbr) {
+		size_t elemSize = 0;
+		switch (type) {
+		case DBR_CHAR:    case DBR_TIME_CHAR:    elemSize = sizeof(dbr_char_t);   break;
+		case DBR_SHORT:   case DBR_TIME_SHORT:   elemSize = sizeof(dbr_short_t);  break;
+		case DBR_LONG:    case DBR_TIME_LONG:    elemSize = sizeof(dbr_long_t);   break;
+		case DBR_FLOAT:   case DBR_TIME_FLOAT:   elemSize = sizeof(dbr_float_t);  break;
+		case DBR_DOUBLE:  case DBR_TIME_DOUBLE:  elemSize = sizeof(dbr_double_t); break;
+		case DBR_ENUM:    case DBR_TIME_ENUM:    elemSize = sizeof(dbr_enum_t);   break;
+		case DBR_STRING:  case DBR_TIME_STRING:  elemSize = MAX_STRING_SIZE;      break;
+		default:
+			CaLabDbgPrintf("valueChanged: Unknown DBR-type %d", type);
+			return;
+		}
+
+		const size_t dataBytes = elemSize * nElems;
+		void* copy = malloc(dataBytes);
+		if (!copy) {
+			CaLabDbgPrintf("valueChanged: malloc(%u) failed", (unsigned)dataBytes);
+			return;
+		}
+		memcpy(copy, dbr_value_ptr(args.dbr, args.type), dataBytes);
+		task.dataBytes = dataBytes;
+		task.dataCopy = copy;
+	}
+	else if (statusCode != ECA_NORMAL) {
+		// Set the error on the PV immediately and log it.
+		if (args.usr) {
+			PVItem* pvItem = static_cast<PVItem*>(args.usr);
+			{
+				std::lock_guard<std::mutex> lk(pvItem->ioMutex());
+				pvItem->setErrorCode(statusCode);
+			}
+			CaLabDbgPrintf("valueChanged error for %s: %s", task.pvName.c_str(), pvItem->getErrorAsString().c_str());
+		}
+		else {
+			CaLabDbgPrintf("valueChanged error for %s: status=%d", task.pvName.c_str(), statusCode);
+		}
+	}
+
+	if (type >= DBR_TIME_STRING && type <= DBR_TIME_DOUBLE && statusCode == ECA_NORMAL && args.dbr) {
+		const struct dbr_time_double* timePtr =
+			reinterpret_cast<const struct dbr_time_double*>(args.dbr);
+		task.hasTimeMeta = true;
+		task.secPastEpoch = timePtr->stamp.secPastEpoch;
+		task.nsec = timePtr->stamp.nsec;
+		task.status = timePtr->status;
+		task.severity = timePtr->severity;
+	}
+
+	enqueueTask(std::move(task));
+
+	// If this is an ENUM PV and its enum labels have not been fetched yet, request them now.
+	if (args.usr && args.status == ECA_NORMAL) {
+		PVItem* pvItem = static_cast<PVItem*>(args.usr);
+		// Use the field type from the channel for robustness.
+		short fieldType = ca_field_type(args.chid);
+		if ((pvItem->getDbrType() == DBF_ENUM || fieldType == DBF_ENUM)) {
+			// Only request labels if we don't have them yet and no request is in-flight.
+			const auto& labels = pvItem->getEnumStrings();
+			if (labels.empty() && pvItem->tryMarkEnumFetchRequested()) {
+				g.addPendingConnection(pvItem);
+				int rc = ca_array_get_callback(DBR_CTRL_ENUM, 1, args.chid, enumInfoChanged, pvItem);
+				if (rc != ECA_NORMAL) {
+					pvItem->setErrorCode(rc);
+					pvItem->clearEnumFetchRequested();
+					g.removePendingConnection(pvItem);
+					CaLabDbgPrintf("Info: enum metadata request for %s deferred: %s", pvItem->getName().c_str(), ca_message_safe(rc));
+				}
+			}
+		}
+	}
+}
+
+void enumInfoChanged(struct event_handler_args args) {
+	PVItem* pvItem = static_cast<PVItem*>(args.usr);
+	if (pvItem) {
+		dbr_ctrl_enum* enumValue = (dbr_ctrl_enum*)args.dbr;
+		if (enumValue) {
+			pvItem->setEnumValue(static_cast<const dbr_ctrl_enum*>(args.dbr));
+		}
+		// Enum labels have arrived; allow future refreshes.
+		pvItem->clearEnumFetchRequested();
+		Globals::getInstance().removePendingConnection(pvItem);
+		// Wake any threads that may be waiting for enum metadata.
+		Globals::getInstance().notify();
+	}
+}
+
+
+// =================================================================================
+// Memory Management Helpers
+// =================================================================================
+
 MgErr DeleteStringArray(sStringArrayHdl array) {
 	MgErr err = noErr;
 	err = DSCheckHandle(array);
 	if (err != noErr)
 		return err;
-	for (uInt32 i = 0; i < (*array)->dimSize; i++)
-		err += DSDisposeHandle((*array)->elt[i]);
-	err += DSDisposeHandle(array);
+	for (uInt32 i = 0; i < (*array)->dimSize; i++) {
+		if ((*array)->elt[i] && DSCheckHandle((*array)->elt[i]) == noErr) {
+			err += DSDisposeHandle((*array)->elt[i]);
+		}
+		(*array)->elt[i] = nullptr;
+	}
+	if (array && DSCheckHandle(array) == noErr) {
+		err += DSDisposeHandle(array);
+	}
+	array = nullptr;
 	return err;
 }
 
-// DbgPrintf wrapper
-//    format: format specifier
-//    ...: additional arguments
+MgErr CleanupResult(sResult* currentResult) {
+	MgErr err = noErr;
+	if (currentResult->PVName && DSCheckHandle(currentResult->PVName) == noErr)
+		err += DSDisposeHandle(currentResult->PVName);
+	currentResult->PVName = nullptr;
+	if (currentResult->StringValueArray && DSCheckHandle(currentResult->StringValueArray) == noErr)
+		err += DeleteStringArray(currentResult->StringValueArray);
+	currentResult->StringValueArray = nullptr;
+	if (currentResult->ValueNumberArray && DSCheckHandle(currentResult->ValueNumberArray) == noErr)
+		err += DSDisposeHandle(currentResult->ValueNumberArray);
+	currentResult->ValueNumberArray = nullptr;
+	if (currentResult->StatusString && DSCheckHandle(currentResult->StatusString) == noErr)
+		err += DSDisposeHandle(currentResult->StatusString);
+	currentResult->StatusString = nullptr;
+	currentResult->StatusNumber = 0;
+	if (currentResult->SeverityString && DSCheckHandle(currentResult->SeverityString) == noErr)
+		err += DSDisposeHandle(currentResult->SeverityString);
+	currentResult->SeverityString = nullptr;
+	currentResult->SeverityNumber = 0;
+	if (currentResult->TimeStampString && DSCheckHandle(currentResult->TimeStampString) == noErr)
+		err += DSDisposeHandle(currentResult->TimeStampString);
+	currentResult->TimeStampString = nullptr;
+	currentResult->TimeStampNumber = 0;
+	if (currentResult->FieldNameArray && DSCheckHandle(currentResult->FieldNameArray) == noErr)
+		err += DeleteStringArray(currentResult->FieldNameArray);
+	currentResult->FieldNameArray = nullptr;
+	if (currentResult->FieldValueArray && DSCheckHandle(currentResult->FieldValueArray) == noErr)
+		err += DeleteStringArray(currentResult->FieldValueArray);
+	currentResult->FieldValueArray = nullptr;
+	if (currentResult->ErrorIO.source && DSCheckHandle(currentResult->ErrorIO.source) == noErr)
+		err += DSDisposeHandle(currentResult->ErrorIO.source);
+	currentResult->ErrorIO.source = nullptr;
+	currentResult->ErrorIO.code = 0;
+	currentResult->ErrorIO.status = 0;
+	currentResult->valueArraySize = 0;
+	return err;
+}
+
+void cleanupMemory(sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, sStringArrayHdl* PvNameArray, const std::vector<uInt32>& changedIndices = {})
+{
+	if (!ResultArray || !PvNameArray || !*PvNameArray || !(**PvNameArray)) {
+		return;
+	}
+
+	MgErr err = noErr;
+	bool needsCleanup = false;
+
+	// Check if the dimensions match. If not, a full cleanup is required.
+	if (*ResultArray) {
+		if ((**ResultArray)->dimSize && ((**ResultArray)->dimSize != (**PvNameArray)->dimSize)) {
+			needsCleanup = true;
+		}
+	}
+
+	if (needsCleanup) {
+		// If a full cleanup is needed (due to array resize) or if no specific indices were provided.
+		if (changedIndices.empty()) {
+			// Perform a full cleanup.
+			if (*ResultArray) {
+				// Clean up all Result elements.
+				for (uInt32 i = 0; i < (**ResultArray)->dimSize; i++) {
+					sResult* currentResult = &(**ResultArray)->result[i];
+					err += CleanupResult(currentResult);
+				}
+				// Free the ResultArray itself.
+				if (*ResultArray && DSCheckHandle(*ResultArray) == noErr)
+					err += DSDisposeHandle(*ResultArray);
+				*ResultArray = nullptr;
+			}
+			// Free the FirstStringValue array.
+			if (*FirstStringValue) {
+				for (uInt32 j = 0; j < (**FirstStringValue)->dimSize; j++) {
+					if ((**FirstStringValue)->elt[j] && DSCheckHandle((**FirstStringValue)->elt[j]) == noErr)
+						err += DSDisposeHandle((**FirstStringValue)->elt[j]);
+					(**FirstStringValue)->elt[j] = nullptr;
+				}
+				if(*FirstStringValue && DSCheckHandle(*FirstStringValue) == noErr)
+					err += DSDisposeHandle(*FirstStringValue);
+				*FirstStringValue = nullptr;
+			}
+
+			// Free the FirstDoubleValue array.
+			if (*FirstDoubleValue && DSCheckHandle(*FirstDoubleValue) == noErr)
+				err += DSDisposeHandle(*FirstDoubleValue);
+			*FirstDoubleValue = nullptr;
+
+			// Free the DoubleValueArray.
+			if (*DoubleValueArray && DSCheckHandle(*DoubleValueArray) == noErr)
+				err += DSDisposeHandle(*DoubleValueArray);
+			*DoubleValueArray = nullptr;
+		}
+		else {
+			// Selectively clean only the changed elements.
+			// Note: We cannot free individual elements of the top-level array,
+			// but we can clean the contents of the Result struct.
+			if (*ResultArray) {
+				for (uInt32 idx : changedIndices) {
+					if (idx < (**ResultArray)->dimSize) {
+						sResult* currentResult = &(**ResultArray)->result[idx];
+						err += CleanupResult(currentResult);
+					}
+				}
+			}
+		}
+
+		// Log errors if any occurred during cleanup.
+		if (err != noErr) {
+			DbgTime();
+			CaLabDbgPrintf("cleanupMemory: Error when releasing handles, error code: %d", err);
+		}
+	}
+}
+
+MgErr prepareOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter, sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringValue, sDoubleArrayHdl* FirstDoubleValue, sDoubleArray2DHdl* DoubleValueArray, sStringArrayHdl* PvNameArray, const std::vector<uInt32>& changedIndices = {})
+{
+	MgErr err = noErr;
+	bool completeInitNeeded = changedIndices.empty();
+
+	// 1. Prepare FirstStringValue array.
+	if (filter & out_filter::firstValueAsString && FirstStringValue) {
+		if (!*FirstStringValue || !**FirstStringValue || (**FirstStringValue)->dimSize != nameCount) {
+			err = NumericArrayResize(uQ, 1, (UHandle*)FirstStringValue, nameCount);
+			if (err != noErr) return err;
+			(**FirstStringValue)->dimSize = nameCount;
+		}
+	}
+
+	// 2. Prepare FirstDoubleValue array.
+	if (filter & out_filter::firstValueAsNumber && FirstDoubleValue) {
+		if (!*FirstDoubleValue || !**FirstDoubleValue || (**FirstDoubleValue)->dimSize != nameCount) {
+			err = NumericArrayResize(fD, 1, (UHandle*)FirstDoubleValue, nameCount);
+			if (err != noErr) return err;
+			(**FirstDoubleValue)->dimSize = nameCount;
+		}
+	}
+
+	// 3. Prepare DoubleValueArray (2D).
+	if (filter & out_filter::valueArrayAsNumber && DoubleValueArray) {
+		if (!*DoubleValueArray || !**DoubleValueArray ||
+			(**DoubleValueArray)->dimSizes[0] != nameCount ||
+			(**DoubleValueArray)->dimSizes[1] != maxNumberOfValues) {
+
+			err = NumericArrayResize(fD, 2, (UHandle*)DoubleValueArray, nameCount * maxNumberOfValues);
+			if (err != noErr) return err;
+			(**DoubleValueArray)->dimSizes[0] = nameCount;
+			(**DoubleValueArray)->dimSizes[1] = maxNumberOfValues;
+		}
+	}
+
+	// 4. Prepare ResultArray and its nested arrays.
+	//bool useResultArray = (filter & (out_filter::pviAll & ~out_filter::pviFieldValues)) != 0;
+	bool useResultArray = (filter & out_filter::pviAll) != 0;
+	if (useResultArray && ResultArray) {
+		if (!*ResultArray || !**ResultArray || (**ResultArray)->dimSize != nameCount) {
+			// Recreate ResultArray if it doesn't exist or has the wrong size.
+			if (*ResultArray) {
+				for (uInt32 i = 0; i < (**ResultArray)->dimSize; i++) {
+					sResult* currentResult = &(**ResultArray)->result[i];
+					err += CleanupResult(currentResult);
+				}
+				if (*ResultArray && DSCheckHandle(*ResultArray) == noErr)
+					err += DSDisposeHandle(*ResultArray);
+				*ResultArray = nullptr;
+			}
+			// LabVIEW array handles use a 4-byte (size_t) dimSize header.
+			if (nameCount > 0) {
+				const size_t totalSize =
+					sizeof(sResultArray) +
+					(static_cast<size_t>(nameCount) - 1) * sizeof(sResult);
+				*ResultArray = reinterpret_cast<sResultArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+			}
+			if (!(*ResultArray)) {
+				DbgTime(); CaLabDbgPrintf("Error: Memory allocation failed for ResultArray in prepareOutputArrays.");
+				return mFullErr;
+			}
+			(**ResultArray)->dimSize = nameCount;
+			completeInitNeeded = true;  // A full initialization is needed after recreation.
+		}
+
+		// Determine which indices to initialize.
+		const std::vector<uInt32> indicesToInit = completeInitNeeded ?
+			makeIndexRange(nameCount) : changedIndices;
+
+		// Initialize only the relevant elements.
+		for (uInt32 idx : indicesToInit) {
+			if (idx >= nameCount) continue;
+
+			sResult* currentResult = &(**ResultArray)->result[idx];
+
+			// Copy or update the PVName.
+			LStrHandle pvLStr = (**PvNameArray)->elt[idx];
+			if (!currentResult->PVName || LStrLen(*currentResult->PVName) != LStrLen(*pvLStr) ||
+				memcmp(LStrBuf(*currentResult->PVName), LStrBuf(*pvLStr), LStrLen(*pvLStr)) != 0) {
+
+				err = NumericArrayResize(uB, 1, (UHandle*)&currentResult->PVName, (*pvLStr)->cnt);
+				if (err != noErr) return err;
+				memcpy(LStrBuf(*currentResult->PVName), LStrBuf(*pvLStr), LStrLen(*pvLStr));
+				LStrLen(*currentResult->PVName) = LStrLen(*pvLStr);
+			}
+
+			// Prepare the string array within the Result cluster.
+			if (filter & out_filter::pviValuesAsString && maxNumberOfValues > 0) {
+				if (!currentResult->StringValueArray || !*currentResult->StringValueArray ||
+					(*currentResult->StringValueArray)->dimSize != maxNumberOfValues) {
+
+					if (currentResult->StringValueArray) DeleteStringArray(currentResult->StringValueArray);
+					const size_t totalSize =
+						sizeof(sStringArray) +
+						(static_cast<size_t>(maxNumberOfValues) - 1) * sizeof(LStrHandle);
+					currentResult->StringValueArray = reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+					if (currentResult->StringValueArray) (*currentResult->StringValueArray)->dimSize = maxNumberOfValues;
+				}
+			}
+
+			// Prepare the numeric array within the Result cluster.
+			if (filter & out_filter::pviValuesAsNumber) {
+				if (!currentResult->ValueNumberArray || !*currentResult->ValueNumberArray ||
+					(*currentResult->ValueNumberArray)->dimSize != maxNumberOfValues) {
+
+					err = NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, maxNumberOfValues);
+					if (err != noErr) return err;
+					if (currentResult && *currentResult->ValueNumberArray) {
+						(*currentResult->ValueNumberArray)->dimSize = maxNumberOfValues;
+					}
+				}
+			}
+		}
+	}
+	return noErr;
+}
+
+
+// =================================================================================
+// Utility & Debugging Functions
+// =================================================================================
+
 MgErr CaLabDbgPrintf(const char* format, ...) {
 	int done = 0;
 #if defined _WIN32 || defined _WIN64
@@ -1959,10 +4129,10 @@ MgErr CaLabDbgPrintf(const char* format, ...) {
 #endif
 	va_list listPointer;
 	va_start(listPointer, format);
-	if (pCaLabDbgFile) {
-		done = vfprintf(pCaLabDbgFile, format, listPointer);
-		fprintf(pCaLabDbgFile, "\n");
-		fflush(pCaLabDbgFile);
+	if (Globals::getInstance().pCaLabDbgFile) {
+		done = vfprintf(Globals::getInstance().pCaLabDbgFile, format, listPointer);
+		fprintf(Globals::getInstance().pCaLabDbgFile, "\n");
+		fflush(Globals::getInstance().pCaLabDbgFile);
 	}
 	else {
 		done = DbgPrintfv(format, listPointer);
@@ -1971,28 +4141,31 @@ MgErr CaLabDbgPrintf(const char* format, ...) {
 	return done;
 }
 
-// write current time stamp into debug window
 void DbgTime(void) {
 #ifdef _DEBUG
 	time_t ltime;
 	ltime = time(NULL);
-	CaLabDbgPrintf("------------------------------");
-	CaLabDbgPrintf("%s", asctime(localtime(&ltime)));
+	char* timestr = asctime(localtime(&ltime));
+	if (timestr) {
+		CaLabDbgPrintf("------------------------------");
+		size_t len = strlen(timestr);
+		if (len > 0 && timestr[len - 1] == '\n') {
+			timestr[len - 1] = '\0';
+		}
+		CaLabDbgPrintf("%s", timestr);
+	}
 #endif
 }
 
-// DbgPrintf wrapper for debug mode only
-//    format: format specifier
-//    ...: additional arguments
-MgErr CaLabDbgPrintfD(const char* format, ...) {
+MgErr CaLabDbgPrintfD([[maybe_unused]] const char* format, ...) {
 	int done = 0;
 #ifdef _DEBUG
 	va_list listPointer;
 	va_start(listPointer, format);
-	if (pCaLabDbgFile) {
-		done = vfprintf(pCaLabDbgFile, format, listPointer);
-		fprintf(pCaLabDbgFile, "\n");
-		fflush(pCaLabDbgFile);
+	if (Globals::getInstance().pCaLabDbgFile) {
+		done = vfprintf(Globals::getInstance().pCaLabDbgFile, format, listPointer);
+		fprintf(Globals::getInstance().pCaLabDbgFile, "\n");
+		fflush(Globals::getInstance().pCaLabDbgFile);
 	}
 	else {
 		done = DbgPrintfv(format, listPointer);
@@ -2002,1474 +4175,307 @@ MgErr CaLabDbgPrintfD(const char* format, ...) {
 	return done;
 }
 
-// callback of LabVIEW when any caLab-VI is loaded
-//    instanceState: undocumented pointer
-extern "C" EXPORT MgErr reserved(InstanceDataPtr * instanceState) {
-	reservedCounter++;
-	return 0;
-}
-
-// callback of LV when any caLab-VI is unloaded
-//    instanceState: undocumented pointer
-extern "C" EXPORT MgErr unreserved(InstanceDataPtr * instanceState) {
-	if (reservedCounter > 0) {
-		//CaLabDbgPrintf("unreserved %d", (uInt32)*instanceState);
-		reservedCounter--;
-	}
-	else
-		CaLabDbgPrintf("\"unreserved()\" called too often!");
-	return 0;
-}
-
-// callback of LV when any caLab-VI is aborted
-//    instanceState: undocumented pointer
-extern "C" EXPORT MgErr aborted(InstanceDataPtr * instanceState) {
-	return 0;
-}
-
-// validate pointer
-int valid(void* pointer) {
-	if (pointer != NULL) {
-		try {
-			return ((calabItem*)pointer)->validAddress == (void*)pointer;
-		}
-		catch (std::exception& e) {
-			DbgTime(); CaLabDbgPrintf("Error: %s", e.what());
-		}
-	}
-	return false;
-}
-
-// callback of EPICS for changed connection state
-//    args:   contains pointer to data object
-void connectionChanged(connection_handler_args args) {
-	// Don't enter if library terminates
-	if (stopped)
-		return;
-	try {
-		calabItem* item = (calabItem*)ca_puser(args.chid);
-		if (item)
-			item->itemConnectionChanged(args);
-	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-}
-
-// callback for changed EPICS values
-//    args:   contains pointer to data object
-void valueChanged(evargs args) {
-	// Don't enter if library terminates
-	if (stopped)
-		return;
-	try {
-		calabItem* item = (calabItem*)ca_puser(args.chid);
-		if (item)
-			item->itemValueChanged(args);
-	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-}
-
-// callback for finished put task
-//    args:   contains pointer to data object
-void putState(evargs args) {
-	// Don't enter if library terminates
-	if (stopped)
-		return;
-	calabItem* item = (calabItem*)ca_puser(args.chid);
-	if (item) {
-		item->setError(args.status);
-		item->putReadBack = true;
+void setLVString(LStrHandle& handle, const std::string& text) {
+	MgErr err = noErr;
+	size_t len = text.size();
+	if (!handle) {
+		handle = (LStrHandle)DSNewHandle(static_cast<uInt32>(sizeof(int32) + len));
+		if (!handle) return;
 	}
 	else {
-		CaLabDbgPrintf("putState got corrupt evargs");
+		err = DSSetHandleSize(handle, static_cast<uInt32>(sizeof(int32) + len));
+		if (err != noErr) return;
 	}
+	(*handle)->cnt = static_cast<int32>(len);
+	if (len)
+		memcpy((*handle)->str, text.data(), len);
 }
 
-// check whether all data objects got values
-//    maxNumberOfValues: maximum number of values in single array across all read arrays
-//    PvIndexArray: Pointer array of data objects
-//    Timeout: time out for check values
-//    all: ignore PvIndexArray and check full list of known data objects
-void wait4value(uInt32& maxNumberOfValues, sLongArrayHdl* PvIndexArray, time_t Timeout, bool all = false) {
-	time_t stop = time(nullptr) + Timeout;
-	calabItem* currentItem;
-	time_t timeout;
-	uInt32 counter;
-	bool isFirstRun = true;
-	while ((timeout = time(nullptr)) < stop) {
-		counter = 1;
-		maxNumberOfValues = 0;
-		if (all) {
-			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-				currentItem = (calabItem*)(**PvIndexArray)->elt[i];
-				if (!valid(currentItem)) {
-					DbgTime(); CaLabDbgPrintf("Error in wait4value all: Index array is corrupted.");
-					continue;
-				}
-				if (isFirstRun) {
-					currentItem->isPassive = false;
-					propertyMapIterator nameIterator = currentItem->properties.begin();
-					while (nameIterator != currentItem->properties.end()) {
-						pvMapIterator myItemIterator = myItems.find(currentItem->szName + std::string(".") + nameIterator->first);
-						if (myItemIterator != myItems.end()) {
-							myItemIterator->second->isPassive = false;
-						}
-						nameIterator++;
-					}
-				}
-				if (currentItem->hasValue) {
-					if (!currentItem->parent) {
-						counter++;
-						if (currentItem->numberOfValues > maxNumberOfValues) {
-							maxNumberOfValues = currentItem->numberOfValues;
-						}
-					}
-				}
-				else {
-					continue;
-				}
-			}
-		}
-		else {
-			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-				currentItem = (calabItem*)(**PvIndexArray)->elt[i];
-				if (!valid(currentItem)) {
-					DbgTime(); CaLabDbgPrintf("Error in wait4value: Index array is corrupted.");
-					continue;
-				}
-				if (isFirstRun) {
-					currentItem->isPassive = false;
-					propertyMapIterator nameIterator = currentItem->properties.begin();
-					while (nameIterator != currentItem->properties.end()) {
-						pvMapIterator myItemIterator = myItems.find(currentItem->szName + std::string(".") + nameIterator->first);
-						if (myItemIterator != myItems.end()) {
-							myItemIterator->second->isPassive = false;
-						}
-						nameIterator++;
-					}
-				}
-				if (currentItem->hasValue) {
-					if (!currentItem->parent) {
-						counter++;
-						int32 err = currentItem->lock();
-						if (err) CaLabDbgPrintf("lock failed on currentItem in wait4value");
-						if (currentItem->numberOfValues > maxNumberOfValues)
-							maxNumberOfValues = currentItem->numberOfValues;
-						currentItem->unlock();
-					}
-				}
-			}
-		}
-		isFirstRun = false;
-		if (counter > (**PvIndexArray)->dimSize)
-			break;
-		epicsThreadSleep(.001);
-	}
-	if (timeout >= stop) {
-		//CaLabDbgPrintfD("timeout in wait4value");
-		if (all) {
-			globals.mapLock.lock_shared();
-			for (auto& iter : myItems) {
-				currentItem = iter.second;
-				if (!valid(currentItem))
-					continue;
-				if (!currentItem->hasValue) {
-					if (currentItem->parent && currentItem->parent->hasValue) {
-						currentItem->hasValue = true;
-						currentItem->isPassive = true;
-					}
-				}
-			}
-			globals.mapLock.unlock_shared();
-		}
-		else {
-			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-				currentItem = (calabItem*)(**PvIndexArray)->elt[i];
-				if (!valid(currentItem))
-					continue;
-				if (!currentItem->hasValue) {
-					if (currentItem->parent && currentItem->parent->hasValue) {
-						currentItem->hasValue = true;
-						currentItem->isPassive = true;
-					}
-				}
-			}
-		}
-	}
-}
+void fillResultFromPv(PVItem* pvItem, sResult* target) {
+	if (!pvItem || !target) return;
 
-// read EPICS PVs
-//    PvNameArray:            handle of a array of PV names
-//    FieldNameArray:         handle of a array of optional field names
-//    PvIndexArray:           handle of a array of indexes
-//    Timeout:                EPICS event timeout in seconds
-//    ResultArray:            handle of a result-cluster (result object)
-//    FirstStringValue:       handle of a array of first values converted to a string
-//    FirstDoubleValue:       handle of a array of first values converted to a double value
-//    DoubleValueArray:       handle of a 2d array of double values
-//    DoubleValueArraySize:   array size of DoubleValueArray
-//    CommunicationStatus:    status of Channel Access communication; 0 = no problem; 1 = any problem occurred
-//    FirstCall:              indicator for first call
-//    NoMDEL:                 indicator for ignoring monitor dead band (TRUE: use caget instead of camonitor)
-extern "C" EXPORT void getValue(sStringArrayHdl * PvNameArray, sStringArrayHdl * FieldNameArray, sLongArrayHdl * PvIndexArray, double Timeout, sResultArrayHdl * ResultArray, sStringArrayHdl * FirstStringValue, sDoubleArrayHdl * FirstDoubleValue, sDoubleArray2DHdl * DoubleValueArray, LVBoolean * CommunicationStatus, LVBoolean * FirstCall, LVBoolean * NoMDEL = 0, LVBoolean * IsInitialized = 0, int filter = 0) {
-	epicsMutexLock(getLock);
-	// Add validation for field values requiring field names
-	if ((filter & out_filter::pviFieldValues) && !(filter & out_filter::pviFieldNames)) {
-		// Disable field values if field names not enabled
-        filter &= ~out_filter::pviFieldValues;
-    }
-	if (filter <= 0) {
-		filter = 0xffff;
-	}
-	try {
-		if (stopped) {
-			epicsMutexUnlock(getLock);
-			return;
-		}
-		if (!*PvNameArray || (**PvNameArray)->dimSize == 0 || !(**PvNameArray)->elt[0]) {
-			DbgTime(); CaLabDbgPrintf("Warning: caLabGet needs any PV name");
-			epicsMutexUnlock(getLock);
-			return;
-		}
-		sResult* currentResult;
-		calabItem* currentItem;
-		MgErr err = noErr;
-		uInt32 maxNumberOfValues = 0;
-		uInt32 doubleValueArrayIndex = 0;
-		*CommunicationStatus = 0;
-		if (bCaLabPolling)
-			*NoMDEL = true;
-		if (*NoMDEL)
-			*FirstCall = true;
-		if ((*PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize)) {
-			*FirstCall = true;
-			*IsInitialized = false;
-		}
-		if (!*IsInitialized) {
-			if (*FirstCall) {
-				// START: RESET LV VARIABLES
-				if (*ResultArray && (**ResultArray)->dimSize != (**PvNameArray)->dimSize) {
-					for (uInt32 i = 0; i < (**ResultArray)->dimSize; i++) {
-						currentResult = &(**ResultArray)->result[i];
-						if (currentResult->PVName)
-							err += DSDisposeHandle(currentResult->PVName);
-						currentResult->PVName = 0x0;
-						if (currentResult->StringValueArray)
-							err += DeleteStringArray(currentResult->StringValueArray);
-						currentResult->StringValueArray = 0x0;
-						if (currentResult->ValueNumberArray)
-							err += DSDisposeHandle(currentResult->ValueNumberArray);
-						currentResult->ValueNumberArray = 0x0;
-						if (currentResult->StatusString)
-							err += DSDisposeHandle(currentResult->StatusString);
-						currentResult->StatusString = 0x0;
-						if (currentResult->SeverityString)
-							err += DSDisposeHandle(currentResult->SeverityString);
-						currentResult->SeverityString = 0x0;
-						if (currentResult->TimeStampString)
-							err += DSDisposeHandle(currentResult->TimeStampString);
-						currentResult->TimeStampString = 0x0;
-						if (currentResult->FieldNameArray)
-							err += DSDisposeHandle(currentResult->FieldNameArray);
-						currentResult->FieldNameArray = 0x0;
-						if (currentResult->FieldValueArray)
-							err += DSDisposeHandle(currentResult->FieldValueArray);
-						currentResult->FieldValueArray = 0x0;
-						if (currentResult->ErrorIO.source)
-							err += DSDisposeHandle(currentResult->ErrorIO.source);
-						currentResult->ErrorIO.source = 0x0;
-					}
-					if (*ResultArray)
-						err += DSDisposeHandle(*ResultArray);
-					*ResultArray = 0x0;
-					if (*FirstStringValue) {
-						for (uInt32 j = 0; j < (**FirstStringValue)->dimSize; j++) {
-							err += DSDisposeHandle((**FirstStringValue)->elt[j]);
-							(**FirstStringValue)->elt[j] = 0x0;
-						}
-						err += DSDisposeHandle(*FirstStringValue);
-						*FirstStringValue = 0x0;
-					}
-					if (*FirstDoubleValue) {
-						err += DSDisposeHandle(*FirstDoubleValue);
-						*FirstDoubleValue = 0x0;
-					}
-					if (*DoubleValueArray) {
-						err += DSDisposeHandle(*DoubleValueArray);
-						*DoubleValueArray = 0x0;
-					}
-				}
-				if (!*ResultArray) {
-					*ResultArray = (sResultArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(sResult[1]));
-					(**ResultArray)->dimSize = (**PvNameArray)->dimSize;
-				}
-				if (!PvIndexArray || !*PvIndexArray || DSCheckHandle(PvIndexArray) != noErr || (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize) {
-					err += NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, (**PvNameArray)->dimSize);
-					(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
-				}
-				if (err != noErr) {
-					DbgTime(); CaLabDbgPrintfD("Error: Bad memory clean up. (%d)", err);
-				}
-				for (uInt32 i = 0; i < (**PvNameArray)->dimSize; i++) {
-					currentItem = globals.add(PvNameArray, (**PvNameArray)->elt[i], *FieldNameArray, filter);
-					if (!currentItem) {
-						CaLabDbgPrintf("Error in creating PV %.*s", (*(**PvNameArray)->elt[i])->cnt, (*(**PvNameArray)->elt[i])->str);
-						epicsMutexUnlock(getLock);
-						return;
-					}
-					currentItem->isPassive = false;
-					(**PvIndexArray)->elt[i] = (uint64_t)currentItem;
-					err += NumericArrayResize(uB, 1, (UHandle*)&(**ResultArray)->result[i].PVName, (*currentItem->name)->cnt);
-					memcpy((*(**ResultArray)->result[i].PVName)->str, (*currentItem->name)->str, (*currentItem->name)->cnt);
-					(*(**ResultArray)->result[i].PVName)->cnt = (*currentItem->name)->cnt;
-				}
-				wait4value(maxNumberOfValues, PvIndexArray, (time_t)Timeout, true);
-				if (!maxNumberOfValues) {
-					for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-						currentItem = (calabItem*)(**PvIndexArray)->elt[i];
-						if (!valid(currentItem)) {
-							DbgTime(); CaLabDbgPrintf("Error in getValue no max #: Index array is corrupted.");
-							continue;
-						}
-						int32 err = currentItem->lock();
-						if (err) CaLabDbgPrintf("lock failed on timout in getvalue");
-						currentResult = &(**ResultArray)->result[i];
-						if (filter & out_filter::pviError && currentItem->ErrorIO.source) {
-							if (!currentResult->ErrorIO.source || (*currentResult->ErrorIO.source)->cnt != (*currentItem->ErrorIO.source)->cnt) {
-								NumericArrayResize(uB, 1, (UHandle*)&currentResult->ErrorIO.source, (*currentItem->ErrorIO.source)->cnt);
-								(*currentResult->ErrorIO.source)->cnt = (*currentItem->ErrorIO.source)->cnt;
-							}
-							memcpy((*currentResult->ErrorIO.source)->str, (*currentItem->ErrorIO.source)->str, (*currentItem->ErrorIO.source)->cnt);
-							currentResult->ErrorIO.code = currentItem->ErrorIO.code;
-							currentResult->ErrorIO.status = currentItem->ErrorIO.status;
-						}
-						if (currentItem->ErrorIO.code)
-							*CommunicationStatus = 1;
-						currentItem->unlock();
-					}
-					epicsMutexUnlock(getLock);
-					return;
-				}
-				if (!*FirstStringValue || (**FirstStringValue)->dimSize != (**PvNameArray)->dimSize) {
-					*FirstStringValue = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(LStrHandle[1]));
-					(**FirstStringValue)->dimSize = (**PvNameArray)->dimSize;
-				}
-				if (!*FirstDoubleValue || (**FirstDoubleValue)->dimSize != (**PvNameArray)->dimSize) {
-					*FirstDoubleValue = (sDoubleArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(double[1]));
-					(**FirstDoubleValue)->dimSize = (**PvNameArray)->dimSize;
-				}
-				if (!*DoubleValueArray || (**DoubleValueArray)->dimSizes[0] != (uInt32)(**PvNameArray)->dimSize || (**DoubleValueArray)->dimSizes[1] != maxNumberOfValues) {
-					err += NumericArrayResize(fD, 2, (UHandle*)DoubleValueArray, (**PvNameArray)->dimSize * maxNumberOfValues);
-					(**DoubleValueArray)->dimSizes[0] = (int32)(**PvNameArray)->dimSize;
-					(**DoubleValueArray)->dimSizes[1] = maxNumberOfValues;
-				}
-			}   // END: RESET LV VARIABLES
-			else {
-				if (*NoMDEL) {
-					wait4value(maxNumberOfValues, PvIndexArray, (time_t)Timeout);
-				}
-				if (*DoubleValueArray) {
-					maxNumberOfValues = (**DoubleValueArray)->dimSizes[1];
-				}
-				else {
-					*CommunicationStatus = 1;
-					epicsMutexUnlock(getLock);
-					return;
-				}
-			}
-		}
-		else {
-			if (*DoubleValueArray) {
-				maxNumberOfValues = (**DoubleValueArray)->dimSizes[1];
-			}
-		}
-		if (*PvIndexArray && **PvIndexArray) {
-			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; i++) {
-				currentItem = (calabItem*)(**PvIndexArray)->elt[i];
-				if (!*FirstCall && !currentItem->fieldModified[PvNameArray].load()) {
-					if (currentItem->ErrorIO.code)
-						*CommunicationStatus = 1;
-					continue;
-				}
-				if (!valid(currentItem)) {
-					*CommunicationStatus = 1;
-					DbgTime(); CaLabDbgPrintf("Error in getValue: Index array is corrupted.");
-					epicsMutexUnlock(getLock);
-					return;
-				}
-				int32 err = currentItem->lock();
-				if (err) CaLabDbgPrintf("lock failed on timout in getvalue 2");
-				currentResult = &(**ResultArray)->result[i];
-				if (filter & out_filter::pviStatusAsString && currentItem->StatusString) {
-					if (!currentResult->StatusString || (*currentResult->StatusString)->cnt != (*currentItem->StatusString)->cnt) {
-						NumericArrayResize(uB, 1, (UHandle*)&currentResult->StatusString, (*currentItem->StatusString)->cnt);
-						(*currentResult->StatusString)->cnt = (*currentItem->StatusString)->cnt;
-					}
-					memcpy((*currentResult->StatusString)->str, (*currentItem->StatusString)->str, (*currentItem->StatusString)->cnt);
-				}
-				if (filter & out_filter::pviStatusAsNumber) {
-					currentResult->StatusNumber = currentItem->StatusNumber;
-				}
-				if (filter & out_filter::pviSeverityAsString && currentItem->SeverityString) {
-					if (!currentResult->SeverityString || (*currentResult->SeverityString)->cnt != (*currentItem->SeverityString)->cnt) {
-						NumericArrayResize(uB, 1, (UHandle*)&currentResult->SeverityString, (*currentItem->SeverityString)->cnt);
-						(*currentResult->SeverityString)->cnt = (*currentItem->SeverityString)->cnt;
-					}
-					memcpy((*currentResult->SeverityString)->str, (*currentItem->SeverityString)->str, (*currentItem->SeverityString)->cnt);
-				}
-				if (filter & out_filter::pviSeverityAsNumber) {
-					currentResult->SeverityNumber = currentItem->SeverityNumber;
-				}
-				if (filter & out_filter::pviTimestampAsString && currentItem->TimeStampString) {
-					if (!currentResult->TimeStampString || (*currentResult->TimeStampString)->cnt != (*currentItem->TimeStampString)->cnt) {
-						NumericArrayResize(uB, 1, (UHandle*)&currentResult->TimeStampString, (*currentItem->TimeStampString)->cnt);
-						(*currentResult->TimeStampString)->cnt = (*currentItem->TimeStampString)->cnt;
-					}
-					memcpy((*currentResult->TimeStampString)->str, (*currentItem->TimeStampString)->str, (*currentItem->TimeStampString)->cnt);
-				}
-				if (filter & out_filter::pviTimestampAsNumber) {
-					currentResult->TimeStampNumber = currentItem->TimeStampNumber;
-				}
-				if (filter & out_filter::pviError && currentItem->ErrorIO.source) {
-					if (!currentResult->ErrorIO.source || (*currentResult->ErrorIO.source)->cnt != (*currentItem->ErrorIO.source)->cnt) {
-						NumericArrayResize(uB, 1, (UHandle*)&currentResult->ErrorIO.source, (*currentItem->ErrorIO.source)->cnt);
-						(*currentResult->ErrorIO.source)->cnt = (*currentItem->ErrorIO.source)->cnt;
-					}
-					memcpy((*currentResult->ErrorIO.source)->str, (*currentItem->ErrorIO.source)->str, (*currentItem->ErrorIO.source)->cnt);
-					currentResult->ErrorIO.code = currentItem->ErrorIO.code;
-					currentResult->ErrorIO.status = currentItem->ErrorIO.status;
-				}
-				if (currentItem->ErrorIO.code)
-					*CommunicationStatus = 1;
-				if (currentItem->numberOfValues <= 0) {
-					currentItem->unlock();
-					continue;
-				}
-				if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || (*currentResult->StringValueArray)->dimSize != currentItem->numberOfValues)) {
-					if (currentResult->StringValueArray) {
-						DeleteStringArray(currentResult->StringValueArray);
-					}
-					currentResult->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + currentItem->numberOfValues * sizeof(LStrHandle[1]));
-					(*currentResult->StringValueArray)->dimSize = currentItem->numberOfValues;
-				}
-				if (filter & out_filter::pviValuesAsNumber && (!currentResult->ValueNumberArray || (*currentResult->ValueNumberArray)->dimSize != currentItem->numberOfValues)) {
-					err += NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, currentItem->numberOfValues);
-					(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
-				}
-				for (uInt32 j = 0; maxNumberOfValues > 0 && j < currentItem->numberOfValues; j++) {
-					if (filter & out_filter::pviValuesAsString && !currentItem->stringValueArray) {
-						// was connected (user event) and is waiting for reconnect
-						epicsMutexUnlock(getLock);
-						return;
-					}
-					else if (filter & out_filter::pviValuesAsNumber && !currentItem->doubleValueArray) {
-						// was connected (user event) and is waiting for reconnect
-						epicsMutexUnlock(getLock);
-						return;
-					}
-					if (filter & out_filter::pviValuesAsNumber && !(*currentItem->stringValueArray)->elt[j]) {
-						if (maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
-							doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
-						continue;
-					}
-					if (filter & out_filter::pviValuesAsString && (!currentResult->StringValueArray || !(*currentResult->StringValueArray)->elt[j] || !(*currentItem->stringValueArray)->elt[j] || (*(*currentItem->stringValueArray)->elt[j])->cnt != (*(*currentResult->StringValueArray)->elt[j])->cnt)) {
-						if ((*currentItem->stringValueArray)->elt[j]) {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], (*(*currentItem->stringValueArray)->elt[j])->cnt);
-							(*(*currentResult->StringValueArray)->elt[j])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
-						}
-						else {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], 1);
-							(*(*currentResult->StringValueArray)->elt[j])->cnt = 1;
-						}
-					}
-					if (filter & out_filter::pviValuesAsString) {
-						if ((*currentItem->stringValueArray)->elt[j]) {
-							memcpy((*(*currentResult->StringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
-						}
-						else {
-							memcpy((*(*currentResult->StringValueArray)->elt[j])->str, "?", 1);
-						}
-					}
-					if (filter & out_filter::pviValuesAsNumber) {
-						(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
-					}
-					if (filter & out_filter::firstValueAsString && j == 0) {
-						if (currentResult->StringValueArray) {
-							err += DSCopyHandle(&(**FirstStringValue)->elt[i], (*currentResult->StringValueArray)->elt[j]);
-						}
-						else {
-							err += NumericArrayResize(uB, 1, (UHandle*)&(**FirstStringValue)->elt[i], (*(*currentItem->stringValueArray)->elt[j])->cnt);
-							if (err == noErr) {
-								memcpy((*(**FirstStringValue)->elt[i])->str, (*(*currentItem->stringValueArray)->elt[j])->str, (*(*currentItem->stringValueArray)->elt[j])->cnt);
-								(*(**FirstStringValue)->elt[i])->cnt = (*(*currentItem->stringValueArray)->elt[j])->cnt;
-							}
-						}
-					}
-					if (filter & out_filter::firstValueAsNumber && j == 0) {
-						(**FirstDoubleValue)->elt[i] = (*currentItem->doubleValueArray)->elt[j];
-					}
-					if (filter & out_filter::valueArrayAsNumber) {
-						if (doubleValueArrayIndex < (**DoubleValueArray)->dimSizes[0] * (**DoubleValueArray)->dimSizes[1]) {
-							(**DoubleValueArray)->elt[doubleValueArrayIndex++] = (*currentItem->doubleValueArray)->elt[j];
-						}
-						else {
-							// array with mixed data types must be padded
-							doubleValueArrayIndex++;
-						}
-					}
-				}
-				if (filter & out_filter::pviElements) {
-					currentResult->valueArraySize = currentItem->numberOfValues;
-				}
-				if (filter & out_filter::valueArrayAsNumber && maxNumberOfValues > 0 && currentItem->numberOfValues != maxNumberOfValues)
-					doubleValueArrayIndex += maxNumberOfValues - currentItem->numberOfValues;
-				if (filter & out_filter::pviFieldNames && !currentResult->FieldNameArray && FieldNameArray && *FieldNameArray) {
-					if (currentResult->FieldNameArray)
-						err += DeleteStringArray(currentResult->FieldNameArray);
-					currentResult->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (**FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-					(*currentResult->FieldNameArray)->dimSize = (**FieldNameArray)->dimSize;
-					for (uInt32 l = 0; l < (**FieldNameArray)->dimSize; l++) {
-						NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], (*(**FieldNameArray)->elt[l])->cnt);
-						(*(*currentResult->FieldNameArray)->elt[l])->cnt = (*(**FieldNameArray)->elt[l])->cnt;
-						memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, (*(**FieldNameArray)->elt[l])->str, (*(**FieldNameArray)->elt[l])->cnt);
-					}
-				}
-				if (filter & out_filter::pviFieldValues && (*FirstCall || currentItem->fieldModified[PvNameArray].load()) && (FieldNameArray && *FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize) && currentResult->FieldNameArray) {
-					if (currentResult->FieldValueArray)
-						err += DeleteStringArray(currentResult->FieldValueArray);
-					currentResult->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + (**FieldNameArray)->dimSize * sizeof(LStrHandle[1]));
-					if (currentResult->FieldValueArray && *currentResult->FieldValueArray) {
-						(*currentResult->FieldValueArray)->dimSize = (**FieldNameArray)->dimSize;
-						for (uInt32 l = 0; l < (**FieldNameArray)->dimSize; l++) {
-							propertyMapIterator nameIterator = currentItem->properties.find(std::string((char*)(*(*currentResult->FieldNameArray)->elt[l])->str, (size_t)(*(*currentResult->FieldNameArray)->elt[l])->cnt));
-							if (nameIterator != currentItem->properties.end()) {
-								std::string fieldValue = nameIterator->second;
-								size_t fieldValueLength = fieldValue.size();
-								if (fieldValueLength) {
-									if (!(*currentResult->FieldValueArray)->elt[l] || ((size_t)(*(*currentResult->FieldValueArray)->elt[l])->cnt != fieldValueLength)) {
-										err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
-										(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
-									}
-									memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
-								}
-								else {
-									err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], 0);
-									(*(*currentResult->FieldValueArray)->elt[l])->cnt = 0;
-								}
-							}
-							else {
-								err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], 0);
-								(*(*currentResult->FieldValueArray)->elt[l])->cnt = 0;
-							}
-						}
-					}
-				}
-				currentItem->fieldModified[PvNameArray] = false;
-				currentItem->unlock();
-				if (*NoMDEL) {
-					currentItem->disconnect();
-				}
-			}
-		}
-	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-	epicsMutexUnlock(getLock);
-}
+	setLVString(target->PVName, pvItem->getName());
+	auto strValues = pvItem->dbrValue2String();
+	auto numValues = pvItem->dbrValue2Double();
 
-// creates new LV user event
-//    RefNum:            reference number of event
-//    ResultArrayHdl:    target item
-extern "C" EXPORT void addEvent(LVUserEventRef * RefNum, sResult * ResultPtr) {
-	// Don't enter if library terminates
-	if (stopped)
-		return;
-	if (!ResultPtr
-		|| DSCheckPtr(ResultPtr) != noErr
-		|| !ResultPtr->PVName
-		|| DSCheckHandle(ResultPtr->PVName) != noErr) {
-		return;
-	}
-	calabItem* currentItem = 0x0;
-	currentItem = globals.add(0x0, ResultPtr->PVName, 0x0, 0);
-	int32 err = currentItem->lock();
-	if (err) CaLabDbgPrintf("lock failed on timout in addEvent");
-	currentItem->RefNum.push_back(*RefNum);
-	currentItem->eventResultCluster.push_back(ResultPtr);
-	currentItem->unlock();
-	currentItem->postEvent();
-}
+	const uInt32 valueCount = static_cast<uInt32>(numValues.size());
+	target->valueArraySize = valueCount;
 
-// destroys all eventResultClusters in all PVs associated with an event
-//    RefNum:            reference number of event
-//    ResultArrayHdl:    target item
-extern "C" EXPORT void destroyEvent(LVUserEventRef * RefNum) {
-	globals.mapLock.lock_shared();
-	for (auto& item : myItems) {
-		calabItem* currentItem = item.second;
-		if (!valid(currentItem)) {
-			CaLabDbgPrintf("destroyevent currentitem invalid");
-			continue;
+	if (!strValues.empty()) {
+		if (!target->StringValueArray || !*target->StringValueArray || (*target->StringValueArray)->dimSize != valueCount) {
+			if (target->StringValueArray) DeleteStringArray(target->StringValueArray);
+			if (valueCount > 0) {
+				const size_t totalSize =
+					sizeof(sStringArray) +
+					(valueCount - 1) * sizeof(LStrHandle);
+				target->StringValueArray = 	reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+				if (target->StringValueArray)
+					(**target->StringValueArray).dimSize = valueCount;
+			}
 		}
-		currentItem->lock();
-		std::vector<LVUserEventRef>::iterator ref = currentItem->RefNum.begin();
-		std::vector<sResult*>::iterator it = currentItem->eventResultCluster.begin();
-		while (ref != currentItem->RefNum.end()) {
-			if (*ref == *RefNum) {
-				ref = currentItem->RefNum.erase(ref);
-				it = currentItem->eventResultCluster.erase(it);
+		if (target->StringValueArray && *target->StringValueArray) {
+			for (uInt32 i = 0; i < valueCount; ++i) {
+				setLVString((*target->StringValueArray)->elt[i], strValues[i]);
+			}
+		}
+	}
+
+	if (!numValues.empty()) {
+		if (!target->ValueNumberArray || !*target->ValueNumberArray || (*target->ValueNumberArray)->dimSize != valueCount) {
+			NumericArrayResize(fD, 1, (UHandle*)&target->ValueNumberArray, valueCount);
+			if (target->ValueNumberArray) (*target->ValueNumberArray)->dimSize = valueCount;
+		}
+		if (target->ValueNumberArray && *target->ValueNumberArray) {
+			memcpy((*target->ValueNumberArray)->elt, numValues.data(), valueCount * sizeof(double));
+		}
+	}
+
+	// Status/severity/timestamp
+	setLVString(target->StatusString, pvItem->getStatusAsString());
+	setLVString(target->SeverityString, pvItem->getSeverityAsString());
+	setLVString(target->TimeStampString, pvItem->getTimestampAsString());
+	target->StatusNumber = pvItem->getStatus();
+	target->SeverityNumber = pvItem->getSeverity();
+	target->TimeStampNumber = pvItem->getTimestamp();
+
+	// Fields: names and values from parent’s cache.
+	const auto& fields = pvItem->getFields();
+	if (!fields.empty()) {
+		const uInt32 n = static_cast<uInt32>(fields.size());
+		if (!target->FieldNameArray || !*target->FieldNameArray || (*target->FieldNameArray)->dimSize != n) {
+			if (target->FieldNameArray) DeleteStringArray(target->FieldNameArray);
+			if (n > 0) {
+				const size_t totalSize =
+					sizeof(sStringArray) +                       // dimSize + 1 Element
+					(static_cast<size_t>(n) - 1) * sizeof(LStrHandle); // restliche Elemente
+				target->FieldNameArray = reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+				if (target->FieldNameArray)
+					(**target->FieldNameArray).dimSize = n;
+			}
+
+		}
+		if (!target->FieldValueArray || !*target->FieldValueArray || (*target->FieldValueArray)->dimSize != n) {
+			if (target->FieldValueArray) DeleteStringArray(target->FieldValueArray);
+			if(n > 0) {
+				const size_t totalSize =
+					sizeof(sStringArray) +                       // dimSize + 1 Element
+					(static_cast<size_t>(n) - 1) * sizeof(LStrHandle); // restliche Elemente
+				target->FieldValueArray = reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+				if (target->FieldValueArray)
+					(**target->FieldValueArray).dimSize = n;
+			}
+		}
+		for (uInt32 i = 0; i < n; ++i) {
+			const std::string& fieldName = fields[i].first;
+			if (!target->FieldNameArray || !*target->FieldNameArray || !target->FieldValueArray || !*target->FieldValueArray) break;
+			setLVString((*target->FieldNameArray)->elt[i], fieldName);
+			std::string fieldValue;
+			if (pvItem->tryGetFieldString_callerLocked(fieldName, fieldValue)) {
+				setLVString((*target->FieldValueArray)->elt[i], fieldValue);
 			}
 			else {
-				ref++;
-				it++;
-			}
-		}
-		currentItem->unlock();
-	}
-	globals.mapLock.unlock_shared();
-}
-
-// Write EPICS PV
-//    PvNameArray:        array of PV names
-//    PvIndexArray:       handle of a array of indexes
-//    StringValueArray2D: 2D-array of string values
-//    DoubleValueArray2D: 2D-array of double values
-//    LongValueArray2D:   2D-array of long values
-//    dataType:           type of EPICS channel
-//    Timeout:            EPICS event timeout in seconds
-//    wait4readback:      true = callback will be used to get read back values
-//    ValuesSetInColumns: true = read values set vertically in array
-//    ErrorArray:         array of resulting errors
-//    Status:             0 = no problem; 1 = any problem occurred
-//    FirstCall:          indicator for first call
-//    dataTypes
-//   ===========
-//        # => LabVIEW                          => C++       => EPICS
-//        0 => String                           => char[]    => dbr_string_t
-//        1 => Single-precision, floating-point => float     => dbr_float_t
-//        2 => Double-precision, floating-point => double    => dbr_double_t
-//        3 => Byte signed integer              => char      => dbr_char_t
-//        4 => Word signed integer              => short     => dbr_short_t
-//        5 => Long signed integer              => long      => dbr_long_t
-//        6 => Quad signed integer              => long      => dbr_long_t
-extern "C" EXPORT void putValue(sStringArrayHdl * PvNameArray, sLongArrayHdl * PvIndexArray, sStringArray2DHdl * StringValueArray2D, sDoubleArray2DHdl * DoubleValueArray2D, sLongArray2DHdl * LongValueArray2D, uInt32 DataType, double Timeout, LVBoolean * wait4readback, sErrorArrayHdl * ErrorArray, LVBoolean * Status, LVBoolean * FirstCall) {
-	// Don't enter if library terminates
-	if (stopped)
-		return;
-	epicsMutexLock(putLock);
-	try {
-		calabItem* currentItem = 0x0;
-		uInt32 iNumberOfValueSets = 0;
-		uInt32 iValuesPerSet = 0;
-		uInt32 maxNumberOfValues = 0;
-
-		// Check handles and pointers
-		if (!*PvNameArray || !**PvNameArray || ((uInt32)(**PvNameArray)->dimSize) <= 0) {
-			*Status = 1;
-			DbgTime(); CaLabDbgPrintf("Missing or corrupt PV name array in caLabPut.");
-			epicsMutexUnlock(putLock);
-			return;
-		}
-		if ((*PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize))
-			*FirstCall = true;
-		// calculate data frame
-		switch (DataType) {
-		case 0:
-			if (!*StringValueArray2D) {
-				*Status = 1;
-				DbgTime(); CaLabDbgPrintf("Missing values to write.");
-				epicsMutexUnlock(putLock);
-				return;
-			}
-			if (((*(*(*StringValueArray2D))).dimSizes)[0] == 1 && (**PvNameArray)->dimSize > 1) {
-				iNumberOfValueSets = ((**StringValueArray2D)->dimSizes)[1];
-				iValuesPerSet = ((**StringValueArray2D)->dimSizes)[0];
-			}
-			else {
-				iNumberOfValueSets = ((**StringValueArray2D)->dimSizes)[0];
-				iValuesPerSet = ((**StringValueArray2D)->dimSizes)[1];
-			}
-			break;
-		case 1:
-		case 2:
-			if (!*DoubleValueArray2D) {
-				*Status = 1;
-				DbgTime(); CaLabDbgPrintf("Missing values to write.");
-				epicsMutexUnlock(putLock);
-				return;
-			}
-			if (((*(*(*DoubleValueArray2D))).dimSizes)[0] == 1 && (**PvNameArray)->dimSize > 1) {
-				iNumberOfValueSets = ((**DoubleValueArray2D)->dimSizes)[1];
-				iValuesPerSet = ((**DoubleValueArray2D)->dimSizes)[0];
-			}
-			else {
-				iNumberOfValueSets = ((**DoubleValueArray2D)->dimSizes)[0];
-				iValuesPerSet = ((**DoubleValueArray2D)->dimSizes)[1];
-			}
-			break;
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-			if (!*LongValueArray2D) {
-				*Status = 1;
-				DbgTime(); CaLabDbgPrintf("Missing values to write.");
-				epicsMutexUnlock(putLock);
-				return;
-			}
-			if (((*(*(*LongValueArray2D))).dimSizes)[0] == 1 && (**PvNameArray)->dimSize > 1) {
-				iNumberOfValueSets = ((**LongValueArray2D)->dimSizes)[1];
-				iValuesPerSet = ((**LongValueArray2D)->dimSizes)[0];
-			}
-			else {
-				iNumberOfValueSets = ((**LongValueArray2D)->dimSizes)[0];
-				iValuesPerSet = ((**LongValueArray2D)->dimSizes)[1];
-			}
-			break;
-		default:
-			*Status = 1;
-			DbgTime(); CaLabDbgPrintf("Unknown data type in value array of caLabPut.");
-			epicsMutexUnlock(putLock);
-			return;
-		}
-		if (iNumberOfValueSets > 0) {
-			if (!*ErrorArray || iNumberOfValueSets != (**ErrorArray)->dimSize) {
-				if (!*ErrorArray) {
-					*ErrorArray = (sErrorArrayHdl)DSNewHClr(sizeof(size_t) + iNumberOfValueSets * sizeof(sError[1]));
-					(**ErrorArray)->dimSize = iNumberOfValueSets;
-				}
-				else {
-					DSDisposeHandle(*ErrorArray);
-					*ErrorArray = (sErrorArrayHdl)DSNewHClr(sizeof(size_t) + iNumberOfValueSets * sizeof(sError[1]));
-					(**ErrorArray)->dimSize = iNumberOfValueSets;
-				}
-			}
-		}
-		else {
-			*Status = 1;
-			DbgTime(); CaLabDbgPrintf("Missing values to write.");
-			epicsMutexUnlock(putLock);
-			return;
-		}
-		*Status = 0;
-		if (bCaLabPolling) *wait4readback = false;
-		if (*FirstCall) {
-			if (*PvIndexArray && (**PvIndexArray)->dimSize != (**PvNameArray)->dimSize) {
-				DSDisposeHandle(*PvIndexArray);
-				*PvIndexArray = (sLongArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(uint64_t[1]));
-				(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
-			}
-			else if (!*PvIndexArray) {
-				*PvIndexArray = (sLongArrayHdl)DSNewHClr(sizeof(size_t) + (**PvNameArray)->dimSize * sizeof(uint64_t[1]));
-				(**PvIndexArray)->dimSize = (**PvNameArray)->dimSize;
-			}
-			for (uInt32 i = 0; i < iNumberOfValueSets && i < (**PvNameArray)->dimSize; i++) {
-				currentItem = globals.add(0x0, (**PvNameArray)->elt[i], 0x0, 1);
-				(**PvIndexArray)->elt[i] = (uint64_t)currentItem;
-				currentItem->isPassive = false;
-			}
-			wait4value(maxNumberOfValues, PvIndexArray, (time_t)Timeout);
-		}
-		for (uInt32 row = 0; *PvIndexArray && row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
-			currentItem = (calabItem*)(**PvIndexArray)->elt[row];
-			if (!valid(currentItem)) {
-				*Status = 1;
-				DbgTime(); CaLabDbgPrintf("Error in putValue: Index array is corrupted.");
-				epicsMutexUnlock(putLock);
-				return;
-			}
-			switch (DataType) {
-			case 0:
-				currentItem->put((void*)StringValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *wait4readback);
-				break;
-			case 1:
-			case 2:
-				currentItem->put((void*)DoubleValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *wait4readback);
-				break;
-			case 3:
-			case 4:
-			case 5:
-			case 6:
-				currentItem->put((void*)LongValueArray2D, DataType, row, iValuesPerSet, &(**ErrorArray)->result[row], Timeout, *wait4readback);
-				break;
-			default:
-				// Handled in previous switch-case statement
-				break;
-			}
-		}
-		if (*wait4readback) {
-			time_t stop = time(nullptr) + (time_t)Timeout;
-			uInt32 row;
-			double wait = .01;
-			do {
-				epicsThreadSleep(wait);
-				for (row = 0; *PvIndexArray && row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
-					currentItem = (calabItem*)(**PvIndexArray)->elt[row];
-					if (!valid(currentItem)) {
-						*Status = 1;
-						DbgTime(); CaLabDbgPrintf("Error in putValue->wait4readback: Index array is corrupted.");
-						epicsMutexUnlock(putLock);
-						return;
-					}
-					if (!currentItem->putReadBack) {						
-						break;
-					}
-					else {
-						(**ErrorArray)->result[row].code = currentItem->ErrorIO.code;
-						(**ErrorArray)->result[row].status = currentItem->ErrorIO.status;
-						size_t stringSize = (*(currentItem->ErrorIO.source))->cnt;
-						if (!&(**ErrorArray)->result[row] || (*((**ErrorArray)->result[row].source))->cnt != (int32)stringSize) {
-							NumericArrayResize(uB, 1, (UHandle*)&(**ErrorArray)->result[row].source, stringSize);
-							(*(**ErrorArray)->result[row].source)->cnt = (int32)stringSize;
-						}
-						memcpy((*(**ErrorArray)->result[row].source)->str, (*currentItem->ErrorIO.source)->str, stringSize);
-					}
-				}
-			} while (row < iNumberOfValueSets && row < (**PvNameArray)->dimSize && time(nullptr) < stop);
-			if (time(nullptr) >= stop) {
-				DbgTime(); CaLabDbgPrintf("Write values run into timeout.");
-			}
-		}
-		for (uInt32 row = 0; row < iNumberOfValueSets && row < (**PvNameArray)->dimSize; row++) {
-			if ((**ErrorArray)->result[row].code)
-				*Status = 1;
-		}
-	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-	epicsMutexUnlock(putLock);
-}
-
-bool comp(std::pair<std::string, calabItem*> a, std::pair<std::string, calabItem*> b) {
-	return a.first.compare(b.first);
-}
-
-// get context info for EPICS
-//   InfoStringArray2D:     container for results
-//   InfoStringArraySize:   elements in result container
-//   FirstCall:             indicator for first call
-extern "C" EXPORT void info(sStringArray2DHdl * InfoStringArray2D, sResultArrayHdl * ResultArray, LVBoolean * FirstCall) {
-	try {
-		// Don't enter if library terminates
-		if (stopped)
-			return;
-		const ENV_PARAM** ppParam = env_param_list;	// Environment variables of EPICS context
-		uInt32				lStringArraySets = 0;		// Number of result arrays
-		char** pszNames = 0;				// Name array
-		char** pszValues = 0;				// Value array
-		uInt32				count = 0;					// Number of environment variables
-		const char* pVal = 0;					// Pointer to environment variables of EPICS context
-		uInt32				infoArrayDimensions = 2;	// Currently we are using two array as result
-		MgErr				err = noErr;				// Error code for debugging
-		sResult* currentResult;				// Current LabVIEW result cluster
-		calabItem* currentItem;				// Current local item
-		epicsMutexLock(getLock);
-		while (*ppParam != NULL) {
-			lStringArraySets++;
-			ppParam++;
-		}
-		lStringArraySets += 5; // version of library + CALAB_POLLING + CALAB_NODBG + EPICS_VERSION_STRING + ca_version
-		pszNames = (char**)malloc(lStringArraySets * sizeof(char*));
-		pszValues = (char**)malloc(lStringArraySets * sizeof(char*));
-		for (uInt32 i = 0; i < lStringArraySets; i++) {
-			pszNames[i] = (char*)malloc(255 * sizeof(char));
-			memset(pszNames[i], 0, 255);
-			pszValues[i] = (char*)malloc(255 * sizeof(char));
-			memset(pszValues[i], 0, 255);
-		}
-		ppParam = env_param_list;
-		count = 0;
-		memcpy(pszNames[count], "CA LAB VERSION", strlen("CA LAB VERSION"));
-#if  IsOpSystem64Bit
-#ifdef _DEBUG
-		epicsSnprintf(pszValues[count], 255, "%s DEBUG 64-bit", CALAB_VERSION);
-#else
-		epicsSnprintf(pszValues[count], 255, "%s 64-bit", CALAB_VERSION);
-#endif
-#else
-#ifdef _DEBUG
-		epicsSnprintf(pszValues[count], 255, "%s DEBUG", CALAB_VERSION);
-#else
-		epicsSnprintf(pszValues[count], 255, "%s", CALAB_VERSION);
-#endif
-#endif
-		count++;
-		memcpy(pszNames[count], "COMPILED FOR EPICS BASE", strlen("COMPILED FOR EPICS BASE"));
-		memcpy(pszValues[count], EPICS_VERSION_STRING, strlen(EPICS_VERSION_STRING));
-		count++;
-		memcpy(pszNames[count], "CA PROTOCOL VERSION", strlen("CA PROTOCOL VERSION"));
-		memcpy(pszValues[count], ca_version(), strlen(ca_version()));
-		count++;
-		while (*ppParam != NULL) {
-			pVal = envGetConfigParamPtr(*ppParam);
-			memcpy(pszNames[count], (*ppParam)->name, strlen((*ppParam)->name));
-			if (pVal)
-				memcpy(pszValues[count], pVal, strlen(pVal));
-			else
-				memcpy(pszValues[count], "undefined", strlen("undefined"));
-			count++;
-			ppParam++;
-		}
-		memcpy(pszNames[count], "CALAB_POLLING", strlen("CALAB_POLLING"));
-		if (getenv("CALAB_POLLING"))
-			memcpy(pszValues[count], getenv("CALAB_POLLING"), strlen(getenv("CALAB_POLLING")));
-		else
-			memcpy(pszValues[count], "undefined", strlen("undefined"));
-		count++;
-		memcpy(pszNames[count], "CALAB_NODBG", strlen("CALAB_NODBG"));
-		if (getenv("CALAB_NODBG"))
-			memcpy(pszValues[count], getenv("CALAB_NODBG"), strlen(getenv("CALAB_NODBG")));
-		else
-			memcpy(pszValues[count], "undefined", strlen("undefined"));
-		count++;
-		// Create InfoStringArray2D or use previous one
-		err += NumericArrayResize(uQ, infoArrayDimensions, (UHandle*)InfoStringArray2D, static_cast<size_t>(infoArrayDimensions) * lStringArraySets);
-		(**InfoStringArray2D)->dimSizes[0] = lStringArraySets;
-		(**InfoStringArray2D)->dimSizes[1] = infoArrayDimensions;
-		uInt32 iNameCounter = 0;
-		uInt32 iValueCounter = 0;
-		size_t lSize = 0;
-		for (uInt32 i = 0; i < (infoArrayDimensions * lStringArraySets); i++) {
-			if (i % 2) {
-				lSize = strlen(pszValues[iValueCounter]);
-				err += NumericArrayResize(uB, 1, (UHandle*)&(**InfoStringArray2D)->elt[i], lSize);
-				memcpy((*(**InfoStringArray2D)->elt[i])->str, pszValues[iValueCounter], lSize);
-				(*(**InfoStringArray2D)->elt[i])->cnt = (int32)lSize;
-				iValueCounter++;
-			}
-			else {
-				lSize = strlen(pszNames[iNameCounter]);
-				err += NumericArrayResize(uB, 1, (UHandle*)&(**InfoStringArray2D)->elt[i], lSize);
-				memcpy((*(**InfoStringArray2D)->elt[i])->str, pszNames[iNameCounter], lSize);
-				(*(**InfoStringArray2D)->elt[i])->cnt = (int32)lSize;
-				iNameCounter++;
-			}
-		}
-		if (*ResultArray) {
-			for (uInt32 i = 0; i < (**ResultArray)->dimSize; i++) {
-				currentResult = &(**ResultArray)->result[i];
-				if (currentResult->PVName)
-					err += DSDisposeHandle(currentResult->PVName);
-				currentResult->PVName = 0x0;
-				if (currentResult->StringValueArray)
-					err += DeleteStringArray(currentResult->StringValueArray);
-				currentResult->StringValueArray = 0x0;
-				if (currentResult->ValueNumberArray)
-					err += DSDisposeHandle(currentResult->ValueNumberArray);
-				currentResult->ValueNumberArray = 0x0;
-				if (currentResult->StatusString)
-					err += DSDisposeHandle(currentResult->StatusString);
-				currentResult->StatusString = 0x0;
-				if (currentResult->SeverityString)
-					err += DSDisposeHandle(currentResult->SeverityString);
-				currentResult->SeverityString = 0x0;
-				if (currentResult->TimeStampString)
-					err += DSDisposeHandle(currentResult->TimeStampString);
-				currentResult->TimeStampString = 0x0;
-				if (currentResult->FieldNameArray)
-					err += DSDisposeHandle(currentResult->FieldNameArray);
-				currentResult->FieldNameArray = 0x0;
-				if (currentResult->FieldValueArray)
-					err += DSDisposeHandle(currentResult->FieldValueArray);
-				currentResult->FieldValueArray = 0x0;
-				if (currentResult->ErrorIO.source)
-					err += DSDisposeHandle(currentResult->ErrorIO.source);
-				currentResult->ErrorIO.source = 0x0;
-			}
-			if (*ResultArray)
-				err += DSDisposeHandle(*ResultArray);
-			*ResultArray = 0x0;
-		}
-		// Compute number of top level items, for sizing ResultArray
-		uInt32 iMainPVs = 0;
-		globals.mapLock.lock_shared();
-		for (auto& iter : myItems) {
-			currentItem = iter.second;
-			if (currentItem->parent)
-				continue;
-			iMainPVs++;
-		}
-		*ResultArray = (sResultArrayHdl)DSNewHClr(sizeof(size_t) + iMainPVs * sizeof(sResult));
-		(**ResultArray)->dimSize = iMainPVs;
-		// sort map for better usability
-		std::map<std::string, calabItem*> sortedMap(myItems.begin(), myItems.end());
-		uInt32 iCount = 0;
-		for (auto& iter : sortedMap) {
-			if (iCount > iMainPVs) {
-				break;
-			}
-			currentItem = iter.second;
-			// hide children (field-PVs)
-			if (currentItem->parent)
-				continue;
-			if (!valid(currentItem)) {
-				CaLabDbgPrintf("Error in info: Index array is corrupted.");
-				break;
-			}
-			int32 err = currentItem->lock();
-			if (err) CaLabDbgPrintf("lock failed on timout in info");
-			currentResult = &(**ResultArray)->result[iCount];
-			if (currentItem->name) {
-				if (!currentResult->PVName || (*currentResult->PVName)->cnt != (*currentItem->name)->cnt) {
-					NumericArrayResize(uB, 1, (UHandle*)&currentResult->PVName, (*currentItem->name)->cnt);
-					(*currentResult->PVName)->cnt = (*currentItem->name)->cnt;
-				}
-				memcpy((*currentResult->PVName)->str, (*currentItem->name)->str, (*currentItem->name)->cnt);
-			}
-			if (currentItem->StatusString) {
-				if (!currentResult->StatusString || (*currentResult->StatusString)->cnt != (*currentItem->StatusString)->cnt) {
-					NumericArrayResize(uB, 1, (UHandle*)&currentResult->StatusString, (*currentItem->StatusString)->cnt);
-					(*currentResult->StatusString)->cnt = (*currentItem->StatusString)->cnt;
-				}
-				memcpy((*currentResult->StatusString)->str, (*currentItem->StatusString)->str, (*currentItem->StatusString)->cnt);
-				currentResult->StatusNumber = currentItem->StatusNumber;
-			}
-			if (currentItem->SeverityString) {
-				if (!currentResult->SeverityString || (*currentResult->SeverityString)->cnt != (*currentItem->SeverityString)->cnt) {
-					NumericArrayResize(uB, 1, (UHandle*)&currentResult->SeverityString, (*currentItem->SeverityString)->cnt);
-					(*currentResult->SeverityString)->cnt = (*currentItem->SeverityString)->cnt;
-				}
-				memcpy((*currentResult->SeverityString)->str, (*currentItem->SeverityString)->str, (*currentItem->SeverityString)->cnt);
-				currentResult->SeverityNumber = currentItem->SeverityNumber;
-			}
-			if (currentItem->TimeStampString) {
-				if (!currentResult->TimeStampString || (*currentResult->TimeStampString)->cnt != (*currentItem->TimeStampString)->cnt) {
-					NumericArrayResize(uB, 1, (UHandle*)&currentResult->TimeStampString, (*currentItem->TimeStampString)->cnt);
-					(*currentResult->TimeStampString)->cnt = (*currentItem->TimeStampString)->cnt;
-				}
-				memcpy((*currentResult->TimeStampString)->str, (*currentItem->TimeStampString)->str, (*currentItem->TimeStampString)->cnt);
-				currentResult->TimeStampNumber = currentItem->TimeStampNumber;
-			}
-			if (currentItem->ErrorIO.source) {
-				if (!currentResult->ErrorIO.source || (*currentResult->ErrorIO.source)->cnt != (*currentItem->ErrorIO.source)->cnt) {
-					NumericArrayResize(uB, 1, (UHandle*)&currentResult->ErrorIO.source, (*currentItem->ErrorIO.source)->cnt);
-					(*currentResult->ErrorIO.source)->cnt = (*currentItem->ErrorIO.source)->cnt;
-				}
-				memcpy((*currentResult->ErrorIO.source)->str, (*currentItem->ErrorIO.source)->str, (*currentItem->ErrorIO.source)->cnt);
-				currentResult->ErrorIO.code = currentItem->ErrorIO.code;
-				currentResult->ErrorIO.status = currentItem->ErrorIO.status;
-			}
-			if (currentItem->numberOfValues <= 0) {
-				currentItem->unlock();
-				iCount++;
-				continue;
-			}
-			if (!currentResult->StringValueArray) {
-				currentResult->StringValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + currentItem->numberOfValues * sizeof(LStrHandle[1]));
-				(*currentResult->StringValueArray)->dimSize = currentItem->numberOfValues;
-				err += NumericArrayResize(fD, 1, (UHandle*)&currentResult->ValueNumberArray, currentItem->numberOfValues);
-				(*currentResult->ValueNumberArray)->dimSize = currentItem->numberOfValues;
-			}
-			for (uInt32 j = 0; j < currentItem->numberOfValues && currentItem->stringValueArray && j < (*currentItem->stringValueArray)->dimSize; j++) {
-				int32 sz = LHStrLen((*currentItem->stringValueArray)->elt[j]);
-				if (sz != LHStrLen((*currentResult->StringValueArray)->elt[j])) {
-					err += NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->StringValueArray)->elt[j], sz);
-					LStrLen(*(*currentResult->StringValueArray)->elt[j]) = sz;
-				}
-				if (sz)
-					memcpy(LStrBuf(*(*currentResult->StringValueArray)->elt[j]), LStrBuf(*(*currentItem->stringValueArray)->elt[j]), sz);
-				(*currentResult->ValueNumberArray)->elt[j] = (*currentItem->doubleValueArray)->elt[j];
-				currentResult->valueArraySize = currentItem->numberOfValues;
-			}
-			size_t propertiesSize = currentItem->properties.size() + 2; // +1 for the class name and +1 for the native data type
-			if (!currentResult->FieldValueArray && propertiesSize) {
-				if (currentResult->FieldNameArray)
-					err += DeleteStringArray(currentResult->FieldNameArray);
-				currentResult->FieldNameArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + propertiesSize * sizeof(LStrHandle[1]));
-				if (currentResult->FieldNameArray)
-					(*currentResult->FieldNameArray)->dimSize = propertiesSize;
-				if (currentResult->FieldValueArray)
-					err += DeleteStringArray(currentResult->FieldValueArray);
-				currentResult->FieldValueArray = (sStringArrayHdl)DSNewHClr(sizeof(size_t) + propertiesSize * sizeof(LStrHandle[1]));
-				if (currentResult->FieldValueArray)
-					(*currentResult->FieldValueArray)->dimSize = propertiesSize;
-				uInt32 l = 0;
-				std::string fieldName;
-				size_t fieldNameLength;
-				std::string fieldValue;
-				size_t fieldValueLength;
-				for (const std::pair<const std::string, std::string>& property : currentItem->properties) {
-					fieldName = property.first;
-					fieldNameLength = fieldName.size();
-					fieldValue = property.second;
-					fieldValueLength = fieldValue.size();
-					if (fieldNameLength && currentResult->FieldNameArray && *currentResult->FieldNameArray) {
-						NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], fieldNameLength);
-						if ((*currentResult->FieldNameArray)->elt[l] && *(*currentResult->FieldNameArray)->elt[l]) {
-							(*(*currentResult->FieldNameArray)->elt[l])->cnt = (int32)fieldNameLength;
-							if ((*(*currentResult->FieldNameArray)->elt[l]))
-								memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, fieldName.c_str(), fieldNameLength);
-							else
-								(*(*currentResult->FieldNameArray)->elt[l])->str[0] = 0x0;
-						}
-						if (fieldValueLength && currentResult->FieldValueArray && *currentResult->FieldValueArray) {
-							NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
-							if ((*currentResult->FieldValueArray)->elt[l] && *(*currentResult->FieldValueArray)->elt[l]) {
-								(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
-								if ((*(*currentResult->FieldValueArray)->elt[l]))
-									memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
-								else
-									(*(*currentResult->FieldValueArray)->elt[l])->str[0] = 0x0;
-							}
-						}
-					}
-					l++;
-				}
-				fieldName = "Class Name";
-				fieldNameLength = fieldName.size();
-				fieldValue = currentItem->className;
-				fieldValueLength = fieldValue.size();
-				if (fieldNameLength && currentResult->FieldNameArray && *currentResult->FieldNameArray && &(*currentResult->FieldNameArray)->elt[l]) {
-					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], fieldNameLength);
-					if ((*currentResult->FieldNameArray)->elt[l] && *(*currentResult->FieldNameArray)->elt[l]) {
-						memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, fieldName.c_str(), fieldNameLength);
-						(*(*currentResult->FieldNameArray)->elt[l])->cnt = (int32)fieldNameLength;
-					}
-				}
-				if (fieldValueLength && currentResult->FieldValueArray && *currentResult->FieldValueArray && &(*currentResult->FieldValueArray)->elt[l]) {
-					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
-					if ((*currentResult->FieldValueArray)->elt[l] && *(*currentResult->FieldValueArray)->elt[l]) {
-						memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
-						(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
-					}
-				}
-				l++;
-				fieldName = "Native Data Type";
-				fieldNameLength = fieldName.size();
-				fieldValue = dbr_type_to_text(currentItem->nativeType);
-				fieldValueLength = fieldValue.size();
-				if (fieldNameLength && currentResult->FieldNameArray && *currentResult->FieldNameArray && &(*currentResult->FieldNameArray)->elt[l]) {
-					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldNameArray)->elt[l], fieldNameLength);
-					if ((*currentResult->FieldNameArray)->elt[l] && *(*currentResult->FieldNameArray)->elt[l]) {
-						memcpy((*(*currentResult->FieldNameArray)->elt[l])->str, fieldName.c_str(), fieldNameLength);
-						(*(*currentResult->FieldNameArray)->elt[l])->cnt = (int32)fieldNameLength;
-					}
-				}
-				if (fieldValueLength && currentResult->FieldValueArray && *currentResult->FieldValueArray && &(*currentResult->FieldValueArray)->elt[l]) {
-					NumericArrayResize(uB, 1, (UHandle*)&(*currentResult->FieldValueArray)->elt[l], fieldValueLength);
-					if ((*currentResult->FieldValueArray)->elt[l] && *(*currentResult->FieldValueArray)->elt[l]) {
-						memcpy((*(*currentResult->FieldValueArray)->elt[l])->str, fieldValue.c_str(), fieldValueLength);
-						(*(*currentResult->FieldValueArray)->elt[l])->cnt = (int32)fieldValueLength;
-					}
-				}
-				l++;
-			}
-			currentItem->unlock();
-			iCount++;
-		}
-		globals.mapLock.unlock_shared();
-
-		for (uInt32 i = 0; i < lStringArraySets; i++) {
-			free(pszNames[i]);
-			pszNames[i] = 0;
-		}
-		free(pszNames);
-		pszNames = 0;
-		for (uInt32 i = 0; i < lStringArraySets; i++) {
-			free(pszValues[i]);
-			pszValues[i] = 0;
-		}
-		free(pszValues);
-		pszValues = 0;
-		epicsMutexUnlock(getLock);
-	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-}
-
-// removes EPICS PVs from event service
-//   PvNameArray:     list of PVs, to be removed
-//   All:             ignore PvNameArray and disconnect all known data objects
-extern "C" EXPORT void disconnectPVs(sStringArrayHdl * PvNameArray, bool All) {
-	try {
-		// Don't enter if library terminates
-		if (stopped)
-			return;
-		calabItem* currentItem = 0x0;
-		if (All) {
-			globals.mapLock.lock_shared();
-			for (auto& iter : myItems) {
-				currentItem = iter.second;
-				if (!valid(currentItem)) {
-					CaLabDbgPrintf("Error in disconnect all: Index array is corrupted.");
-					break;
-				}
-				currentItem->disconnect();
-			}
-			globals.mapLock.unlock_shared();
-			return;
-		}
-		if (*PvNameArray && **PvNameArray && ((uInt32)(**PvNameArray)->dimSize) > 0) {
-			for (uInt32 i = 0; i < (**PvNameArray)->dimSize; i++) {
-				char cName[MAX_NAME_SIZE]{};
-				_LToCStrN(*((**PvNameArray)->elt[i]), (CStr)cName, sizeof(cName));
-				std::string sName = cName;
-				globals.mapLock.lock_shared();
-				auto search = myItems.find(sName);
-				currentItem = (search == myItems.end()) ? NULL : search->second;
-				globals.mapLock.unlock_shared();
-				if (!currentItem || !valid(currentItem)) {
-					CaLabDbgPrintf("Error in disconnect: Index array is corrupted.");
-					break;
-				}
-				// disconnect field listeners
-				if (currentItem->parent) {
-					char* pIndicator;
-					pIndicator = strchr(currentItem->szName, '.');
-					if (pIndicator) {
-						int pos = (int)(strlen(currentItem->szName) - (pIndicator - currentItem->szName));
-						if (strncmp((const char*)(*currentItem->name)->str, (const char*)(*(**PvNameArray)->elt[i])->str, static_cast<size_t>((*(**PvNameArray)->elt[i])->cnt) - pos) == 0) {
-							currentItem->disconnect();
-						}
-					}
-					continue;
-				}
-				// disconnect value listeners
-				if ((*(**PvNameArray)->elt[i])->cnt == (*currentItem->name)->cnt && strncmp((const char*)(*currentItem->name)->str, (const char*)(*(**PvNameArray)->elt[i])->str, (*(**PvNameArray)->elt[i])->cnt) == 0) {
-					currentItem->disconnect();
-				}
+				setLVString((*target->FieldValueArray)->elt[i], std::string());
 			}
 		}
 	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-}
 
-// Channel Access task
-// connects / reconnects / disconnects data objects to EPICS
-static void caTask(void) {
-	try {
-		tasks.fetch_add(1);
-		uInt32 iResult = ECA_NORMAL;
-		calabItem* currentItem;
-		uInt32 sizeOfCurrentList = 0;
-		uInt32 connectCounter = 0;
-		std::chrono::duration<double> diff;
-		ca_attach_context(pcac);
-		while (!stopped) {
-			if (myItems.empty()) {
-				epicsThreadSleep(.01);
-				continue;
-			}
-			sizeOfCurrentList = 0;
-			connectCounter = 0;
-			globals.mapLock.lock_shared();
-			for (auto& iter : myItems) {
-				currentItem = iter.second;
-				if (!valid(currentItem))
-					break;
-				sizeOfCurrentList++;
-				// create channel identifier
-				if (!currentItem->caID) {
-					int32 err = currentItem->lock();
-					if (err) CaLabDbgPrintf("lock failed on timout in caTask 3");
-					iResult = ca_create_channel(currentItem->szName, connectionChanged, (void*)currentItem, 20, &currentItem->caID);
-					currentItem->unlock();
-				}
-				else {
-					// subscribe channel
-					if (!currentItem->isPassive && currentItem->isConnected && currentItem->caID && !currentItem->caEventID) {
-						currentItem->nativeType = ca_field_type(currentItem->caID);
-						if (currentItem->nativeType >= 0 && currentItem->nativeType < LAST_BUFFER_TYPE) {
-							int32 err = currentItem->lock();
-							if (err) CaLabDbgPrintf("lock failed on timout in caTask 4");
-							iResult = ca_create_subscription(dbf_type_to_DBR_TIME(currentItem->nativeType), UINT_MAX, currentItem->caID, DBE_VALUE | DBE_ALARM, valueChanged, (void*)currentItem, &currentItem->caEventID);
-							if (currentItem->nativeType == DBF_ENUM && !currentItem->sEnum.no_str) {
-								iResult = ca_create_subscription(DBR_CTRL_ENUM, 1, currentItem->caID, DBE_VALUE, valueChanged, (void*)currentItem, &currentItem->caEnumEventID);
-							}
-							ca_get_callback(DBR_CLASS_NAME, currentItem->caID, valueChanged, (void*)currentItem);
-							currentItem->unlock();
-						}
-						else {
-							CaLabDbgPrintfD("%s skip create subscription because invalid native data type (%d)", currentItem->szName, currentItem->nativeType);
-						}
-					}
-					else {
-						// reconnect channel
-						if (!currentItem->isPassive && !currentItem->isConnected && !currentItem->caEventID) {
-							if (currentItem->parent && currentItem->parent->isConnected) {
-							}
-							else {
-								diff = std::chrono::high_resolution_clock::now() - currentItem->timer;
-								if (diff.count() > 10) {
-									currentItem->timer = std::chrono::high_resolution_clock::now();
-									if (currentItem->caID) {
-										iResult = ca_clear_channel(currentItem->caID);
-										if (iResult == ECA_NORMAL)
-											iResult = ca_pend_io(3);
-										if (iResult == ECA_NORMAL)
-											currentItem->caID = 0x0;
-									}
-								}
-							}
-						}
-						else {
-							connectCounter++;
-						}
-					}
-				}
-				// unsubscribe channel
-				if (currentItem->isPassive && currentItem->caEventID) {
-					iResult = ca_clear_subscription(currentItem->caEventID);
-					if (iResult == ECA_NORMAL)
-						iResult = ca_pend_io(3);
-					if (iResult == ECA_NORMAL)
-						currentItem->caEventID = 0x0;
-					currentItem->hasValue = false;
-				}
-			}
-			globals.mapLock.unlock_shared();
-			ca_flush_io();
-			if (iResult != ECA_NORMAL) {
-				DbgTime(); CaLabDbgPrintfD("CA Task error (3): %s", ca_message(iResult));
-			}
-			epicsThreadSleep(.001);
-		}
-		ca_detach_context();
-		tasks.fetch_sub(1);
-	}
-	catch (std::exception& ex) {
-		DbgTime(); CaLabDbgPrintf("%s", ex.what());
-	}
-}
-
-// Global counter for tests
-//   returns count of calls
-extern "C" EXPORT uInt32 getCounter() {
-	return ++globalCounter;
-}
-
-#if defined _WIN32 || defined _WIN64
-#else
-void loadFunctions() {
-	caLibHandle = dlopen("libca.so", RTLD_LAZY);
-	comLibHandle = dlopen("libCom.so", RTLD_LAZY);
-	ca_array_get = (ca_array_get_t)dlsym(caLibHandle, "ca_array_get");
-	ca_add_exception_event = (ca_add_exception_event_t)dlsym(caLibHandle, "ca_add_exception_event");
-	ca_array_put = (ca_array_put_t)dlsym(caLibHandle, "ca_array_put");
-	ca_array_put_callback = (ca_array_put_callback_t)dlsym(caLibHandle, "ca_array_put_callback");
-	ca_attach_context = (ca_attach_context_t)dlsym(caLibHandle, "ca_attach_context");
-	ca_clear_channel = (ca_clear_channel_t)dlsym(caLibHandle, "ca_clear_channel");
-	ca_clear_subscription = (ca_clear_subscription_t)dlsym(caLibHandle, "ca_clear_subscription");
-	ca_context_create = (ca_context_create_t)dlsym(caLibHandle, "ca_context_create");
-	ca_context_destroy = (ca_context_destroy_t)dlsym(caLibHandle, "ca_context_destroy");
-	ca_create_channel = (ca_create_channel_t)dlsym(caLibHandle, "ca_create_channel");
-	ca_create_subscription = (ca_create_subscription_t)dlsym(caLibHandle, "ca_create_subscription");
-	ca_array_get_callback = (ca_array_get_callback_t)dlsym(caLibHandle, "ca_array_get_callback");
-	ca_current_context = (ca_current_context_t)dlsym(caLibHandle, "ca_current_context");
-	ca_detach_context = (ca_detach_context_t)dlsym(caLibHandle, "ca_detach_context");
-	ca_element_count = (ca_element_count_t)dlsym(caLibHandle, "ca_element_count");
-	ca_flush_io = (ca_flush_io_t)dlsym(caLibHandle, "ca_flush_io");
-	ca_field_type = (ca_field_type_t)dlsym(caLibHandle, "ca_field_type");
-	ca_message = (ca_message_t)dlsym(caLibHandle, "ca_message");
-	ca_name = (ca_name_t)dlsym(caLibHandle, "ca_name");
-	ca_pend_io = (ca_pend_io_t)dlsym(caLibHandle, "ca_pend_io");
-	ca_puser = (ca_puser_t)dlsym(caLibHandle, "ca_puser");
-	ca_state = (ca_state_t)dlsym(caLibHandle, "ca_state");
-	ca_version = (ca_version_t)dlsym(caLibHandle, "ca_version");
-	dbr_value_offset = (dbr_value_offset_t)dlsym(caLibHandle, "dbr_value_offset");
-	envGetConfigParamPtr = (envGetConfigParamPtr_t)dlsym(comLibHandle, "envGetConfigParamPtr");
-	env_param_list = (env_param_list_t)dlsym(comLibHandle, "env_param_list");
-	epicsMutexDestroy = (epicsMutexDestroy_t)dlsym(comLibHandle, "epicsMutexDestroy");
-	epicsMutexLock = (epicsMutexLock_t)dlsym(comLibHandle, "epicsMutexLock");
-	epicsMutexOsiCreate = (epicsMutexOsiCreate_t)dlsym(comLibHandle, "epicsMutexOsiCreate");
-	epicsMutexUnlock = (epicsMutexUnlock_t)dlsym(comLibHandle, "epicsMutexUnlock");
-	epicsMutexTryLock = (epicsMutexTryLock_t)dlsym(comLibHandle, "epicsMutexTryLock");
-	epicsSnprintf = (epicsSnprintf_t)dlsym(comLibHandle, "epicsSnprintf");
-	epicsThreadCreate = (epicsThreadCreate_t)dlsym(comLibHandle, "epicsThreadCreate");
-	epicsThreadGetStackSize = (epicsThreadGetStackSize_t)dlsym(comLibHandle, "epicsThreadGetStackSize");
-	epicsThreadSleep = (epicsThreadSleep_t)dlsym(comLibHandle, "epicsThreadSleep");
-	epicsTimeToStrftime = (epicsTimeToStrftime_t)dlsym(comLibHandle, "epicsTimeToStrftime");
-	dbr_value_size = (dbr_value_size_t)dlsym(caLibHandle, "dbr_value_size");
-	dbr_size = (dbr_size_t)dlsym(caLibHandle, "dbr_size");
-}
-#endif
-
-// prepare the library before first using
-void caLabLoad(void) {
-	uInt32 iResult = 0;
-	if (pcac)
-		return;
-
-	if (getenv("CALAB_POLLING")) {
-		bCaLabPolling = true;
+	// ErrorIO from PVItem
+	const int err = pvItem->getErrorCode();
+	const uInt32 lvCode = (err <= (int)ECA_NORMAL) ? 0u : static_cast<uInt32>(err) + ERROR_OFFSET;
+	if (target->ErrorIO.code == lvCode && target->ErrorIO.source && *target->ErrorIO.source && (*target->ErrorIO.source)->cnt) {
+		// No change; skip updating the string to avoid unnecessary memory operations.
 	}
 	else {
-		bCaLabPolling = false;
+		target->ErrorIO.code = lvCode;
+		target->ErrorIO.status = 0;
+		setLVString(target->ErrorIO.source, pvItem->getErrorAsString());
 	}
-	const char* tmp = getenv("CALAB_NODBG");
-	if (tmp) {
-		if (strlen(tmp) > 3) {
-			pCaLabDbgFile = fopen(tmp, "w");
+}
+
+/**
+ * @brief Collects environment and version information.
+ * @return A vector of key-value pairs representing the information.
+ */
+std::vector<std::pair<std::string, std::string>> collectEnvironmentInfo() {
+	std::vector<std::pair<std::string, std::string>> info;
+	char buffer[255];
+
+	// Version Info
+#if IsOpSystem64Bit
+#ifdef _DEBUG
+	epicsSnprintf(buffer, sizeof(buffer), "%s DEBUG 64 bit", CALAB_VERSION);
+#else
+	epicsSnprintf(buffer, sizeof(buffer), "%s 64 bit", CALAB_VERSION);
+#endif
+#else
+#ifdef _DEBUG
+	epicsSnprintf(buffer, sizeof(buffer), "%s DEBUG 32 bit", CALAB_VERSION);
+#else
+	epicsSnprintf(buffer, sizeof(buffer), "%s 32 bit", CALAB_VERSION);
+#endif
+#endif
+	info.push_back({ "CA LAB VERSION", buffer });
+	info.push_back({ "COMPILED FOR EPICS BASE", EPICS_VERSION_STRING });
+	info.push_back({ "CA PROTOCOL VERSION", ca_version() });
+
+	// EPICS Environment Variables
+	const ENV_PARAM* const* ppParam = env_param_list;
+	while (*ppParam != NULL) {
+		const char* pVal = envGetConfigParamPtr(*ppParam);
+		info.push_back({ (*ppParam)->name, pVal ? pVal : "undefined" });
+		ppParam++;
+	}
+
+	// CALab Environment Variables
+	const char* calabPolling = getenv("CALAB_POLLING");
+	info.push_back({ "CALAB_POLLING", calabPolling ? calabPolling : "undefined" });
+	const char* calabNoDbg = getenv("CALAB_NODBG");
+	info.push_back({ "CALAB_NODBG", calabNoDbg ? calabNoDbg : "undefined" });
+
+	return info;
+}
+
+// =================================================================================
+// Info Array Population Helper
+// =================================================================================
+
+MgErr populateInfoStringArray(sStringArray2DHdl* InfoStringArray2D, const std::vector<std::pair<std::string, std::string>>& info) {
+	if (!InfoStringArray2D) return noErr;
+
+	const uInt32 rows = static_cast<uInt32>(info.size());
+	const uInt32 cols = 2u; // key + value
+
+	// If array exists and dimensions differ, dispose existing element handles and the array
+	if (*InfoStringArray2D && **InfoStringArray2D) {
+		const uInt32 oldRows = (**InfoStringArray2D)->dimSizes[0];
+		const uInt32 oldCols = (**InfoStringArray2D)->dimSizes[1];
+		if (oldRows != rows || oldCols != cols) {
+			// Free contained string handles first to avoid leaks
+			const uInt32 total = oldRows * oldCols;
+			for (uInt32 i = 0; i < total; ++i) {
+				if ((**InfoStringArray2D)->elt[i] && DSCheckHandle(((**InfoStringArray2D)->elt[i])) == noErr) 
+					DSDisposeHandle((**InfoStringArray2D)->elt[i]);
+				(**InfoStringArray2D)->elt[i] = nullptr;				
+			}
+			if (*InfoStringArray2D && DSCheckHandle(*InfoStringArray2D) == noErr)
+				DSDisposeHandle(*InfoStringArray2D);
+			*InfoStringArray2D = nullptr;
 		}
 	}
-	signal(SIGABRT, signalHandler);
-	signal(SIGFPE, signalHandler);
-	signal(SIGILL, signalHandler);
-	signal(SIGINT, signalHandler);
-	signal(SIGSEGV, signalHandler);
-	signal(SIGTERM, signalHandler);
-#if defined _WIN32 || defined _WIN64
-	iResult = GetModuleHandleEx(
-		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, // GET_MODULE_HANDLE_EX_FLAG_PIN to prevent unload lib
-		(LPCTSTR)DllMain,
-		&libRef);
-	if (!iResult) {
-		DbgTime(); CaLabDbgPrintf("Error: Could not retrieves a module handle for the myCaLib library.");
-		return;
+
+	// Allocate array if missing
+	if (!*InfoStringArray2D || **InfoStringArray2D == nullptr) {
+		const uInt32 total = rows * cols;
+		if (total > 0) {
+			const size_t totalSize =
+				sizeof(sStringArray2D) +
+				(static_cast<size_t>(total) - 1) * sizeof(LStrHandle);
+
+			*InfoStringArray2D =
+				reinterpret_cast<sStringArray2DHdl>(
+					DSNewHClr(static_cast<uInt32>(totalSize)));
+
+			if (**InfoStringArray2D) {
+				(**InfoStringArray2D)->dimSizes[0] = rows;
+				(**InfoStringArray2D)->dimSizes[1] = cols;
+			}
+		}
+		else {
+			*InfoStringArray2D = nullptr;
+		}
 	}
-#else
-	loadFunctions();
-#endif
-	stopped = false;
-	iResult = ca_context_create(ca_enable_preemptive_callback);
-	if (iResult != ECA_NORMAL) {
-		DbgTime(); CaLabDbgPrintf("Error: Could not create any instance of Channel Access.");
-		return;
+	else {
+		// Ensure dims are set (in case they matched and were kept)
+		(**InfoStringArray2D)->dimSizes[0] = rows;
+		(**InfoStringArray2D)->dimSizes[1] = cols;
+		// Clear existing element handles to avoid stale data when shrinking
+		const uInt32 total = rows * cols;
+		for (uInt32 i = 0; i < total; ++i) {
+			if ((**InfoStringArray2D)->elt[i] && DSCheckHandle(((**InfoStringArray2D)->elt[i])) == noErr) 
+				DSDisposeHandle((**InfoStringArray2D)->elt[i]);
+			(**InfoStringArray2D)->elt[i] = nullptr;			
+		}
 	}
-	pcac = ca_current_context();
-	ca_add_exception_event(exceptionCallback, NULL);
-	epicsThreadCreate("caTask",
-		epicsThreadPriorityBaseMax,
-		epicsThreadGetStackSize(epicsThreadStackBig),
-		(EPICSTHREADFUNC)caTask, 0);
-#ifdef _DEBUG
-	DbgTime(); CaLabDbgPrintfD("load CA Lab OK");
-#endif
+
+	if (rows == 0) return noErr;
+
+	// Fill content: row-major layout [row * dimSizes[1] + col]
+	for (uInt32 r = 0; r < rows; ++r) {
+		const auto& kv = info[r];
+		const uInt32 base = r * cols;
+		if (**InfoStringArray2D != nullptr) {
+			setLVString((**InfoStringArray2D)->elt[base + 0], kv.first);
+			setLVString((**InfoStringArray2D)->elt[base + 1], kv.second);
+		}
+	}
+
+	return noErr;
 }
 
-// clean up library before unload
-void caLabUnload(void) {
-#if defined _WIN32 || defined _WIN64
-#else
-	//dlclose(caLibHandle); <-- caused memory exceptions in memory manager of LV
-	//dlclose(comLibHandle);
-#endif
-#ifdef _DEBUG
-	DbgTime(); CaLabDbgPrintfD("unload CA Lab OK");
-#endif
-}
-
-// LToCStrN is not available in (very) old LabVIEW versions
-uInt32 _LToCStrN(ConstLStrP source, unsigned char* dest, uInt32 destSize) {
-	uInt32 resultingSize = (source) ? (source->cnt + 1) : 1;
-	if (resultingSize > destSize)
-		resultingSize = destSize;
-	if (resultingSize > 0) {
-		if (source)
-			strncpy((char*)dest, (char*)source->str, static_cast<size_t>(resultingSize) - 1);
-		dest[resultingSize - 1] = '\0';
+MgErr populateAllResultArray(sResultArrayHdl* ResultArray) {
+	Globals& g = Globals::getInstance();
+	// Snapshot PV list under shared lock to minimize contention
+	std::vector<PVItem*> items;
+	{
+		TimeoutSharedLock<std::shared_timed_mutex> lock(g.pvRegistryLock, "populateAllResultArray-scan", std::chrono::milliseconds(500));
+		if (!lock.isLocked()) return mgArgErr;
+		items.reserve(g.pvRegistry.size());
+		for (const auto& kv : g.pvRegistry) {
+			// Include only base PVs, not fields
+			if (kv.second) {
+				PVItem* pv = kv.second.get();
+				std::string recordType = pv->getRecordType();
+				if (recordType.empty()) continue;
+				items.push_back(pv);
+			}
+		}
 	}
-	return resultingSize;
-}
 
-#ifndef __GNUC__
-#pragma warning(pop)
-#endif
+	// Sort items alphanumerically by PV name
+	std::sort(items.begin(), items.end(), [](PVItem* a, PVItem* b) {
+		return a->getName() < b->getName();
+		});
+
+	const uInt32 n = static_cast<uInt32>(items.size());
+	if (!ResultArray) return noErr;
+
+	// If size changes, free existing per-element handles before realloc
+	if (*ResultArray && **ResultArray && (**ResultArray)->dimSize != n) {
+		for (uInt32 i = 0; i < (**ResultArray)->dimSize; ++i) {
+			sResult* r = &(**ResultArray)->result[i];
+			CleanupResult(r);
+		}
+		if (*ResultArray && DSCheckHandle(*ResultArray) == noErr)
+			DSDisposeHandle(*ResultArray);
+		*ResultArray = nullptr;
+	}
+
+	// Allocate if missing
+	if (!*ResultArray || !**ResultArray) {
+		// LabVIEW handle: header (size_t dimSize) + n elements
+		if (n == 0) {
+			*ResultArray = nullptr;
+			return noErr;
+		}
+		const size_t totalSize =
+			sizeof(sResultArray) +
+			(static_cast<size_t>(n) - 1) * sizeof(sResult);
+		*ResultArray = reinterpret_cast<sResultArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+		if (!*ResultArray)
+			return mFullErr;
+		(**ResultArray)->dimSize = n;
+	}
+
+	// Fill rows
+	for (uInt32 i = 0; i < n; ++i) {
+		sResult* dst = &(**ResultArray)->result[i];
+		PVItem* pv = items[i];
+		if (!pv) continue;
+		{
+			std::lock_guard<std::mutex> lk(pv->ioMutex());
+			fillResultFromPv(pv, dst);
+		}
+	}
+
+	return noErr;
+}

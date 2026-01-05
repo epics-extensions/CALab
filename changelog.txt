@@ -1,4 +1,275 @@
 ﻿Changelog of CA Lab
+
+V1.8.0.1 (Unreleased)
+
+### CALab – Ultra‑Short Changelog (User‑Focused)
+
+* Faster EPICS connections and updates (tuned CA timeouts, 
+  background polling). 
+* More robust, thread‑safe operation in LabVIEW; fewer hangs
+  on abort/stop and during heavy parallel use. 
+* Richer per‑PV results: values, status/severity, timestamps, 
+  record fields, and per‑PV error information. 
+* Clearer diagnostics via the `info` API and a global PV error counter
+  for quick health checks.
+* Improved Linux support with runtime loading of EPICS libraries,
+  avoiding hard build‑time dependencies.
+
+### CALab – Full Changelog
+----------------------------------------------------------------------
+# Major architectural rewrite and threading model
+* The core CALab implementation (`calab.cpp`, `globals.cpp`, 
+  `PVItem.cpp` and supporting headers) has been extensively refactored
+  for thread-safety and maintainability while keeping the LabVIEW API 
+  and data structures stable.
+* Introduced a central `Globals` singleton responsible for EPICS CA
+  context management, the PV registry, per‑VI instance tracking,
+  background worker registration, and coordinated shutdown.
+* Added generic `TimeoutUniqueLock` and `TimeoutSharedLock` RAII
+  wrappers for `std::mutex` / `std::shared_timed_mutex` that enforce
+  acquisition timeouts and log detailed diagnostics when locks
+  cannot be obtained in time, making deadlocks and long holds
+  visible in the debug log.
+* Clarified and enforced a lock hierarchy, consistently using
+  shared/exclusive access on the PV registry to reduce contention
+  between CA callbacks, LabVIEW calls, and background workers.
+
+---
+
+# EPICS interaction and Linux support
+
+* On Linux, EPICS CA and libCom are now loaded dynamically via
+  `epics_dynamic_linux.cpp` and the new compatibility shim
+  `epics_compat.h`. This allows building and distributing CALab
+  without EPICS headers on the build host and improves robustness
+  when different EPICS versions are present at runtime.
+* Added fall‑back text tables and optional environment accessors so
+  CALab continues to work even when certain symbols (such as
+  `dbr_text` or `envGetConfigParamPtr`) are not exported by the EPICS
+  libraries.
+* Unified EPICS context attach/detach logic through a new RAII helper
+  `CaContextGuard`, ensuring that worker threads, callbacks, and all
+  public entry points operate on a valid CA context.
+
+---
+
+# PV registry, instance management and teardown
+
+* Introduced a more robust per‑VI instance model (`MyInstanceData`)
+  with explicit lifecycle hooks (`reserved`, `unreserved`, `aborted`).
+  Each instance tracks its bound LabVIEW handles, the first function
+  that used it, an `activeCalls` counter, and an `isUnreserving` flag,
+  enabling controlled teardown.
+* Implemented a generic array‑to‑instance map in `Globals` to resolve
+  which VI instance owns a given LabVIEW array handle. `getValue`,
+  `putValue` and `addEvent` now reliably bind arrays to their owning
+  instance even in multi‑VI and reentrant setups.
+* Added a per‑instance call guard that increments `activeCalls` on
+  entry and decrements it on exit. The guard blocks new calls while
+  an instance is unreserving and wakes waiters on every exit,
+  allowing `unreserved` to wait for all in‑flight EPICS operations
+  to finish without risking deadlocks.
+* The `unreserved` callback now performs a careful two‑phase
+  teardown of the `PvIndexArray`. It atomically claims `PvIndexEntry`
+  objects, waits (with timeout) until all readers drop their
+  references, and then deletes entries either immediately or via a
+  deferred deletion worker. This eliminates use‑after‑free scenarios
+  that could previously occur during shutdown.
+* `Globals::unregisterArraysForInstance` now removes all
+  array‑to‑instance associations under a timed write lock,
+  preventing stale mappings when an instance disappears.
+
+---
+
+# PvIndexArray and change tracking
+
+* Reworked `PvIndexArray` entries: each slot now points to a 
+  `PvIndexEntry` object holding a `PVItem*`, a `PVMetaInfo` block, an
+  internal atomic reference counter and a deletion flag. Readers use
+  `try_acquire()` / `release()` to safely share entries; deleters set
+  `deleting=true` and reclaim entries once `refs` drops to zero.
+* `PVMetaInfo` caches the last change‑hash of its `PVItem` and exposes
+  `hasChanged()` / `update()` helpers. `getValue` uses this to detect
+  unchanged PVs without copying payloads, which makes large PV arrays
+  much cheaper to poll.
+* New helpers around `PvIndexArray` update the stored change‑hash
+  either globally or only for changed indices, keeping tracking
+  consistent even when only a subset of PVs is refreshed.
+
+---
+
+# Background worker for value changes
+
+* CALab now decouples EPICS value‑change callbacks from PV updates by
+  queuing change events into a dedicated background worker 
+  (a `ValueChangeTask` deque). The worker thread looks up the
+  corresponding `PVItem`, updates its cached DBR buffer, time
+  metadata, status and severity, and then notifies subscribers.
+* The worker uses `TimeoutSharedLock` for PV registry lookups and
+  `TimeoutUniqueLock` on the per‑PV mutex; failures to acquire locks
+  within bounded time produce clear debug messages instead of blocking
+  indefinitely.
+* When `.RTYP` PVs update, the worker automatically propagates the
+  record type to the parent base PV. For other field PVs 
+  (`BASE.FIELD`), the latest field value is cached as a string on the
+  parent `PVItem`, with careful numeric‑to‑string conversion when the
+  field is numeric.
+* After processing each task, the worker notifies interested LabVIEW
+  subscribers via `postEventForPv`, which snapshots subscribers,
+  fills their `sResult` clusters from the current `PVItem` state,
+  and posts user events outside of internal locks.
+
+---
+
+# LabVIEW user event handling
+
+* Introduced an explicit `EventRegistry` that maps PV names to 
+  `(LVUserEventRef, sResult*)` pairs. `addEvent` ensures that the
+  target `PVItem` exists in the PV registry, registers the event, and
+  optionally posts an event immediately if the PV already has a value.
+* `destroyEvent` now walks the entire event registry and removes every
+  occurrence of the given `LVUserEventRef`, deleting empty PV entries.
+  This avoids dangling references and keeps the registry compact.
+* `postEventForPv` snapshots subscribers while holding the registry’s
+  event mutex and posts LabVIEW events without that lock held,
+  preventing reentrancy problems and potential deadlocks with user code.
+
+---
+
+# Numeric formatting and PREC handling
+
+* The `PVItem::FormatUnit` numeric formatting logic has been
+  completely rewritten. It now fully respects the `PREC` field for all
+  numeric record types, switching to scientific notation when a value
+  is too small to be represented reasonably in fixed notation at the
+  requested precision.
+* Formatting is locale‑aware: decimal and thousands separators are
+  chosen based on the current C++ locale of the calling thread. For
+  integer‑like values with `PREC=0`, thousands separators are inserted
+  while preserving the sign.
+* When no `PREC` is available, CALab uses heuristics to avoid
+  floating‑point artefacts: it finds a small number of decimal places
+  that round the value cleanly within a tolerance, trims trailing
+  zeros, removes a trailing decimal point if necessary, and switches
+  to scientific notation for very large or very small values.
+
+---
+
+# getValue / putValue behaviour and error reporting
+
+* `getValue` has been restructured into clear phases: instance
+  resolution and binding, call‑guard activation, PV registry/field
+  initialization, subscription and connection handling, 
+  change detection, and output population. This makes the control flow
+  more predictable and ensures concurrent calls coordinate correctly
+  via per‑instance `activeCalls`.
+* When only a subset of PVs has changed, CALab now incrementally
+  cleans and repopulates only the affected entries in `ResultArray`,
+  `FirstStringValue`, `FirstDoubleValue`, and `DoubleValueArray`.
+  This significantly reduces LabVIEW heap churn for large PV arrays.
+* Memory cleanup has been centralised in `CleanupResult` and
+  `cleanupMemory`, which now support both full teardown and selective
+  cleanup based on a list of changed indices. Any errors from the
+  LabVIEW memory manager are logged with timestamps and error codes.
+* `fillResultFromPv` always pulls the current error state from `PVItem`
+  into the `ErrorIO` cluster and skips updating the error string when
+  the code and string are unchanged, avoiding unnecessary allocations
+  during steady‑state operation.
+* `putValue` has been refactored around a `PutValueCtx` helper that
+  handles string, double and 64‑bit integer sources
+  (`StringValueArray2D`, `DoubleValueArray2D`, `LongValueArray2D`).
+  It performs robust type checking, clamps values to EPICS native
+  ranges where needed, and records per‑PV error messages on conversion
+  failures.
+* When `wait4readback` is true, CALab uses `ca_put_callback` and a
+  small `PutCtx` object to track callback completions, waiting up to
+  the specified timeout while interleaving `ca_pend_event()` calls
+  with internal notifications. If any callbacks time out, the
+  communication status is set accordingly.
+
+---
+
+# disconnectPVs and communication status
+
+* `disconnectPVs` has been rewritten to minimise the time spent
+  holding the PV registry lock. It first collects the `PVItem` objects
+  to disconnect (either all PVs or a deduplicated, parent‑aware subset
+  of the requested names) under a shared lock, then releases the lock
+  and performs channel clear / connection teardown work outside the
+  critical section.
+* When called with `All=true`, `disconnectPVs` now first checks
+  whether more than one VI instance currently has active CALab arrays
+  and refuses to disconnect in that case, preventing one VI from
+  inadvertently disconnecting PVs used by others.
+* The global PV error counter and per‑PV error codes now feed into
+  `CommunicationStatus`: a non‑zero status is reported only when
+  at least one addressed PV is currently in an error state, rather
+  than treating any historic error as a permanent global failure.
+
+---
+
+# info() and diagnostic visibility
+
+* `info()` has been expanded to report CALab version (including build
+  type and word size), the compiled‑against EPICS base version, 
+  the CA protocol version, all EPICS environment variables known via
+  `env_param_list`, and CALab‑specific environment variables
+  (`CALAB_POLLING`, `CALAB_NODBG`).
+* New helper `populateInfoStringArray` writes this data into a 2D
+  LabVIEW string array of (key, value) rows, correctly disposing and
+  reallocating internal string handles when dimensions change and
+  avoiding stale data when shrinking.
+* `populateAllResultArray` builds a snapshot of all base PVs currently
+  in the registry, sorted by PV name, and fills an `sResultArrayHdl`
+  using the same logic as `fillResultFromPv`, giving `CaLabInfo.vi`
+  a consistent view of all PVs, including status, severity, timestamp,
+  fields and error information.
+
+---
+
+# Record field validation and metadata
+
+* New methods in `Globals` (`recordFieldIsCommonField` and
+  `recordFieldExists`) validate whether a field name is valid for a
+  given EPICS record type, using a comprehensive hard‑coded field list
+  plus a small cache. This prevents CALab from trying to connect to
+  obviously non‑existent field PVs and improves behaviour when users
+  request invalid fields.
+* Field PV updates now populate a per‑PV field map on the parent
+  `PVItem` with human‑readable string values. `getValue` uses this
+  cache to fill `FieldNameArray` and `FieldValueArray` without extra
+  EPICS lookups, so applications can access record fields efficiently.
+
+---
+
+# Miscellaneous improvements
+
+* All public and internal headers (`calab.h`, `globals.h`, `PVItem.h`,
+  `TimeoutUniqueLock.h`, `epics_compat.h`) have been thoroughly
+  documented with clearer comments on ownership, threading rules and
+  semantics. This documentation work does not change the binary
+  interface but makes the codebase significantly easier to understand
+  and maintain.
+* Debug output is now centralised through `CaLabDbgPrintf` /
+  `CaLabDbgPrintfD` and enriched with timestamps and contextual tags
+  (function names, lock names, PV names), making diagnostics for
+  timing issues and deadlocks much more straightforward.
+* Many internal error paths have been hardened: all LabVIEW memory
+  allocations are checked, exceptions in DLL entry points are caught
+  and logged, and defensive checks prevent further work once the
+  global `stopped` flag indicates that CALab is shutting down.
+
+----------------------------------------------------------------------
+
+V1.7.5.1
+  # Updated EPICS Base to Version 7.0.9
+  # Filter fixed
+  # CaLabGet returns bad status if some PV don't connect now
+  # PV initialisation with ECA_CHIDNOTFND before first value
+  # Code optimisations and many more code comments
+  # Updated lib VIs and example VIs
+
+----------------------------------------------------------------------
 V1.7.4.1 (Released: December 2024)
   # Resolved Windows Setup Issues
     - Added "Install for all users"

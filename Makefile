@@ -1,22 +1,44 @@
 # Linux Makefile
-#
+
 # Modify these to match your installation directories
-LVDIR ?= /usr/local/natinst/LabVIEW-2020-64/cintools
-EPICSDIR ?= /usr/local/epics/include
+LVDIR     ?= /usr/local/natinst/LabVIEW-2024-64/cintools
+EPICSDIR  ?= /usr/local/epics/include
 
 # You probably don't have to change anything below
-CC ?= g++
-# DEBUGFLAGS=-D_DEBUG
-CFLAGS ?= -fPIC -std=c++17 -g3 -Wall -Wno-multichar $(DEBUGFLAGS)
-INCLUDES ?= -I$(LVDIR) -I$(EPICSDIR) -I$(EPICSDIR)/os/Linux
+CXX       ?= g++
+CXXFLAGS  ?= -fPIC -std=c++17 -Wall -Wextra -Wno-multichar
+CXXFLAGS  += -fexceptions -frtti -fno-lto
+CXXFLAGS  += -MMD -MP
+BUILD     ?= release
 
-all:	libcalab.so
+ifeq ($(BUILD),debug)
+  CXXFLAGS += -g3 -O0
+else
+  CXXFLAGS += -O2
+endif
 
-calab.o:	src/calab.cpp
-	$(CC) $(CFLAGS) $(INCLUDES) -c src/calab.cpp
+INCLUDES  ?= -I$(LVDIR) -I$(EPICSDIR) -I$(EPICSDIR)/os/Linux -I$(EPICSDIR)/compiler/gcc
+LDFLAGS   ?= -shared -fno-lto
+LDLIBS    ?= -ldl -lpthread
 
-libcalab.so:	calab.o
-	$(CC) -fPIC -L$(LVDIR) -shared -o libcalab.so calab.o
+SRC = $(wildcard src/*.cpp)
+OBJ = $(SRC:.cpp=.o)
+DEPS = $(OBJ:.o=.d)
+TARGET = libcalab.so
+DESTDIR = /usr/local/calab
+
+all: $(TARGET)
+	@echo "Kopiere $(TARGET) nach $(DESTDIR)/"
+	mkdir -p $(DESTDIR)
+	cp -f $(TARGET) $(DESTDIR)/
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+$(TARGET): $(OBJ)
+	$(CXX) $(LDFLAGS) -o $@ $(OBJ) $(LDLIBS)
+
+-include $(DEPS)
 
 clean:
-	rm -f calab.o libcalab.so
+	rm -f $(OBJ) $(DEPS) $(TARGET)

@@ -3,7 +3,8 @@
 [Files]
 // General Installation Files
 Source: "Release\calab.dll"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab
-Source: "src\calab.cpp"; DestDir: "{app}\src"; Flags: confirmoverwrite; Components: sources
+Source: "src\*.cpp"; DestDir: "{app}\src"; Flags: confirmoverwrite; Components: sources
+Source: "src\*.h"; DestDir: "{app}\src"; Flags: confirmoverwrite; Components: sources
 
 // EPICS Dependencies
 Source: "..\..\..\epics\current-epics-base\bin\win32-x86\*.dll"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab or caTools
@@ -65,13 +66,13 @@ AppComments=Before un/installing CA Lab, you should close all EPICS applications
 AppContact=carsten.winkler@helmholtz-berlin.de
 AppCopyright=HZB GmbH
 AppendDefaultGroupName=true
-AppId={{B6C731D9-DF80-4C2E-8A3D-25A4FC5DFB76}
+AppId={{B6C731D9-DF80-4C2E-8A3D-25A4FC5DFB77}
 AppName=CA Lab 32-bit
 AppPublisher=HZB GmbH
 AppPublisherURL=www.helmholtz-berlin.de
 AppSupportURL=https://hz-b.de/calab
 AppUpdatesURL=https://hz-b.de/calab
-AppVersion=1.7.4.1
+AppVersion=1.8.0.1
 
 
 ChangesEnvironment=true
@@ -83,7 +84,7 @@ InfoAfterFile=
 InfoBeforeFile="changelog.txt"
 LanguageDetectionMethod=none
 LicenseFile="LICENSE"
-OutputBaseFilename=caLabSetup_1741x86
+OutputBaseFilename=caLabSetup_1801x86
 OutputDir=.
 PrivilegesRequired=none
 PrivilegesRequiredOverridesAllowed=dialog
@@ -97,14 +98,14 @@ VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
 VersionInfoProductName=CA Lab
-VersionInfoProductVersion=1.7.4.1
-VersionInfoTextVersion=1.7.4.1
-VersionInfoVersion=1.7.4.1
+VersionInfoProductVersion=1.8.0.1
+VersionInfoTextVersion=1.8.0.1
+VersionInfoVersion=1.8.0.1
 WizardImageFile="res\WizardImage-IS.bmp"
 WizardSmallImageFile=res\WizardSmallImage-IS2.bmp
 MinVersion=0,6.1sp1
-VersionInfoProductTextVersion=Version: 1.7.4.1
-VersionInfoOriginalFileName=caLabSetup_1741x86.exe
+VersionInfoProductTextVersion=Version: 1.8.0.1
+VersionInfoOriginalFileName=caLabSetup_1801x86.exe
 
 [Icons]
 Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\caLab.dll; IconIndex: 0

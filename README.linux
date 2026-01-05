@@ -5,8 +5,9 @@
 ## This manual has been updated on 27/Jul/2023
 
 ## Testsystem
-# RHEL 8.5 and Ubuntu 22.04 LTS
+# Ubuntu 22.04 LTS
 # LabVIEW 2020/2021/2023 (64 bit) installed in /usr/local/natinst/
+# This guide assumes Ubuntu.
 
 ## Install tools and libraries
 ##############################
@@ -44,14 +45,14 @@ restart computer
 
 ## LAST ADAPTATIONS
 ####################
-set enviroment variables EPICS_CA_ADDR_LIST and EPICS_CA_AUTO_ADDR_LIST
-optional set enviroment variables CALAB_NODBG and CALAB_POLLING
+set environment variables EPICS_CA_ADDR_LIST and EPICS_CA_AUTO_ADDR_LIST
+optionally set environment variables CALAB_NODBG and CALAB_POLLING
 start Soft IOC shell: /usr/local/epics/bin/linux-x86_64/softIoc -d /usr/local/calab/vis/demo/db/demo.db
-start labVIEW
+start LabVIEW
    go to menu Tools->Advanced->Mass Compile
    set 'Directory to compile' to '/usr/local/calab/vis'
    press button 'Mass Compile'
-   the result view shows some trubles but no error => all is fine => press the button 'Done'
+   the result view shows some troubles but no error => all is fine => press the button 'Done'
 all demo VIs (except SoftIoc*.vi => see next lines) should be able to run
 they are located at '/usr/local/calab/vis/Examples/'
 if you want to run the 'SoftIoc Demo.vi', 'screen' must be installed first
@@ -63,13 +64,11 @@ if you want to run the 'SoftIoc Demo.vi', 'screen' must be installed first
 
 ## Troubleshooting
 #######################
-Modern Linuxes often have a firewall running, which might prevent EPICS from working.
+Modern Ubuntu versions often have a firewall running, which might prevent EPICS from working.
 EPICS needs TCP and UDP ports 5064 and 5065 open.
-One solution is to download the "firewall-config" package. Once installed...
-    Add service for "EPICSChannelAccess" (the name doesn't matter)
-    Under this service, add TCP port 5064-5065 and UDP port 5064-5065.
-    Also add "source ports" for TCP port 5064-5065 and UDP port 5064-5065.
-    Reload firewalld.
-    Add EPICSChannelAccess to the zones "Permanent" and "Runtime".
+If you use ufw:
+    sudo ufw allow 5064:5065/tcp
+    sudo ufw allow 5064:5065/udp
+    sudo ufw reload
 
 Enjoy CA Lab!

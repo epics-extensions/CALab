@@ -213,6 +213,46 @@ record(waveform, "caLab:waveDouble4")
     field(EGU, "mm")
     field (PINI, "YES")
 }
+record(waveform, "caLab:waveFloat")
+{
+    field(DESC, "Float waveform record")
+    field(NELM, 200)
+    field(FTVL, "FLOAT")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveFloat1")
+{
+    field(DESC, "Float waveform record")
+    field(NELM, 200)
+    field(FTVL, "FLOAT")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveFloat2")
+{
+    field(DESC, "Float waveform record")
+    field(NELM, 200)
+    field(FTVL, "FLOAT")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveFloat3")
+{
+    field(DESC, "Float waveform record")
+    field(NELM, 200)
+    field(FTVL, "FLOAT")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
+record(waveform, "caLab:waveFloat4")
+{
+    field(DESC, "Float waveform record")
+    field(NELM, 200)
+    field(FTVL, "FLOAT")
+    field(EGU, "mm")
+    field (PINI, "YES")
+}
 record(waveform, "caLab:waveLong")
 {
     field(DESC, "Long waveform record")
