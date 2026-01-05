@@ -11,4 +11,3 @@ record(waveform, "caLab:waveShort") { field(DESC, "demo short array PV") field(P
 record(waveform, "caLab:waveLong") { field(DESC, "demo ai PV") field(PINI, "YES") field(NELM, "2048") field(FTVL, "LONG")}
 record(waveform, "caLab:waveDouble") { field(DESC, "demo double array PV") field(PINI, "YES") field(NELM, "200") field(FTVL, "DOUBLE")}
 record(waveform, "caLab:waveString") { field(DESC, "demo string array PV") field(PINI, "YES") field(NELM, "200") field(FTVL, "STRING")}
-

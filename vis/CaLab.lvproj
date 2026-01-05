@@ -1,6 +1,7 @@
 ﻿<?xml version='1.0' encoding='UTF-8'?>
 <Project Type="Project" LVVersion="19008000">
 	<Property Name="CCSymbols" Type="Str"></Property>
+	<Property Name="NI.LV.All.SaveVersion" Type="Str">19.0</Property>
 	<Property Name="NI.LV.All.SourceOnly" Type="Bool">true</Property>
 	<Property Name="NI.Project.Description" Type="Str">This project demonstrates a comprehensive interface between LabVIEW and the Experimental Physics and Industrial Control System (EPICS). The examples included in this project illustrate how to read, write, and receive EPICS values through events. Additionally, the project showcases the use of a self-instantiated SoftIOC (Soft Input/Output Controller), providing a practical example of its implementation.
 
@@ -16,16 +17,21 @@ Key Features:
 This project serves as a practical guide for engineers and researchers looking to integrate LabVIEW with EPICS for control and monitoring applications in scientific and industrial environments.</Property>
 	<Property Name="NI.Project.SaveVersion" Type="Str">Editor version</Property>
 	<Item Name="My Computer" Type="My Computer">
+		<Property Name="CCSymbols" Type="Str"></Property>
 		<Property Name="server.app.propertiesEnabled" Type="Bool">true</Property>
 		<Property Name="server.control.propertiesEnabled" Type="Bool">true</Property>
+		<Property Name="server.tcp.acl" Type="Str">0800000008000000</Property>
 		<Property Name="server.tcp.enabled" Type="Bool">false</Property>
 		<Property Name="server.tcp.port" Type="Int">0</Property>
-		<Property Name="server.tcp.serviceName" Type="Str">My Computer/VI Server</Property>
+		<Property Name="server.tcp.serviceName" Type="Str"></Property>
 		<Property Name="server.tcp.serviceName.default" Type="Str">My Computer/VI Server</Property>
+		<Property Name="server.vi.access" Type="Str"></Property>
 		<Property Name="server.vi.callsEnabled" Type="Bool">true</Property>
 		<Property Name="server.vi.propertiesEnabled" Type="Bool">true</Property>
+		<Property Name="server.viscripting.showScriptingOperationsInContextHelp" Type="Bool">false</Property>
+		<Property Name="server.viscripting.showScriptingOperationsInEditor" Type="Bool">false</Property>
 		<Property Name="specify.custom.address" Type="Bool">false</Property>
-		<Item Name="Examples" Type="Folder">
+		<Item Name="examples" Type="Folder">
 			<Item Name="Parallel Event Demo Sub" Type="Folder">
 				<Item Name="Parallel Event Close.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Close.vi"/>
 				<Item Name="Parallel Event Indicator.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Indicator.vi"/>
@@ -33,10 +39,10 @@ This project serves as a practical guide for engineers and researchers looking t
 				<Item Name="Parallel Event Struct.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Struct.vi"/>
 				<Item Name="Parallel Event Task.vi" Type="VI" URL="../examples/Parallel Event Demo Sub/Parallel Event Task.vi"/>
 			</Item>
-			<Item Name="caLab.db" Type="Document" URL="../Examples/caLab.db"/>
+			<Item Name="caLab.db" Type="Document" URL="../examples/caLab.db"/>
 			<Item Name="Event Demo.vi" Type="VI" URL="../examples/Event Demo.vi"/>
 			<Item Name="Parallel Event Demo.vi" Type="VI" URL="../examples/Parallel Event Demo.vi"/>
-			<Item Name="pvList.txt" Type="Document" URL="../Examples/pvList.txt"/>
+			<Item Name="pvList.txt" Type="Document" URL="../examples/pvList.txt"/>
 			<Item Name="Read Demo 1.vi" Type="VI" URL="../examples/Read Demo 1.vi"/>
 			<Item Name="Read Demo 2.vi" Type="VI" URL="../examples/Read Demo 2.vi"/>
 			<Item Name="SoftIOC Demo Sub.vi" Type="VI" URL="../examples/SoftIOC Demo Sub.vi"/>
@@ -44,6 +50,7 @@ This project serves as a practical guide for engineers and researchers looking t
 			<Item Name="Write Demo - Looping.vi" Type="VI" URL="../examples/Write Demo - Looping.vi"/>
 			<Item Name="Write Demo - Timed.vi" Type="VI" URL="../examples/Write Demo - Timed.vi"/>
 			<Item Name="Write Demo.vi" Type="VI" URL="../examples/Write Demo.vi"/>
+			<Item Name="Write Random TestPV_ai.vi" Type="VI" URL="../examples/Write Random TestPV_ai.vi"/>
 		</Item>
 		<Item Name="CaLab.lvlib" Type="Library" URL="../CaLab.lvlib"/>
 		<Item Name="Dependencies" Type="Dependencies">
@@ -83,6 +90,10 @@ This project serves as a practical guide for engineers and researchers looking t
 				<Item Name="Not Found Dialog.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Not Found Dialog.vi"/>
 				<Item Name="Palette Menu.lvlib" Type="Library" URL="/&lt;vilib&gt;/Palette API/Palette Menu/Palette Menu.lvlib"/>
 				<Item Name="Picture to Pixmap.vi" Type="VI" URL="/&lt;vilib&gt;/picture/pictutil.llb/Picture to Pixmap.vi"/>
+				<Item Name="Random Number (Range) DBL.vi" Type="VI" URL="/&lt;vilib&gt;/numeric/Random Number (Range) DBL.vi"/>
+				<Item Name="Random Number (Range) I64.vi" Type="VI" URL="/&lt;vilib&gt;/numeric/Random Number (Range) I64.vi"/>
+				<Item Name="Random Number (Range) U64.vi" Type="VI" URL="/&lt;vilib&gt;/numeric/Random Number (Range) U64.vi"/>
+				<Item Name="Random Number (Range).vi" Type="VI" URL="/&lt;vilib&gt;/numeric/Random Number (Range).vi"/>
 				<Item Name="Read Palette.vi" Type="VI" URL="/&lt;vilib&gt;/Palette API/Read Palette.vi"/>
 				<Item Name="Search and Replace Pattern.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Search and Replace Pattern.vi"/>
 				<Item Name="Set Bold Text.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Set Bold Text.vi"/>
@@ -92,12 +103,14 @@ This project serves as a practical guide for engineers and researchers looking t
 				<Item Name="Set Cursor.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/cursorutil.llb/Set Cursor.vi"/>
 				<Item Name="Set String Value.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Set String Value.vi"/>
 				<Item Name="Simple Error Handler.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Simple Error Handler.vi"/>
+				<Item Name="sub_Random U32.vi" Type="VI" URL="/&lt;vilib&gt;/numeric/sub_Random U32.vi"/>
 				<Item Name="subDisplayMessage.vi" Type="VI" URL="/&lt;vilib&gt;/express/express output/DisplayMessageBlock.llb/subDisplayMessage.vi"/>
 				<Item Name="subFile Dialog.vi" Type="VI" URL="/&lt;vilib&gt;/express/express input/FileDialogBlock.llb/subFile Dialog.vi"/>
 				<Item Name="System Exec.vi" Type="VI" URL="/&lt;vilib&gt;/Platform/system.llb/System Exec.vi"/>
 				<Item Name="TagReturnType.ctl" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/TagReturnType.ctl"/>
 				<Item Name="Three Button Dialog CORE.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Three Button Dialog CORE.vi"/>
 				<Item Name="Three Button Dialog.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Three Button Dialog.vi"/>
+				<Item Name="Trim Whitespace One-Sided.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Trim Whitespace One-Sided.vi"/>
 				<Item Name="Trim Whitespace.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/Trim Whitespace.vi"/>
 				<Item Name="Unset Busy.vi" Type="VI" URL="/&lt;vilib&gt;/Utility/cursorutil.llb/Unset Busy.vi"/>
 				<Item Name="whitespace.ctl" Type="VI" URL="/&lt;vilib&gt;/Utility/error.llb/whitespace.ctl"/>
@@ -106,7 +119,6 @@ This project serves as a practical guide for engineers and researchers looking t
 			<Item Name="calab.dll" Type="Document" URL="calab.dll">
 				<Property Name="NI.PreserveRelativePath" Type="Bool">true</Property>
 			</Item>
-			<Item Name="Get_EPICS_binaries_path.vi" Type="VI" URL="../private/Get_EPICS_binaries_path.vi"/>
 		</Item>
 		<Item Name="Build Specifications" Type="Build"/>
 	</Item>
