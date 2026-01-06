@@ -39,3 +39,5 @@ src/calab - Kopie.cpp
 *.html
 /vis/tests
 *.patch
+bak/ 
+bin/ 
