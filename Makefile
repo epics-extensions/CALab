@@ -28,9 +28,13 @@ TARGET = libcalab.so
 DESTDIR = /usr/local/calab
 
 all: $(TARGET)
-	@echo "Kopiere $(TARGET) nach $(DESTDIR)/"
-	mkdir -p $(DESTDIR)
-	cp -f $(TARGET) $(DESTDIR)/
+	@echo "Copying $(TARGET) to $(DESTDIR)/"
+	@if [ "$(abspath $(DESTDIR))" != "$(abspath $(CURDIR))" ]; then \
+		mkdir -p "$(DESTDIR)"; \
+		cp -f "$(TARGET)" "$(DESTDIR)/"; \
+	else \
+		echo "Target is current directory; skipping copy."; \
+	fi
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
