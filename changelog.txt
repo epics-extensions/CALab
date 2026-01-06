@@ -14,6 +14,7 @@ V1.8.0.2 (Unreleased)
   for quick health checks.
 * Improved Linux support with runtime loading of EPICS libraries,
   avoiding hard build‑time dependencies.
+* Improved numeric string parsing for comma/dot locales
 
 ### CALab – Full Changelog
 ----------------------------------------------------------------------
