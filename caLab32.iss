@@ -72,7 +72,7 @@ AppPublisher=HZB GmbH
 AppPublisherURL=www.helmholtz-berlin.de
 AppSupportURL=https://hz-b.de/calab
 AppUpdatesURL=https://hz-b.de/calab
-AppVersion=1.8.0.1
+AppVersion=1.8.0.2
 
 
 ChangesEnvironment=true
@@ -84,7 +84,7 @@ InfoAfterFile=
 InfoBeforeFile="changelog.txt"
 LanguageDetectionMethod=none
 LicenseFile="LICENSE"
-OutputBaseFilename=caLabSetup_1801x86
+OutputBaseFilename=caLabSetup_1802x86
 OutputDir=.
 PrivilegesRequired=none
 PrivilegesRequiredOverridesAllowed=dialog
@@ -98,14 +98,14 @@ VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
 VersionInfoProductName=CA Lab
-VersionInfoProductVersion=1.8.0.1
-VersionInfoTextVersion=1.8.0.1
-VersionInfoVersion=1.8.0.1
+VersionInfoProductVersion=1.8.0.2
+VersionInfoTextVersion=1.8.0.2
+VersionInfoVersion=1.8.0.2
 WizardImageFile="res\WizardImage-IS.bmp"
 WizardSmallImageFile=res\WizardSmallImage-IS2.bmp
 MinVersion=0,6.1sp1
-VersionInfoProductTextVersion=Version: 1.8.0.1
-VersionInfoOriginalFileName=caLabSetup_1801x86.exe
+VersionInfoProductTextVersion=Version: 1.8.0.2
+VersionInfoOriginalFileName=caLabSetup_1802x86.exe
 
 [Icons]
 Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\caLab.dll; IconIndex: 0

@@ -1,7 +1,7 @@
 ﻿//==================================================================================================
 // Name      : calab.cpp
 // Authors   : Carsten Winkler, Brian Powell
-// Version   : 1.8.0.1
+// Version   : 1.8.0.2
 // Copyright : HZB
 // Description: Modernized CALab core for reading/writing EPICS PVs and LabVIEW events
 // GitHub    : https://github.com/epics-extensions/CALab
@@ -20,7 +20,7 @@
 // MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 //==================================================================================================
 
-#include <locale>
+#include <locale.h>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -29,8 +29,8 @@
 #include <shared_mutex>
 #include <cstdarg>
 #include <ctime>
+#include <cctype>
 #include <cstdlib>
-#include <sstream>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -56,7 +56,7 @@
 #endif
 
 #ifndef CALAB_VERSION
-#define CALAB_VERSION "1.8.0.1"
+#define CALAB_VERSION "1.8.0.2"
 #endif
 
 
@@ -1152,6 +1152,67 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			return std::string(s, len);
 		}
 
+		static bool parseNumericString(const std::string& txt, double& out) {
+			auto parseClassic = [](const std::string& s, double& value) -> bool {
+				const char* start = s.c_str();
+				char* end = nullptr;
+#if defined _WIN32 || defined _WIN64
+				static _locale_t cLocale = _create_locale(LC_NUMERIC, "C");
+				value = _strtod_l(start, &end, cLocale);
+#else
+				static locale_t cLocale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
+				if (cLocale) {
+					value = strtod_l(start, &end, cLocale);
+				}
+				else {
+					value = std::strtod(start, &end);
+				}
+#endif
+				if (start == end) return false;
+				while (*end && std::isspace(static_cast<unsigned char>(*end))) { ++end; }
+				return (*end == '\0');
+			};
+
+			if (parseClassic(txt, out)) return true;
+
+			size_t lastComma = std::string::npos;
+			size_t lastDot = std::string::npos;
+			for (size_t i = 0; i < txt.size(); ++i) {
+				if (txt[i] == ',') lastComma = i;
+				else if (txt[i] == '.') lastDot = i;
+			}
+			const bool hasComma = (lastComma != std::string::npos);
+			const bool hasDot = (lastDot != std::string::npos);
+
+			if (!hasComma && !hasDot) {
+				return false;
+			}
+
+			// Normalize decimal separators to allow both "1.23" and "1,23".
+			if (!hasComma && hasDot) return false;
+
+			char decimal = ',';
+			char thousands = '\0';
+			if (hasComma && hasDot) {
+				if (lastComma > lastDot) { decimal = ','; thousands = '.'; }
+				else { decimal = '.'; thousands = ','; }
+			}
+
+			std::string normalized;
+			normalized.reserve(txt.size());
+			for (char c : txt) {
+				if (thousands && c == thousands) continue;
+				if (c == decimal) normalized.push_back('.');
+				else normalized.push_back(c);
+			}
+
+			if (normalized == txt) {
+				return false;
+			}
+
+			return parseClassic(normalized, out);
+		}
+
 		void ensureErrorArray(uInt32 n) {
 			if (!ErrorArray || n < 1) return;
 			if (!*ErrorArray || (**ErrorArray)->dimSize != n) {
@@ -1684,14 +1745,11 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 				else { caStatus[i] = ctx.doPut(DBR_CHAR, count, channelID, s.c_str(), doWaitRequested, putCtx, totalWrites); }
 			}
 			else {
-				auto parseDouble = [](const std::string& txt, double& out) -> bool {
-					std::stringstream ss(txt); ss.imbue(std::locale::classic()); ss >> out; return !ss.fail();
-					};
 				bool allOk = true;
 				std::vector<double> numericValues(nToWrite);
 				for (uInt32 j = 0; j < nToWrite; ++j) {
 					std::string s = PutValueCtx::getLVString((**StringValueArray2D)->elt[startIndex + j]);
-					if (!parseDouble(s, numericValues[j])) { allOk = false; break; }
+					if (!PutValueCtx::parseNumericString(s, numericValues[j])) { allOk = false; break; }
 				}
 				if (!allOk) { ctx.setErrorAt(i, (uInt32)ECA_BADTYPE, "Invalid numeric string(s)"); caStatus[i] = ECA_BADTYPE; continue; }
 
