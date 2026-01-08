@@ -932,6 +932,7 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 		*CommunicationStatus = 1;
 		return;
 	}
+	bool didPrepare = false;
 	{
 		TimeoutSharedLock<std::shared_timed_mutex> rlock(g.pvRegistryLock, "getValue-check", std::chrono::milliseconds(30000));
 		if (!rlock.isLocked()) {
@@ -960,22 +961,23 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 			}
 		}
 
-		if (hasChanges || needsReinit) {
-			cleanupMemory(ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray, PvNameArray,
-				needsReinit ? std::vector<uInt32>() : changedIndexList);
+			if (hasChanges || needsReinit) {
+				cleanupMemory(ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray, PvNameArray,
+					needsReinit ? std::vector<uInt32>() : changedIndexList);
 
-			MgErr err = prepareOutputArrays(nameCount, maxNumberOfValues, filter,
-				ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray, PvNameArray,
-				needsReinit ? std::vector<uInt32>() : changedIndexList);
-			if (err != noErr) {
-				CaLabDbgPrintf("Error preparing output arrays: %d", err);
-				*CommunicationStatus = 1;
-				return;
-			}
+				MgErr err = prepareOutputArrays(nameCount, maxNumberOfValues, filter,
+					ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray, PvNameArray,
+					needsReinit ? std::vector<uInt32>() : changedIndexList);
+				if (err != noErr) {
+					CaLabDbgPrintf("Error preparing output arrays: %d", err);
+					*CommunicationStatus = 1;
+					return;
+				}
+				didPrepare = true;
 
-			populateOutputArrays(nameCount, maxNumberOfValues, filter, PvIndexArray,
-				ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray,
-				needsReinit ? std::vector<uInt32>() : changedIndexList);
+				populateOutputArrays(nameCount, maxNumberOfValues, filter, PvIndexArray,
+					ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray,
+					needsReinit ? std::vector<uInt32>() : changedIndexList);
 
 			if (CommunicationStatus) {
 				const int globalErrors = g.pvErrorCount.load(std::memory_order_relaxed);
@@ -993,6 +995,11 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 				}
 			}
 		}
+	}
+
+	if (didPrepare) {
+		// Arrays may have moved due to reallocation; refresh instance bindings.
+		bindArraysToInstance("getValue", PvIndexArray, ResultArray, FirstStringValue, FirstDoubleValue, DoubleValueArray);
 	}
 
 	updatePvIndexArray(PvIndexArray, changedIndexList);
@@ -1466,9 +1473,9 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			PVItem* item = ctx.getPvItemForIndex(i);
 			items[i] = item;
 			if (!item) continue;
-			if (item->channelId != nullptr && ca_state(item->channelId) != cs_conn && item->isConnected()) {
-				CaLabDbgPrintf("putValue: PV %s with chanID %p has inconsistent channel state %d; resetting connection", item->getName().c_str(), item->channelId, ca_state(item->channelId));
-			}
+			// if (item->channelId != nullptr && ca_state(item->channelId) != cs_conn && item->isConnected()) {
+			// 	CaLabDbgPrintf("putValue: PV %s with chanID %p has inconsistent channel state %d; resetting connection", item->getName().c_str(), item->channelId, ca_state(item->channelId));
+			// }
 			const bool needsConnect = (item->channelId == nullptr || !item->isConnected());
 			if (needsConnect) {
 				toConnect.push_back(i);
@@ -2374,7 +2381,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 			if (hErr == noErr) {		
 				for (uInt32 i = 0; i < (*resultHdl)->dimSize; i++) {
 					sResult* currentResult = &(*resultHdl)->result[i];
-					if (currentResult == nullptr) {
+					if (currentResult == nullptr || currentResult->PVName == nullptr) {
 						continue;
 					}
 					hErr = DSCheckHandle(currentResult->PVName);
@@ -3710,7 +3717,7 @@ void populateOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter
 							const size_t totalSize =
 								sizeof(sStringArray) +                                    // header + 1 element
 								(static_cast<size_t>(fieldCount) - 1) * sizeof(LStrHandle); // remaining elements
-							currentResult->FieldNameArray = reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
+							currentResult->FieldValueArray = reinterpret_cast<sStringArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
 							if (currentResult->FieldValueArray)
 								(*currentResult->FieldValueArray)->dimSize = fieldCount;
 						}
@@ -3928,8 +3935,9 @@ void enumInfoChanged(struct event_handler_args args) {
 
 MgErr DeleteStringArray(sStringArrayHdl array) {
 	MgErr err = noErr;
+	if (!array) return err;
 	err = DSCheckHandle(array);
-	if (err != noErr)
+	if (err != noErr || !*array)
 		return err;
 	for (uInt32 i = 0; i < (*array)->dimSize; i++) {
 		if ((*array)->elt[i] && DSCheckHandle((*array)->elt[i]) == noErr) {
@@ -3979,6 +3987,7 @@ MgErr CleanupResult(sResult* currentResult) {
 	currentResult->ErrorIO.code = 0;
 	currentResult->ErrorIO.status = 0;
 	currentResult->valueArraySize = 0;
+	currentResult = nullptr;
 	return err;
 }
 
@@ -4360,13 +4369,13 @@ std::vector<std::pair<std::string, std::string>> collectEnvironmentInfo() {
 
 	// Version Info
 #if IsOpSystem64Bit
-#ifdef _DEBUG
+#if defined(DEBUG) || defined(_DEBUG)
 	epicsSnprintf(buffer, sizeof(buffer), "%s DEBUG 64 bit", CALAB_VERSION);
 #else
 	epicsSnprintf(buffer, sizeof(buffer), "%s 64 bit", CALAB_VERSION);
 #endif
 #else
-#ifdef _DEBUG
+#if defined(DEBUG) || defined(_DEBUG)
 	epicsSnprintf(buffer, sizeof(buffer), "%s DEBUG 32 bit", CALAB_VERSION);
 #else
 	epicsSnprintf(buffer, sizeof(buffer), "%s 32 bit", CALAB_VERSION);
