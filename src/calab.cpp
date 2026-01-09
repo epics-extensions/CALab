@@ -2047,12 +2047,12 @@ extern "C" EXPORT MgErr reserved(InstanceDataPtr* instanceState) {
 extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 	try {
 		if (!instanceState || !*instanceState) {
-			CaLabDbgPrintf("unreserved: Called with null instanceState");
+			CaLabDbgPrintfD("unreserved: Called with null instanceState");
 			return 0;
 		}
 		MyInstanceData* data = static_cast<MyInstanceData*>(*instanceState);
 		if (!data) {
-			CaLabDbgPrintf("unreserved: Instance data pointer is null");
+			CaLabDbgPrintfD("unreserved: Instance data pointer is null");
 			return 0;
 		}
 
@@ -2060,7 +2060,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 
 		// get name
 		std::string funcName = data->firstFunctionName;
-		//CaLabDbgPrintf("unreserved: Unreserving instance for function '%s' (instanceState=%p data=%p PvIndexArray=%p)", funcName.c_str(), static_cast<void*>(instanceState), static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
+		//CaLabDbgPrintfD("unreserved: Unreserving instance for function '%s' (instanceState=%p data=%p PvIndexArray=%p)", funcName.c_str(), static_cast<void*>(instanceState), static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
 		// Early exit for unused instances (no function was ever called)
 		if (data->firstFunctionName.empty()) {
 			std::lock_guard<std::mutex> lock(g.instancesMutex);
@@ -2130,11 +2130,11 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 			std::vector<PVItem*> basePvs;
 			{
 				std::lock_guard<std::mutex> lk(data->arrayMutex);
-				//CaLabDbgPrintf("unreserved: collecting basePvs: data=%p PvIndexArray=%p", static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
+				//CaLabDbgPrintfD("unreserved: collecting basePvs: data=%p PvIndexArray=%p", static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
 				if (data->PvIndexArray && *data->PvIndexArray) {
 					sLongArrayHdl hdl = data->PvIndexArray;
 					sLongArray* arr = *data->PvIndexArray;
-					//CaLabDbgPrintf("unreserved: PvIndexArray array handle=%p arr=%p dimSize=%u", static_cast<void*>(data->PvIndexArray), static_cast<void*>(arr), (arr ? static_cast<unsigned int>(arr->dimSize) : 0u));
+					//CaLabDbgPrintfD("unreserved: PvIndexArray array handle=%p arr=%p dimSize=%u", static_cast<void*>(data->PvIndexArray), static_cast<void*>(arr), (arr ? static_cast<unsigned int>(arr->dimSize) : 0u));
 					try {
 						MgErr hErr = DSCheckHandle(hdl);
 						if (hErr != noErr) {
@@ -2143,7 +2143,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 						else {
 							const size_t dim = arr->dimSize;
 							if (dim > 1'000'000) { // Grenze nach deinem Bedarf
-								CaLabDbgPrintf("unreserved: #1 %s Implausible dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), static_cast<uint64_t>(dim), static_cast<void*>(arr));
+								CaLabDbgPrintfD("unreserved: #1 %s Implausible dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), static_cast<uint64_t>(dim), static_cast<void*>(arr));
 							}
 							else {
 								basePvs.reserve(arr->dimSize);
@@ -2293,11 +2293,11 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 								static_cast<void*>(arr), hErr);
 						}
 						else {
-							/*CaLabDbgPrintf("unreserved: #2 Collecting PvIndex entries from %s PvIndexArray=%p (arr=%p dimSize=%" PRIu64 ")", funcName.c_str(),
+							/*CaLabDbgPrintfD("unreserved: #2 Collecting PvIndex entries from %s PvIndexArray=%p (arr=%p dimSize=%" PRIu64 ")", funcName.c_str(),
 								static_cast<void*>(hdl), static_cast<void*>(arr), arr->dimSize);*/
 							const uInt64 dim = arr->dimSize;
 							if (dim > 1'000'000) { // Grenze nach deinem Bedarf
-								CaLabDbgPrintf("unreserved: #2 Implausible %s dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), dim, static_cast<void*>(arr));
+								CaLabDbgPrintfD("unreserved: #2 Implausible %s dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), dim, static_cast<void*>(arr));
 							}
 							else {
 								entriesToDelete.reserve(arr->dimSize);
