@@ -35,9 +35,15 @@ batch/copyFiles.bat
 copy*.bat
 post_install*
 src/calab - Kopie.cpp
+src/*.o
+src/*.d
 *.7z
 *.html
 /vis/tests
 *.patch
 bak/ 
 bin/ 
+build/
+src/*.sh
+src/*.py
+
