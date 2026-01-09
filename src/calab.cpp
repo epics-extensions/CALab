@@ -2378,7 +2378,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 		if (data->ResultArray && *data->ResultArray) {
 			sResultArrayHdl resultHdl = data->ResultArray;
 			MgErr hErr = DSCheckHandle(resultHdl);
-			if (hErr == noErr) {		
+			if (hErr == noErr) {
 				for (uInt32 i = 0; i < (*resultHdl)->dimSize; i++) {
 					sResult* currentResult = &(*resultHdl)->result[i];
 					if (currentResult == nullptr || currentResult->PVName == nullptr) {
@@ -2389,21 +2389,43 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 						err += CleanupResult(currentResult);
 					}
 				}
-			} 
+			}
 		}
 		data->ResultArray = nullptr;
 
-		if (data->FirstStringValue && *data->FirstStringValue) {
-			for (uInt32 j = 0; j < (*data->FirstStringValue)->dimSize; j++) {
-				if ((*data->FirstStringValue)->elt[j] && DSCheckHandle((*data->FirstStringValue)->elt[j]) == noErr)
-					err += DSDisposeHandle((*data->FirstStringValue)->elt[j]);
-				(*data->FirstStringValue)->elt[j] = nullptr;
-			}
-		}
-		data->FirstStringValue = nullptr;
-		data->FirstDoubleValue = nullptr;
-		data->DoubleValueArray = nullptr;
+		{
+			std::lock_guard<std::mutex> lk(data->arrayMutex);
+			if (data->FirstStringValue && *data->FirstStringValue) {
+				// Validate pointer alignment before dereferencing
+				const uintptr_t ptrValue = reinterpret_cast<uintptr_t>(*data->FirstStringValue);
+				const bool isAligned = (ptrValue % alignof(sStringArray)) == 0;
+				const bool isPlausible = ptrValue >= 0x10000;
 
+				if (!isAligned || !isPlausible) {
+					CaLabDbgPrintf("unreserved: FirstStringValue pointer 0x%016" PRIxPTR " is invalid (aligned=%d, plausible=%d); skipping cleanup",
+						ptrValue, isAligned, isPlausible);
+				}
+				else {
+					MgErr hErr = DSCheckHandle((*data->FirstStringValue));
+					if (hErr == noErr) {
+						const uInt32 dim = (*data->FirstStringValue)->dimSize;
+						if (dim > 1'000'000) {
+							CaLabDbgPrintf("unreserved: Implausible dimSize=%u for FirstStringValue; skipping cleanup", dim);
+						}
+						else {
+							for (uInt32 j = 0; j < dim; j++) {
+								if ((*data->FirstStringValue)->elt[j] && DSCheckHandle((*data->FirstStringValue)->elt[j]) == noErr)
+									err += DSDisposeHandle((*data->FirstStringValue)->elt[j]);
+								(*data->FirstStringValue)->elt[j] = nullptr;
+							}
+						}
+					}
+				}
+			}
+			data->FirstStringValue = nullptr;
+			data->FirstDoubleValue = nullptr;
+			data->DoubleValueArray = nullptr;
+		}
 
 		g.unregisterArraysForInstance(instanceState);
 
