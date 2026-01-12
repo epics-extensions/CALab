@@ -331,7 +331,6 @@ inline bool tryClaimAndDeletePvIndexEntry(void* eltPtr) {
 		entry->metaInfo = nullptr;
 	}
 	entry->pvItem = nullptr;
-	//  CaLabDbgPrintf("tryClaimAndDeletePvIndexEntry: deleted entry %p", static_cast<void*>(entry));
 	mark_deletion_done(entry);
 	delete entry;
 
@@ -862,7 +861,6 @@ extern "C" EXPORT void getValue(sStringArrayHdl* PvNameArray, sStringArrayHdl* F
 				if (boundInstance->PvIndexArray != *PvIndexArray) {
 					boundInstance->PvIndexArray = *PvIndexArray;
 					g.registerArrayToInstance(static_cast<void*>(*PvIndexArray), myOwnerPtr);
-					//CaLabDbgPrintf("getValue: Bound PvIndexArray to instance (firstFunction=%s) owner pointer %x.", boundInstance->firstFunctionName.c_str(), myOwnerPtr);
 				}
 			}
 		}
@@ -1095,7 +1093,6 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 				if (instanceData->PvIndexArray != *PvIndexArray) {
 					instanceData->PvIndexArray = *PvIndexArray;
 					g.registerArrayToInstance(static_cast<void*>(*PvIndexArray), ownerPtr);
-					//CaLabDbgPrintf("putValue: Bound PvIndexArray to instance (firstFunction=%s) owner pointer %x.", instanceData->firstFunctionName.c_str(), ownerPtr);
 				}
 			}
 		}
@@ -1310,7 +1307,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 				}
 			}
 
-			// Wenn nicht vorhanden, lege neu an (mit registry-unique-lock)
+			// If missing, create it (with registry unique lock)
 			for (int retry = 0; retry < 2; ++retry) {
 				TimeoutUniqueLock<std::shared_timed_mutex> uniqueLock(
 					globals.pvRegistryLock,
@@ -1335,7 +1332,7 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 				PVItem* pvItem = newPv.get();
 				globals.pvRegistry[pvName] = std::move(newPv);
 
-				// Atomisch altes Element claimen und löschen (falls vorhanden)
+				// Atomically claim and delete old element if present
 				if (PvIndexArray && *PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize > i) {
 					tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
 				}
@@ -1473,9 +1470,6 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 			PVItem* item = ctx.getPvItemForIndex(i);
 			items[i] = item;
 			if (!item) continue;
-			// if (item->channelId != nullptr && ca_state(item->channelId) != cs_conn && item->isConnected()) {
-			// 	CaLabDbgPrintf("putValue: PV %s with chanID %p has inconsistent channel state %d; resetting connection", item->getName().c_str(), item->channelId, ca_state(item->channelId));
-			// }
 			const bool needsConnect = (item->channelId == nullptr || !item->isConnected());
 			if (needsConnect) {
 				toConnect.push_back(i);
@@ -2060,7 +2054,6 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 
 		// get name
 		std::string funcName = data->firstFunctionName;
-		//CaLabDbgPrintfD("unreserved: Unreserving instance for function '%s' (instanceState=%p data=%p PvIndexArray=%p)", funcName.c_str(), static_cast<void*>(instanceState), static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
 		// Early exit for unused instances (no function was ever called)
 		if (data->firstFunctionName.empty()) {
 			std::lock_guard<std::mutex> lock(g.instancesMutex);
@@ -2094,6 +2087,13 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 
 
 		MgErr err = noErr;
+		bool skipCleanup = false;
+		auto markCorruptAndSkip = [&](const char* reason) {
+			if (!skipCleanup) {
+				CaLabDbgPrintfD("unreserved: corruption detected (%s); skipping further cleanup", reason);
+			}
+			skipCleanup = true;
+		};
 
 		// Helper to check if array is shared by another instance
 		auto isArraySharedByOtherInstance = [&](void* arrayHandle) -> bool {
@@ -2130,19 +2130,18 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 			std::vector<PVItem*> basePvs;
 			{
 				std::lock_guard<std::mutex> lk(data->arrayMutex);
-				//CaLabDbgPrintfD("unreserved: collecting basePvs: data=%p PvIndexArray=%p", static_cast<void*>(data), static_cast<void*>(data->PvIndexArray));
 				if (data->PvIndexArray && *data->PvIndexArray) {
 					sLongArrayHdl hdl = data->PvIndexArray;
 					sLongArray* arr = *data->PvIndexArray;
-					//CaLabDbgPrintfD("unreserved: PvIndexArray array handle=%p arr=%p dimSize=%u", static_cast<void*>(data->PvIndexArray), static_cast<void*>(arr), (arr ? static_cast<unsigned int>(arr->dimSize) : 0u));
 					try {
 						MgErr hErr = DSCheckHandle(hdl);
 						if (hErr != noErr) {
 							CaLabDbgPrintfD("unreserved: #1 DSCheckHandle failed for %s PvIndexArray=%p (err=%d)", funcName.c_str(),	static_cast<void*>(arr), hErr);
+							markCorruptAndSkip("#1 DSCheckHandle failed");
 						}
 						else {
 							const size_t dim = arr->dimSize;
-							if (dim > 1'000'000) { // Grenze nach deinem Bedarf
+							if (dim > 1'000'000) { // adjust limit as needed
 								CaLabDbgPrintfD("unreserved: #1 %s Implausible dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), static_cast<uint64_t>(dim), static_cast<void*>(arr));
 							}
 							else {
@@ -2158,6 +2157,7 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 					catch (...) {
 						CaLabDbgPrintf("unreserved: Exception while collecting base PVs");
 						CaLabDbgPrintf("You should terminated and restart LabVIEW to avoid memory leaks.");
+						markCorruptAndSkip("exception collecting base PVs");
 						basePvs.clear();
 						*data->PvIndexArray = nullptr;
 					}
@@ -2187,7 +2187,6 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 				}
 			}
 
-			// Add base PVs to the reset list
 			pvsToReset.insert(pvsToReset.end(), basePvs.begin(), basePvs.end());
 		}
 
@@ -2205,10 +2204,10 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 			std::vector<ResetInfo> resetInfos;
 			resetInfos.reserve(pvsToReset.size());
 
-			// Menge der zu resetenden PVs – schnelle O(1)-Nachschlagezeit
+			// Set of PVs to reset for O(1) lookup
 			std::unordered_set<PVItem*> toResetSet(pvsToReset.begin(), pvsToReset.end());
 
-			// Einmaliger Shared-Lock auf die Registry
+			// Single shared lock on the registry
 			{
 				TimeoutSharedLock<std::shared_timed_mutex> regLock(
 					g.pvRegistryLock,
@@ -2217,19 +2216,17 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 				);
 
 				if (!regLock.isLocked()) {
-					// Verhalten analog zu bisher: wenn Lock nicht zu bekommen ist,
-					// brechen wir das Reset hier ab (konservativ).
-					// Optional: Logging hinzufügen.
+					// Behavior matches previous: if the lock cannot be acquired, abort reset here (conservative).
 				}
 				else {
-					// Einmaliger Scan durch die Registry
+					// Single scan through the registry
 					for (auto& kv : g.pvRegistry) {
 						if (!kv.second) continue;
 
 						PVItem* pvItem = kv.second.get();
 						if (!pvItem) continue;
 
-						// Nur PVs bearbeiten, die wir tatsächlich resetten wollen
+						// Only process PVs we actually want to reset
 						if (toResetSet.find(pvItem) == toResetSet.end()) {
 							continue;
 						}
@@ -2237,14 +2234,13 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 						ResetInfo info;
 						info.pvItem = pvItem;
 
-						// Reihenfolge der Locks beibehalten: zuerst Registry (shared),
-						// dann PV-Mutex.
+						// Preserve lock order: registry (shared) first, then PV mutex.
 						{
 							std::lock_guard<std::mutex> pvLock(pvItem->ioMutex());
 
 							info.ev = pvItem->eventId;
 							info.ch = pvItem->channelId;
-							info.pvName = pvItem->getName();  // nur für Logging/Debugging nötig
+							info.pvName = pvItem->getName();  // only needed for logging/debugging
 
 							pvItem->eventId = nullptr;
 							pvItem->channelId = nullptr;
@@ -2256,10 +2252,10 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 
 						resetInfos.emplace_back(std::move(info));
 					}
-				} // regLock wird hier freigegeben
+				} // regLock released here
 			}
 
-			// CA-Cleanup und Pending-Removal weiterhin außerhalb der Locks
+			// CA cleanup and pending removal remain outside the locks
 			for (const auto& info : resetInfos) {
 				if (info.ev) {
 					ca_clear_subscription(info.ev);
@@ -2276,152 +2272,160 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 		}
 
 
-		// NOW clean up arrays owned by this instance (AFTER PV reset)
-		// Collect & atomically claim entries while the array buffer is still valid.
-		std::vector<PvIndexEntry*> entriesToDelete;
-		{
-			std::lock_guard<std::mutex> lk(data->arrayMutex);
+		if (!skipCleanup) {
+			// NOW clean up arrays owned by this instance (AFTER PV reset)
+			// Collect & atomically claim entries while the array buffer is still valid.
+			std::vector<PvIndexEntry*> entriesToDelete;
+			{
+				std::lock_guard<std::mutex> lk(data->arrayMutex);
 
-			if (data->PvIndexArray && *data->PvIndexArray && !isArraySharedByOtherInstance(static_cast<void*>(*data->PvIndexArray))) {
-				sLongArrayHdl hdl = data->PvIndexArray;
-				sLongArray* arr = *data->PvIndexArray;
-				try {
-					if (hdl && arr) {
-						MgErr hErr = DSCheckHandle(hdl);
-						if (hErr != noErr) {
-							CaLabDbgPrintfD("unreserved: #2 DSCheckHandle failed for %s PvIndexArray=%p (err=%d)", funcName.c_str(),
-								static_cast<void*>(arr), hErr);
-						}
-						else {
-							/*CaLabDbgPrintfD("unreserved: #2 Collecting PvIndex entries from %s PvIndexArray=%p (arr=%p dimSize=%" PRIu64 ")", funcName.c_str(),
-								static_cast<void*>(hdl), static_cast<void*>(arr), arr->dimSize);*/
-							const uInt64 dim = arr->dimSize;
-							if (dim > 1'000'000) { // Grenze nach deinem Bedarf
-								CaLabDbgPrintfD("unreserved: #2 Implausible %s dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), dim, static_cast<void*>(arr));
+				if (data->PvIndexArray && *data->PvIndexArray && !isArraySharedByOtherInstance(static_cast<void*>(*data->PvIndexArray))) {
+					sLongArrayHdl hdl = data->PvIndexArray;
+					sLongArray* arr = *data->PvIndexArray;
+					try {
+						if (hdl && arr) {
+							MgErr hErr = DSCheckHandle(hdl);
+							if (hErr != noErr) {
+								CaLabDbgPrintfD("unreserved: #2 DSCheckHandle failed for %s PvIndexArray=%p (err=%d)", funcName.c_str(),
+									static_cast<void*>(arr), hErr);
 							}
 							else {
-								entriesToDelete.reserve(arr->dimSize);
-								for (uInt64 i = 0; i < arr->dimSize; ++i) {
-									// Interpret the LabVIEW slot as an atomic pointer-sized integer.
-									atomic_ptr_t* atomicElt = reinterpret_cast<atomic_ptr_t*>(&arr->elt[i]);
-									uintptr_t raw = atomicElt->load(std::memory_order_acquire);
-									if (raw == 0) continue;
+								const uInt64 dim = arr->dimSize;
+								if (dim > 1'000'000) { // adjust limit as needed
+									CaLabDbgPrintfD("unreserved: #2 Implausible %s dimSize=%" PRIu64 " for PvIndexArray=%p, skipping basePvs", funcName.c_str(), dim, static_cast<void*>(arr));
+								}
+								else {
+									entriesToDelete.reserve(arr->dimSize);
+									for (uInt64 i = 0; i < arr->dimSize; ++i) {
+										// Interpret the LabVIEW slot as an atomic pointer-sized integer.
+										atomic_ptr_t* atomicElt = reinterpret_cast<atomic_ptr_t*>(&arr->elt[i]);
+										uintptr_t raw = atomicElt->load(std::memory_order_acquire);
+										if (raw == 0) continue;
 
-									uintptr_t expected = raw;
-									// Claim the slot by CAS while the array memory is still valid.
-									if (atomicElt->compare_exchange_strong(expected, 0, std::memory_order_acq_rel, std::memory_order_acquire)) {
-										// Successfully claimed the slot; keep the entry pointer for later deletion.
-										PvIndexEntry* entry = reinterpret_cast<PvIndexEntry*>(raw);
-										if (entry) {
-											// Mark deleting to prevent further acquirers (defensive).
-											entry->mark_deleting();
-											entriesToDelete.push_back(entry);
+										uintptr_t expected = raw;
+										// Claim the slot by CAS while the array memory is still valid.
+										if (atomicElt->compare_exchange_strong(expected, 0, std::memory_order_acq_rel, std::memory_order_acquire)) {
+											// Successfully claimed the slot; keep the entry pointer for later deletion.
+											PvIndexEntry* entry = reinterpret_cast<PvIndexEntry*>(raw);
+											if (entry) {
+												// Mark deleting to prevent further acquirers (defensive).
+												entry->mark_deleting();
+												entriesToDelete.push_back(entry);
+											}
 										}
 									}
 								}
 							}
 						}
 					}
+					catch (...) {
+						CaLabDbgPrintf("unreserved: Exception while collecting PvIndex entries");
+						CaLabDbgPrintf("You should terminated and restart LabVIEW to avoid memory leaks.");
+						entriesToDelete.clear();
+						*data->PvIndexArray = nullptr;
+					}
 				}
-				catch (...) {
-					CaLabDbgPrintf("unreserved: Exception while collecting PvIndex entries");
-					CaLabDbgPrintf("You should terminated and restart LabVIEW to avoid memory leaks.");
-					entriesToDelete.clear();
-					*data->PvIndexArray = nullptr;
-				}
+
+				// Detach the array pointer while we do the actual deletions outside the lock
+				data->PvIndexArray = nullptr;
 			}
 
-			// Detach the array pointer while we do the actual deletions outside the lock
-			data->PvIndexArray = nullptr;
-		}
-
-		// Helper: plausibility check for pointer-like values.
-		auto isPlausiblePointer = [](uintptr_t p) -> bool {
-			// Reject very small addresses and misaligned pointers.
-			if (p < 0x10000) return false;
+			// Helper: plausibility check for pointer-like values.
+			auto isPlausiblePointer = [](uintptr_t p) -> bool {
+				// Reject very small addresses and misaligned pointers.
+				if (p < 0x10000) return false;
 #if (UINTPTR_MAX == 0xffffffff)
-			const uintptr_t align = 4;
+				const uintptr_t align = 4;
 #else
-			const uintptr_t align = 8;
+				const uintptr_t align = 8;
 #endif
-			if ((p & (align - 1)) != 0) return false;
-			return true;
-			};
+				if ((p & (align - 1)) != 0) return false;
+				return true;
+				};
 
-		// Perform wait + deletion for the claimed entries without holding data->arrayMutex.
-		if (!entriesToDelete.empty()) {
-			const auto hardTimeout = std::chrono::seconds(3);
-			std::vector<PvIndexEntry*> deferred;
-			for (PvIndexEntry* entry : entriesToDelete) {
-				if (!entry) continue;
+			// Perform wait + deletion for the claimed entries without holding data->arrayMutex.
+			if (!entriesToDelete.empty()) {
+				const auto hardTimeout = std::chrono::seconds(3);
+				std::vector<PvIndexEntry*> deferred;
+				for (PvIndexEntry* entry : entriesToDelete) {
+					if (!entry) continue;
 
-				const uintptr_t rawAddr = reinterpret_cast<uintptr_t>(entry);
-				if (!isPlausiblePointer(rawAddr)) {
-					CaLabDbgPrintf("unreserved: Implausible entry pointer 0x%016" PRIxPTR " - scheduling deferred deletion", rawAddr);
-					deferred.push_back(entry);
-					continue;
-				}
-
-				if (!tryReclaimAndDelete(entry, hardTimeout)) {
-					deferred.push_back(entry);
-				}
-			}
-			if (!deferred.empty()) {
-				CaLabDbgPrintf("unreserved: Starting deferred deletion worker for %zu entries", deferred.size());
-				std::thread(deferredDeletionWorker, std::move(deferred)).detach();
-				// Short pause to give CA callbacks some time
-				ca_pend_event(0.001);
-			}
-			entriesToDelete.clear();
-		}
-
-		if (data->ResultArray && *data->ResultArray) {
-			sResultArrayHdl resultHdl = data->ResultArray;
-			MgErr hErr = DSCheckHandle(resultHdl);
-			if (hErr == noErr) {
-				for (uInt32 i = 0; i < (*resultHdl)->dimSize; i++) {
-					sResult* currentResult = &(*resultHdl)->result[i];
-					if (currentResult == nullptr || currentResult->PVName == nullptr) {
+					const uintptr_t rawAddr = reinterpret_cast<uintptr_t>(entry);
+					if (!isPlausiblePointer(rawAddr)) {
+						CaLabDbgPrintf("unreserved: Implausible entry pointer 0x%016" PRIxPTR " - scheduling deferred deletion", rawAddr);
+						deferred.push_back(entry);
 						continue;
 					}
-					hErr = DSCheckHandle(currentResult->PVName);
-					if (hErr == noErr) {
-						err += CleanupResult(currentResult);
+
+					if (!tryReclaimAndDelete(entry, hardTimeout)) {
+						deferred.push_back(entry);
+					}
+				}
+				if (!deferred.empty()) {
+					CaLabDbgPrintf("unreserved: Starting deferred deletion worker for %zu entries", deferred.size());
+					std::thread(deferredDeletionWorker, std::move(deferred)).detach();
+					// Short pause to give CA callbacks some time
+					ca_pend_event(0.001);
+				}
+				entriesToDelete.clear();
+			}
+
+			if (data->ResultArray && *data->ResultArray) {
+				sResultArrayHdl resultHdl = data->ResultArray;
+				MgErr hErr = DSCheckHandle(resultHdl);
+				if (hErr == noErr) {
+					for (uInt32 i = 0; i < (*resultHdl)->dimSize; i++) {
+						sResult* currentResult = &(*resultHdl)->result[i];
+						if (currentResult == nullptr || currentResult->PVName == nullptr) {
+							continue;
+						}
+						hErr = DSCheckHandle(currentResult->PVName);
+						if (hErr == noErr) {
+							err += CleanupResult(currentResult);
+						}
 					}
 				}
 			}
-		}
-		data->ResultArray = nullptr;
+			data->ResultArray = nullptr;
 
-		{
-			std::lock_guard<std::mutex> lk(data->arrayMutex);
-			if (data->FirstStringValue && *data->FirstStringValue) {
-				// Validate pointer alignment before dereferencing
-				const uintptr_t ptrValue = reinterpret_cast<uintptr_t>(*data->FirstStringValue);
-				const bool isAligned = (ptrValue % alignof(sStringArray)) == 0;
-				const bool isPlausible = ptrValue >= 0x10000;
+			{
+				std::lock_guard<std::mutex> lk(data->arrayMutex);
+				if (data->FirstStringValue && *data->FirstStringValue) {
+					// Validate pointer alignment before dereferencing
+					const uintptr_t ptrValue = reinterpret_cast<uintptr_t>(*data->FirstStringValue);
+					const bool isAligned = (ptrValue % alignof(sStringArray)) == 0;
+					const bool isPlausible = ptrValue >= 0x10000;
 
-				if (!isAligned || !isPlausible) {
-					CaLabDbgPrintf("unreserved: FirstStringValue pointer 0x%016" PRIxPTR " is invalid (aligned=%d, plausible=%d); skipping cleanup",
-						ptrValue, isAligned, isPlausible);
-				}
-				else {
-					MgErr hErr = DSCheckHandle((*data->FirstStringValue));
-					if (hErr == noErr) {
-						const uInt32 dim = (*data->FirstStringValue)->dimSize;
-						if (dim > 1'000'000) {
-							CaLabDbgPrintf("unreserved: Implausible dimSize=%u for FirstStringValue; skipping cleanup", dim);
-						}
-						else {
-							for (uInt32 j = 0; j < dim; j++) {
-								if ((*data->FirstStringValue)->elt[j] && DSCheckHandle((*data->FirstStringValue)->elt[j]) == noErr)
-									err += DSDisposeHandle((*data->FirstStringValue)->elt[j]);
-								(*data->FirstStringValue)->elt[j] = nullptr;
+					if (!isAligned || !isPlausible) {
+						CaLabDbgPrintfD("unreserved: FirstStringValue pointer 0x%016" PRIxPTR " is invalid (aligned=%d, plausible=%d); skipping cleanup",
+							ptrValue, isAligned, isPlausible);
+					}
+					else {
+						MgErr hErr = DSCheckHandle((*data->FirstStringValue));
+						if (hErr == noErr) {
+							const uInt32 dim = static_cast<uInt32>((*data->FirstStringValue)->dimSize);
+							if (dim > 1'000'000) {
+								CaLabDbgPrintfD("unreserved: Implausible dimSize=%u for FirstStringValue; skipping cleanup", dim);
+							}
+							else {
+								for (uInt32 j = 0; j < dim; j++) {
+									if ((*data->FirstStringValue)->elt[j] && DSCheckHandle((*data->FirstStringValue)->elt[j]) == noErr)
+										err += DSDisposeHandle((*data->FirstStringValue)->elt[j]);
+									(*data->FirstStringValue)->elt[j] = nullptr;
+								}
 							}
 						}
 					}
 				}
+				data->FirstStringValue = nullptr;
+				data->FirstDoubleValue = nullptr;
+				data->DoubleValueArray = nullptr;
 			}
+		}
+		else {
+			std::lock_guard<std::mutex> lk(data->arrayMutex);
+			data->PvIndexArray = nullptr;
+			data->ResultArray = nullptr;
 			data->FirstStringValue = nullptr;
 			data->FirstDoubleValue = nullptr;
 			data->DoubleValueArray = nullptr;
@@ -2631,13 +2635,12 @@ bool setupPvIndexAndRegistry(sStringArrayHdl* PvNameArray, sStringArrayHdl* Fiel
 	if (PvIndexArray && *PvIndexArray && **PvIndexArray) {
 		if (PvIndexArray && *PvIndexArray && **PvIndexArray) {
 			for (uInt32 i = 0; i < (**PvIndexArray)->dimSize; ++i) {
-				// atomisch claimen & löschen falls vorhanden
+				// Atomically claim and delete if present
 				tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
 			}
 		}
 	}
 
-	// Resize PvIndexArray
 	if (PvIndexArray != nullptr && (*PvIndexArray == nullptr || **PvIndexArray == nullptr || (**PvIndexArray)->dimSize != nameCount)) {
 		if (NumericArrayResize(iQ, 1, (UHandle*)PvIndexArray, nameCount) != noErr) {
 			CaLabDbgPrintf("Error: Memory allocation failed for PvIndexArray in getValue.");
@@ -2722,7 +2725,6 @@ bool setupPvIndexAndRegistry(sStringArrayHdl* PvNameArray, sStringArrayHdl* Fiel
 				}
 			}
 
-			// Set up fields if provided
 			if (FieldNameArray && *FieldNameArray && **FieldNameArray && (**FieldNameArray)->dimSize > 0) {
 				std::vector<std::pair<std::string, chanId>> fields;
 				fields.reserve((**FieldNameArray)->dimSize);
@@ -2738,11 +2740,11 @@ bool setupPvIndexAndRegistry(sStringArrayHdl* PvNameArray, sStringArrayHdl* Fiel
 				pvItem->setFields(fields);
 			}
 
-			// Erzeuge Meta & Entry und schreibe atomisch in das Array
+			// Create meta and entry and store atomically in the array
 			auto metaInfo = new PVMetaInfo(pvItem);
 			PvIndexEntry* entry = new PvIndexEntry(pvItem, metaInfo);
 
-			// Verwende pointer-sized atomic für Portabilität
+			// Use pointer-sized atomic for portability
 			auto atomicElt = reinterpret_cast<atomic_ptr_t*>(&(**PvIndexArray)->elt[i]);
 			atomicElt->store(reinterpret_cast<uintptr_t>(entry), std::memory_order_release);
 		}
@@ -2767,15 +2769,11 @@ void subscribePv(PVItem* pvItem) {
 		}
 		if (pvItem->channelId == nullptr) {
 			pvItem->setErrorCode(ECA_DISCONNCHID);
-			/*CaLabDbgPrintf("Warning: Cannot subscribe %s - channelId is null (channel not properly connected)",
-				pvItem->getName().c_str());*/
 			return;
 		}
 		channel_state state = ca_state(pvItem->channelId);
 		if (state != cs_conn) {
 			pvItem->setErrorCode(ECA_DISCONN);
-			/*CaLabDbgPrintf("Warning: Cannot subscribe %s - channel state is %d (not connected)",
-				pvItem->getName().c_str(), state);*/
 			return;
 		}
 		dbrType = pvItem->getDbrType();
@@ -2848,7 +2846,6 @@ void connectPVs(const std::unordered_set<std::string>& basePvNames, double Timeo
             hasRecordType = !ref.parent->getRecordType().empty();
         }
         if (!hasRecordType && !waitForRecordType(ref)) {
-			//CaLabDbgPrintf("Warning: Record type for %s not available before timeout (%lldms); skipping field PV creation.", ref.baseName.c_str(), timeoutMs);
             continue;
         }
         readyParents.push_back(ref);
@@ -3693,7 +3690,6 @@ void populateOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter
 						if (stringHandle && LStrLen(*stringHandle) == (int32)effectiveLen && (effectiveLen == 0 || memcmp(LStrBuf(*stringHandle), valueString.data(), effectiveLen) == 0)) {
 							continue;
 						}
-						//CaLabDbgPrintf("populateOutputArrays: Setting string value for PV '%s' index %u, value %u: '%s'", pvItem->getName().c_str(), idx, j, valueString.c_str());
 						setLVString(stringHandle, valueString);
 					}
 				}
@@ -3853,7 +3849,6 @@ void valueChanged(struct event_handler_args args) {
 	const int statusCode = args.status;
 	const char* name = ca_name(args.chid);
 	std::string pvName(name);
-	//CaLabDbgPrintf("valueChanged: PV=%s, type=%d, nElems=%u, status=%d", pvName.c_str(), type, nElems, statusCode);
 	ValueChangeTask task;
 	task.pvName = std::move(pvName);
 	task.type = type;
@@ -4327,7 +4322,7 @@ void fillResultFromPv(PVItem* pvItem, sResult* target) {
 	target->SeverityNumber = pvItem->getSeverity();
 	target->TimeStampNumber = pvItem->getTimestamp();
 
-	// Fields: names and values from parent’s cache.
+	// Fields: names and values from parent's cache.
 	const auto& fields = pvItem->getFields();
 	if (!fields.empty()) {
 		const uInt32 n = static_cast<uInt32>(fields.size());
