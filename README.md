@@ -27,7 +27,7 @@ To use this interface, it's **not** necessary to create any LabVIEW™ project n
 CA Lab is **open source** and works with all LabVIEW™ versions from 2019 up to the current version.<br/>
 It has been tested under Windows 11®, Linux (Ubuntu 24.04) and NI Linux RT (2022).
 
-<img width="1100" height="260" alt="schema of CA Lab interface<" src="https://github.com/user-attachments/assets/ee597992-1f72-45bf-8bb1-db8d1a41b9f3" /><br/>
+<img width="1100" height="260" alt="schema of CA Lab interface" src="https://github.com/user-attachments/assets/218adaed-2403-4fc9-90d6-ccc1225ad8b7" />
 <sup>schema of CA Lab interface</sup>
 
 Any VI can use caLabGet.vi to read or caLabPut.vi to write EPICS variables.<br/>
