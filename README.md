@@ -1,5 +1,6 @@
-# CA Lab - LabVIEW (Realtime) + EPICS<br/>[![Download](https://github-production-user-asset-6210df.s3.amazonaws.com/17197773/256530946-ddda9486-4d74-4e74-b729-1843c2a9ea0d.png "Download")](https://github.com/epics-extensions/CALab/releases "Download")
-
+# CA Lab - LabVIEW (Realtime) + EPICS<br/><a href="https://github.com/epics-extensions/CALab/releases">
+  <img src="https://github.com/user-attachments/assets/5f7999fb-08ef-40d5-aecc-086edb485a39" alt="Download" width="20%">
+</a>
 
 ## Overview
 
