@@ -7,13 +7,7 @@ V1.8.0.2 (Released: January 2026)
 * Faster EPICS connections and updates (tuned CA timeouts, 
   background polling). 
 * More robust, thread‑safe operation in LabVIEW; fewer hangs
-  on abort/stop and during heavy parallel use. 
-* Richer per‑PV results: values, status/severity, timestamps, 
-  record fields, and per‑PV error information. 
-* Clearer diagnostics via the `info` API and a global PV error counter
-  for quick health checks.
-* Improved Linux support with runtime loading of EPICS libraries,
-  avoiding hard build‑time dependencies.
+  on abort/stop and during heavy parallel use.
 * Improved numeric string parsing for comma/dot locales
 
 ### CALab – Full Changelog
@@ -251,10 +245,6 @@ V1.8.0.2 (Released: January 2026)
   semantics. This documentation work does not change the binary
   interface but makes the codebase significantly easier to understand
   and maintain.
-* Debug output is now centralised through `CaLabDbgPrintf` /
-  `CaLabDbgPrintfD` and enriched with timestamps and contextual tags
-  (function names, lock names, PV names), making diagnostics for
-  timing issues and deadlocks much more straightforward.
 * Many internal error paths have been hardened: all LabVIEW memory
   allocations are checked, exceptions in DLL entry points are caught
   and logged, and defensive checks prevent further work once the
