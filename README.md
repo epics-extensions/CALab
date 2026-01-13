@@ -25,7 +25,7 @@ This interface requires only LabVIEW™.
 To use this interface, it's **not** necessary to create any LabVIEW™ project nor to use external services. CA Lab can be used directly.
 
 CA Lab is **open source** and works with all LabVIEW™ versions from 2019 up to the current version.<br/>
-It has been tested under Windows 7®, Windows 10/11®, Linux (RHEL 8.5, Ubuntu 20.04/22.04) and NI Linux RT (2022).
+It has been tested under Windows 11®, Linux (Ubuntu 24.04) and NI Linux RT (2022).
 
 <img src="https://github.com/epics-extensions/CALab/assets/17197773/a975e0fc-20b8-441d-8013-f0d11c06898b"
     alt="schema of CA Lab interface"><br/>

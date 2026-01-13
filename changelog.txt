@@ -1,6 +1,6 @@
 ﻿Changelog of CA Lab
 
-V1.8.0.2 (Unreleased)
+V1.8.0.2 (Released: January 2026)
 
 ### CALab – Ultra‑Short Changelog (User‑Focused)
 

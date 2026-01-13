@@ -143,15 +143,8 @@ begin
       '<label for="step2" class="step"> Add CA Lab to palette set (User Controls / User Libraries)</label><br>' +
       '<div class="substep">' +
       '<input type="checkbox" id="substep4" name="substep4" value="substep4">' +
-      '<label for="substep4"> go to LabVIEW<sup>&trade;</sup> &rarr; and run <code id="code1">"<span id="lvPath"></span>\utilities\add CaLab palette.vi"</code>' +
-      '<button type="button" onclick="copyToClipboard(''code1'')">copy code</button></label><br>' +
-      '</div>' +
-      '<label for="step3" class="step"> Let''s see if everything is working fine</label><br>' +
-      '<div class="substep">' +
-      '<input type="checkbox" id="substep5" name="substep5" value="substep5">' +
-      '<label for="substep5"> go to LabVIEW<sup>&trade;</sup> and run<br>' +
-      '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code1a">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code>' +
-      '<button type="button" onclick="copyToClipboard(''code1a'')">copy code</button></label><br>' +
+      '<label for="substep4"> open LabVIEW<sup>&trade;</sup> &rarr; and run <code id="code1">"<span id="lvPath"></span>\utilities\add CaLab palette.vi"</code>' +
+      '<button type="button" onclick="copyToClipboard(''code1'', this)">copy code</button></label><br>' +
       '</div>';
   end;
 
@@ -161,7 +154,8 @@ begin
     'form { margin-bottom: 250px; padding: 0; } svg { margin-top: 0; }' +
     'input[type="checkbox"] { transform: scale(1.5); margin-right: 10px; background-color: #f0f0f0; }' +
     'input[type="checkbox"]:checked + label { color: #000; } label { color: #666; }' +
-    'button { background-color: #4caf4f30; } code { background-color: #afafaf; padding: 2px; }' +
+    'button { background-color: #4caf4f30; transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; }' +
+    'button.copied { background-color: #4CAF50; color: #fff; } code { background-color: #afafaf; padding: 2px; }' +
     '.step { font-weight: bold; margin-top: 30px; } .substep { font-weight: normal; margin-left: 30px; margin-bottom: 5px; }' +
     '.char { opacity: 0; animation: fadeIn 0.3s forwards; }' +
     '@keyframes fadeIn { to { opacity: 1; } }' +
@@ -194,25 +188,22 @@ begin
     '<div id="progress-text">0%</div>' +
     '</div>' +
     '<form action="/submit" method="get">' +
-    '<label for="step1" class="step"> Compile CA Lab to current LabVIEW<sup>&trade;</sup> version</label><br>' +
+    '<label for="step1" class="step"> Compile CA Lab to current LabVIEW<sup>&trade;</sup> version</label>' +
     '<div class="substep">' +
     '<input type="checkbox" id="substep1" name="substep1" value="substep1">' +
-    '<label for="substep1"> go to LabVIEW<sup>&trade;</sup> &rarr; Tools &rarr; Advanced &rarr; Mass Compile &hellip;</label><br>' +
-    '<input type="checkbox" id="substep2" name="substep2" value="substep2">' +
-    '<label for="substep2"> then open <code id="code0">"<span id="lvPath"></span>"</code> (could be repeated)</label>' +
-    '<button type="button" onclick="copyToClipboard(''code0'')">copy code</button><br>' +
-    '<input type="checkbox" id="substep3" name="substep3" value="substep3">' +
-    '<label for="substep3"> click &quot;Mass Compile&quot; (you can ignore &quot;Insane Array&quot; warnings)</label><br>' +
-    '</div>' +
+    '<label for="substep1"> open LabVIEW<sup>&trade;</sup> and run<br>&nbsp;&nbsp;&nbsp;&nbsp;' +
+    '<code id="code2">"<span id="lvPath"></span>\utilities\mass compile.vi"</code>' +
+    '<button type="button" onclick="copyToClipboard(''code2'', this)">copy code</button>' +
+    '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(CA Lab VIs will be compiled for the current LabVIEW version.)</label></div>' +
     PaletteSection +
     '<label for="step3" class="step"> Lets see if everything is working fine</label><br>' +
     '<div class="substep"><input type="checkbox" id="substep5" name="substep5" value="substep5">' +
-    '<label for="substep5"> go to LabVIEW<sup>&trade;</sup> and run<br>' +
-    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code1">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code> <button type="button" onclick="copyToClipboard(''code1'')">copy code</button><br>' +
+    '<label for="substep5"> open LabVIEW<sup>&trade;</sup> and run<br>' +
+    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code3">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code> <button type="button" onclick="copyToClipboard(''code3'', this)">copy code</button><br>' +
     '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(softIoc and caRepeater may trigger the firewall. You should grant them access.)</label></div><br>' +
     '<label for="step4" class="step"> EPICS Base control commands</label><br>' +
-    '<label for="substep21">open a command prompt</label><br>' +
-    '<input type="checkbox" id="substep22" name="substep22" value="substep22">' +
+    '<label for="substep21" class="substep">open a command prompt</label><br>' +
+    '<input type="checkbox" id="substep22" name="substep22" value="substep22" class="substep">' +
     '<label for="substep22">caget, camonitor, caput and softIoc should now be available as commands<br>' +
     '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(They may all trigger the firewall. You should grant them access.)</label><br>' +
     '</form>' +
@@ -225,10 +216,31 @@ begin
     '  document.getElementById(''progress-bar'').style.width = percentage + ''%'';' +
     '  document.getElementById(''progress-text'').textContent = percentage + ''%'';' +
     '}' +
-    'function copyToClipboard(id) {' +
+    'function setCopyFeedback(button, success) {' +
+    '  if (!button) { return; }' +
+    '  if (!button.dataset.originalText) {' +
+    '    button.dataset.originalText = button.textContent;' +
+    '  }' +
+    '  button.textContent = success ? "copied!" : "copy failed";' +
+    '  button.classList.add("copied");' +
+    '  if (button._copyTimeout) {' +
+    '    clearTimeout(button._copyTimeout);' +
+    '  }' +
+    '  button._copyTimeout = setTimeout(() => {' +
+    '    button.textContent = button.dataset.originalText;' +
+    '    button.classList.remove("copied");' +
+    '  }, 1500);' +
+    '}' +
+    'function copyToClipboard(id, button) {' +
     '  const codeElement = document.getElementById(id);' +
     '  const text = codeElement.innerText || codeElement.textContent;' +
-    '  navigator.clipboard.writeText(text);' +
+    '  if (navigator.clipboard && navigator.clipboard.writeText) {' +
+    '    navigator.clipboard.writeText(text)' +
+    '      .then(() => setCopyFeedback(button, true))' +
+    '      .catch(() => setCopyFeedback(button, false));' +
+    '  } else {' +
+    '    setCopyFeedback(button, false);' +
+    '  }' +
     '}' +
     'document.querySelectorAll(''input[type="checkbox"]'').forEach(checkbox => {' +
     '  checkbox.addEventListener(''change'', updateProgress);' +
