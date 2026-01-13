@@ -27,8 +27,7 @@ To use this interface, it's **not** necessary to create any LabVIEW™ project n
 CA Lab is **open source** and works with all LabVIEW™ versions from 2019 up to the current version.<br/>
 It has been tested under Windows 11®, Linux (Ubuntu 24.04) and NI Linux RT (2022).
 
-<img src="https://github.com/epics-extensions/CALab/assets/17197773/a975e0fc-20b8-441d-8013-f0d11c06898b"
-    alt="schema of CA Lab interface"><br/>
+<img width="1100" height="260" alt="schema of CA Lab interface<" src="https://github.com/user-attachments/assets/ee597992-1f72-45bf-8bb1-db8d1a41b9f3" /><br/>
 <sup>schema of CA Lab interface</sup>
 
 Any VI can use caLabGet.vi to read or caLabPut.vi to write EPICS variables.<br/>
@@ -41,6 +40,7 @@ These CA Lab VIs call the interface library 'caLab', which uses EPICS base libra
 CA Lab library builds an internal PV cache and monitors PVs to improve the read and write access and reduce network traffic. Optionally, you can disable caching.
 
 CA Lab includes an EPICS Base package (caget, caput, camonitor, softIOC and more).
+
 
 <a href="https://github.com/epics-extensions/CALab/releases">download Windows® setups and source code releases</a><br/>
 <a href="https://www.helmholtz-berlin.de/zentrum/organisation/it/calab/index_en.html">more info and examples</a>
