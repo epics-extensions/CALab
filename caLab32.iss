@@ -48,7 +48,6 @@ Name: custom; Description: Custom installation; Flags: iscustom
 Name: caLab; Description: LabVIEW™️ VIs for get PVs, put PVs and create new PVs at EPICS; Types: full vis
 Name: catools; Description: native tools (caget.exe, camonitor.exe, caput.exe, cainfo.exe); Types: full
 Name: sources; Description: sources; Types: full
-Name: vcruntime; Description: "Check if bundled VS runtime install is necessary?"; Types: full custom; Check: IsAdminInstallMode
 
 [Languages]
 Name: en; MessagesFile: compiler:Default.isl; LicenseFile: "LICENSE"
@@ -66,13 +65,13 @@ AppComments=Before un/installing CA Lab, you should close all EPICS applications
 AppContact=carsten.winkler@helmholtz-berlin.de
 AppCopyright=HZB GmbH
 AppendDefaultGroupName=true
-AppId={{B6C731D9-DF80-4C2E-8A3D-25A4FC5DFB77}
+AppId={{8BE30262-CCD1-5B40-A3DA-4206E0C7D921}
 AppName=CA Lab 32-bit
 AppPublisher=HZB GmbH
 AppPublisherURL=www.helmholtz-berlin.de
 AppSupportURL=https://hz-b.de/calab
 AppUpdatesURL=https://hz-b.de/calab
-AppVersion=1.8.0.2
+AppVersion=1.8.0.3
 
 
 ChangesEnvironment=true
@@ -84,7 +83,7 @@ InfoAfterFile=
 InfoBeforeFile="changelog.txt"
 LanguageDetectionMethod=none
 LicenseFile="LICENSE"
-OutputBaseFilename=caLabSetup_1802x86
+OutputBaseFilename=caLabSetup_1803x86
 OutputDir=.
 PrivilegesRequired=none
 PrivilegesRequiredOverridesAllowed=dialog
@@ -98,14 +97,14 @@ VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
 VersionInfoProductName=CA Lab
-VersionInfoProductVersion=1.8.0.2
-VersionInfoTextVersion=1.8.0.2
-VersionInfoVersion=1.8.0.2
+VersionInfoProductVersion=1.8.0.3
+VersionInfoTextVersion=1.8.0.3
+VersionInfoVersion=1.8.0.3
 WizardImageFile="res\WizardImage-IS.bmp"
 WizardSmallImageFile=res\WizardSmallImage-IS2.bmp
 MinVersion=0,6.1sp1
-VersionInfoProductTextVersion=Version: 1.8.0.2
-VersionInfoOriginalFileName=caLabSetup_1802x86.exe
+VersionInfoProductTextVersion=Version: 1.8.0.3
+VersionInfoOriginalFileName=caLabSetup_1803x86.exe
 
 [Icons]
 Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\caLab.dll; IconIndex: 0
@@ -118,7 +117,7 @@ Name: {group}\Uninstall; Filename: {uninstallexe}; IconFilename: {app}\caLab.dll
 // install redistributable packages for Visual Studio 2015, 2017, 2019, and 2022
 // https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
 // latest version: https://aka.ms/vs/17/release/VC_redist.x86.exe
-Components: vcruntime; Filename: {tmp}\VC_redist.x86.exe; Check: IsAdminInstallMode and NeedsVCRedistInstall; Parameters: "/passive /norestart /Q:a /c:""msiexec /qb /i vcredist.msi"" "; StatusMsg: Checking for VC++ RunTime ...
+Filename: {tmp}\VC_redist.x86.exe; Parameters: "/passive /norestart"; StatusMsg: Installing VC++ RunTime ...
 Filename: "{app}\docs\post_install.html"; Description: "Important: Open the post installation checklist"; \
     Flags: postinstall shellexec
 

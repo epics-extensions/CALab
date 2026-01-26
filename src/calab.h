@@ -383,21 +383,18 @@ typedef MyInstanceData* MyInstanceDataPtr;
 
 // Debugging Utilities
 /**
- * @brief Print a formatted debug line to the CALab debug file or LabVIEW window.
+ * @brief Print a formatted debug line with a timestamp prefix.
  * @param format Printf-style format string.
  * @return Number of characters written.
  */
 MgErr CaLabDbgPrintf(const char* format, ...);
 
 /**
- * @brief Print a formatted debug line (debug builds only).
+ * @brief Print a formatted debug line with a timestamp prefix (debug builds only).
  * @param format Printf-style format string.
  * @return Number of characters written (0 in non-debug builds).
  */
 MgErr CaLabDbgPrintfD(const char* format, ...);
-
-/** Emit a timestamp line to the debug output (debug builds only). */
-void DbgTime(void);
 
 // Undocumented but used LV function for debug printing.
 TH_REENTRANT EXTERNC MgErr _FUNCC DbgPrintfv(const char* buf, va_list args);

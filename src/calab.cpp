@@ -1,7 +1,7 @@
 ﻿//==================================================================================================
 // Name      : calab.cpp
 // Authors   : Carsten Winkler, Brian Powell
-// Version   : 1.8.0.2
+// Version   : 1.8.0.3
 // Copyright : HZB
 // Description: Modernized CALab core for reading/writing EPICS PVs and LabVIEW events
 // GitHub    : https://github.com/epics-extensions/CALab
@@ -56,7 +56,7 @@
 #endif
 
 #ifndef CALAB_VERSION
-#define CALAB_VERSION "1.8.0.2"
+#define CALAB_VERSION "1.8.0.3"
 #endif
 
 
@@ -4077,7 +4077,6 @@ void cleanupMemory(sResultArrayHdl* ResultArray, sStringArrayHdl* FirstStringVal
 
 		// Log errors if any occurred during cleanup.
 		if (err != noErr) {
-			DbgTime();
 			CaLabDbgPrintf("cleanupMemory: Error when releasing handles, error code: %d", err);
 		}
 	}
@@ -4142,7 +4141,7 @@ MgErr prepareOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter
 				*ResultArray = reinterpret_cast<sResultArrayHdl>(DSNewHClr(static_cast<uInt32>(totalSize)));
 			}
 			if (!(*ResultArray)) {
-				DbgTime(); CaLabDbgPrintf("Error: Memory allocation failed for ResultArray in prepareOutputArrays.");
+				CaLabDbgPrintf("Error: Memory allocation failed for ResultArray in prepareOutputArrays.");
 				return mFullErr;
 			}
 			(**ResultArray)->dimSize = nameCount;
@@ -4206,53 +4205,65 @@ MgErr prepareOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter
 // Utility & Debugging Functions
 // =================================================================================
 
+static void buildTimestampedFormat(const char* format, std::string& out) {
+	char timestamp[32] = {};
+	const std::time_t now = std::time(nullptr);
+	std::tm tm_snapshot{};
+#if defined _WIN32 || defined _WIN64
+	localtime_s(&tm_snapshot, &now);
+#else
+	localtime_r(&now, &tm_snapshot);
+#endif
+	if (std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm_snapshot) == 0) {
+		std::snprintf(timestamp, sizeof(timestamp), "0000-00-00 00:00:00");
+	}
+	out.clear();
+	out.reserve((format ? std::strlen(format) : 0) + std::strlen(timestamp) + 4);
+	out.append("[");
+	out.append(timestamp);
+	out.append("] ");
+	if (format) {
+		out.append(format);
+	}
+}
+
 MgErr CaLabDbgPrintf(const char* format, ...) {
 	int done = 0;
 #if defined _WIN32 || defined _WIN64
 	if (!dllStatus) return done; // DLL_PROCESS_DETACH
 #endif
+	if (!format) return done;
+	std::string formatWithTimestamp;
+	buildTimestampedFormat(format, formatWithTimestamp);
 	va_list listPointer;
 	va_start(listPointer, format);
 	if (Globals::getInstance().pCaLabDbgFile) {
-		done = vfprintf(Globals::getInstance().pCaLabDbgFile, format, listPointer);
+		done = vfprintf(Globals::getInstance().pCaLabDbgFile, formatWithTimestamp.c_str(), listPointer);
 		fprintf(Globals::getInstance().pCaLabDbgFile, "\n");
 		fflush(Globals::getInstance().pCaLabDbgFile);
 	}
 	else {
-		done = DbgPrintfv(format, listPointer);
+		done = DbgPrintfv(formatWithTimestamp.c_str(), listPointer);
 	}
 	va_end(listPointer);
 	return done;
 }
 
-void DbgTime(void) {
-#ifdef _DEBUG
-	time_t ltime;
-	ltime = time(NULL);
-	char* timestr = asctime(localtime(&ltime));
-	if (timestr) {
-		CaLabDbgPrintf("------------------------------");
-		size_t len = strlen(timestr);
-		if (len > 0 && timestr[len - 1] == '\n') {
-			timestr[len - 1] = '\0';
-		}
-		CaLabDbgPrintf("%s", timestr);
-	}
-#endif
-}
-
 MgErr CaLabDbgPrintfD([[maybe_unused]] const char* format, ...) {
 	int done = 0;
 #ifdef _DEBUG
+	if (!format) return done;
+	std::string formatWithTimestamp;
+	buildTimestampedFormat(format, formatWithTimestamp);
 	va_list listPointer;
 	va_start(listPointer, format);
 	if (Globals::getInstance().pCaLabDbgFile) {
-		done = vfprintf(Globals::getInstance().pCaLabDbgFile, format, listPointer);
+		done = vfprintf(Globals::getInstance().pCaLabDbgFile, formatWithTimestamp.c_str(), listPointer);
 		fprintf(Globals::getInstance().pCaLabDbgFile, "\n");
 		fflush(Globals::getInstance().pCaLabDbgFile);
 	}
 	else {
-		done = DbgPrintfv(format, listPointer);
+		done = DbgPrintfv(formatWithTimestamp.c_str(), listPointer);
 	}
 	va_end(listPointer);
 #endif
