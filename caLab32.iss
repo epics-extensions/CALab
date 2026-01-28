@@ -65,13 +65,13 @@ AppComments=Before un/installing CA Lab, you should close all EPICS applications
 AppContact=carsten.winkler@helmholtz-berlin.de
 AppCopyright=HZB GmbH
 AppendDefaultGroupName=true
-AppId={{8BE30262-CCD1-5B40-A3DA-4206E0C7D921}
+AppId={{47C8ECDB-A386-5039-A61F-F53CEFE0EE8B}
 AppName=CA Lab 32-bit
 AppPublisher=HZB GmbH
 AppPublisherURL=www.helmholtz-berlin.de
 AppSupportURL=https://hz-b.de/calab
 AppUpdatesURL=https://hz-b.de/calab
-AppVersion=1.8.0.3
+AppVersion=1.8.0.4
 
 
 ChangesEnvironment=true
@@ -83,7 +83,7 @@ InfoAfterFile=
 InfoBeforeFile="changelog.txt"
 LanguageDetectionMethod=none
 LicenseFile="LICENSE"
-OutputBaseFilename=caLabSetup_1803x86
+OutputBaseFilename=caLabSetup_1804x86
 OutputDir=.
 PrivilegesRequired=none
 PrivilegesRequiredOverridesAllowed=dialog
@@ -97,14 +97,14 @@ VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
 VersionInfoProductName=CA Lab
-VersionInfoProductVersion=1.8.0.3
-VersionInfoTextVersion=1.8.0.3
-VersionInfoVersion=1.8.0.3
+VersionInfoProductVersion=1.8.0.4
+VersionInfoTextVersion=1.8.0.4
+VersionInfoVersion=1.8.0.4
 WizardImageFile="res\WizardImage-IS.bmp"
 WizardSmallImageFile=res\WizardSmallImage-IS2.bmp
 MinVersion=0,6.1sp1
-VersionInfoProductTextVersion=Version: 1.8.0.3
-VersionInfoOriginalFileName=caLabSetup_1803x86.exe
+VersionInfoProductTextVersion=Version: 1.8.0.4
+VersionInfoOriginalFileName=caLabSetup_1804x86.exe
 
 [Icons]
 Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\caLab.dll; IconIndex: 0

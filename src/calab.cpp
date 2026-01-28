@@ -1,7 +1,7 @@
 ﻿//==================================================================================================
 // Name      : calab.cpp
 // Authors   : Carsten Winkler, Brian Powell
-// Version   : 1.8.0.3
+// Version   : 1.8.0.4
 // Copyright : HZB
 // Description: Modernized CALab core for reading/writing EPICS PVs and LabVIEW events
 // GitHub    : https://github.com/epics-extensions/CALab
@@ -56,7 +56,7 @@
 #endif
 
 #ifndef CALAB_VERSION
-#define CALAB_VERSION "1.8.0.3"
+#define CALAB_VERSION "1.8.0.4"
 #endif
 
 
@@ -2676,8 +2676,33 @@ bool setupPvIndexAndRegistry(sStringArrayHdl* PvNameArray, sStringArrayHdl* Fiel
 
 	if (PvIndexArray != nullptr && *PvIndexArray != nullptr && **PvIndexArray != nullptr) {
 		for (uInt32 i = 0; i < nameCount; ++i) {
-			std::string pvName((char*)(*(**PvNameArray)->elt[i])->str, (size_t)(*(**PvNameArray)->elt[i])->cnt);
-
+			LStrHandle pvHandle = (**PvNameArray)->elt[i];
+			if (!pvHandle || !*pvHandle || (*pvHandle)->cnt == 0) {
+				// Empty PV name: clear any stale entry and skip.
+				tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
+				continue;
+			}
+			std::string pvName(reinterpret_cast<const char*>((*pvHandle)->str), static_cast<size_t>((*pvHandle)->cnt));
+			if (pvName.empty()) {
+				tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
+				continue;
+			}
+			// trim whitespace
+			{
+				const auto first = pvName.find_first_not_of(" \t\n\r");
+				if (first == std::string::npos) {
+					pvName.clear();
+				}
+				else {
+					const auto last = pvName.find_last_not_of(" \t\n\r");
+					pvName.erase(last + 1);
+					pvName.erase(0, first);
+				}
+			}
+			if (pvName.empty()) {
+				tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
+				continue;
+			}
 			auto it = Globals::getInstance().pvRegistry.find(pvName);
 			PVItem* pvItem = nullptr;
 
@@ -2730,7 +2755,7 @@ bool setupPvIndexAndRegistry(sStringArrayHdl* PvNameArray, sStringArrayHdl* Fiel
 				fields.reserve((**FieldNameArray)->dimSize);
 				for (uInt32 f = 0; f < (**FieldNameArray)->dimSize; ++f) {
 					LStrHandle fHandle = (**FieldNameArray)->elt[f];
-					if (!fHandle) continue;
+					if (!fHandle || !*fHandle) continue;
 					const char* fStr = reinterpret_cast<const char*>((*fHandle)->str);
 					const size_t fLen = static_cast<size_t>((*fHandle)->cnt);
 					if (fLen == 0) continue;
@@ -4160,13 +4185,21 @@ MgErr prepareOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter
 
 			// Copy or update the PVName.
 			LStrHandle pvLStr = (**PvNameArray)->elt[idx];
-			if (!currentResult->PVName || LStrLen(*currentResult->PVName) != LStrLen(*pvLStr) ||
-				memcmp(LStrBuf(*currentResult->PVName), LStrBuf(*pvLStr), LStrLen(*pvLStr)) != 0) {
+			if (!pvLStr || !*pvLStr) {
+				setLVString(currentResult->PVName, std::string());
+			}
+			else {
+				const int32 newLen = LStrLen(*pvLStr);
+				if (!currentResult->PVName || !*currentResult->PVName || LStrLen(*currentResult->PVName) != newLen ||
+					(newLen > 0 && memcmp(LStrBuf(*currentResult->PVName), LStrBuf(*pvLStr), newLen) != 0)) {
 
-				err = NumericArrayResize(uB, 1, (UHandle*)&currentResult->PVName, (*pvLStr)->cnt);
-				if (err != noErr) return err;
-				memcpy(LStrBuf(*currentResult->PVName), LStrBuf(*pvLStr), LStrLen(*pvLStr));
-				LStrLen(*currentResult->PVName) = LStrLen(*pvLStr);
+					err = NumericArrayResize(uB, 1, (UHandle*)&currentResult->PVName, (*pvLStr)->cnt);
+					if (err != noErr) return err;
+					if (newLen > 0) {
+						memcpy(LStrBuf(*currentResult->PVName), LStrBuf(*pvLStr), newLen);
+					}
+					LStrLen(*currentResult->PVName) = newLen;
+				}
 			}
 
 			// Prepare the string array within the Result cluster.

@@ -1,8 +1,18 @@
 ﻿Changelog of CA Lab
+V1.8.0.4
+* Fixed a crash that occurred when the PVItem was empty.
+* Leading and trailing whitespace characters in PV names
+  are now ignored
+
+----------------------------------------------------------------------
+
 V1.8.0.3 (Released: January 2026)
 * Debug output always includes timestamps (Windows and Linux)
-* Setup now always runs the bundled VC++ Redistributable so Microsoft’s installer can
-  upgrade to the newest required runtime automatically (x64/x86)
+* Setup now always runs the bundled VC++ Redistributable so 
+  Microsoft’s installer can upgrade to the newest required runtime
+  automatically (x64/x86)
+
+----------------------------------------------------------------------
 
 V1.8.0.2 (Released: January 2026)
 
