@@ -3,6 +3,8 @@ V1.8.0.4
 * Fixed a crash that occurred when the PVItem was empty.
 * Leading and trailing whitespace characters in PV names
   are now ignored
+* Extend the unreserved function to protect PVs used by other
+  instances or active user events to prevent unwanted resets.
 
 ----------------------------------------------------------------------
 
