@@ -1,46 +1,59 @@
-# CA Lab - LabVIEW (Realtime) + EPICS<br/>
-<a href="https://github.com/epics-extensions/CALab/releases"><img src="https://github.com/user-attachments/assets/5f7999fb-08ef-40d5-aecc-086edb485a39" alt="Download" width="20%"></a>
+# CA Lab - LabVIEW (Realtime) + EPICS
+
+<p align="center">
+  <a href="https://github.com/epics-extensions/CALab/releases">
+    <img src="https://github.com/user-attachments/assets/5f7999fb-08ef-40d5-aecc-086edb485a39" alt="Download" width="220" />
+  </a>
+</p>
+
+> A lightweight, high-performance, user-friendly interface between LabVIEW™ and EPICS.
+
+## Table of contents
+- [Overview](#overview)
+- [Highlights](#highlights)
+- [Compatibility](#compatibility)
+- [How it works](#how-it-works)
+- [Included tools](#included-tools)
+- [Downloads and links](#downloads-and-links)
 
 ## Overview
+CA Lab connects LabVIEW™ VIs to EPICS PVs and provides a streamlined Channel Access interface.
 
-What is CA Lab?<br/>
-**It is a**<br/>
-- user-friendly,<br/>
-- lightweight and<br/>
-- high performance<br/>interface between LabVIEW™ and EPICS.<br/>
+## Highlights
+- Simple create/read/write of EPICS variables and user events
+- Consistent data clusters (timestamp, status, severity, optional PV fields)
+- Easy to build executables from your VIs
+- Requires only LabVIEW™ (no project or external services)
+- High performance interface
+- Open source
 
-**This interface uses**<br/>
-- proven EPICS BASE libraries (V7),<br/>
-- a CA Lab interface library<br/>
-- and polymorphic VIs<br/>
-to access EPICS variables.
+## Compatibility
+| Item | Details |
+| --- | --- |
+| LabVIEW™ | 2019 to current |
+| Platforms | Windows®, Linux, NI Linux RT |
+| EPICS | EPICS BASE libraries (V7) |
 
-**Creating, reading and writing EPICS variables** is very simple now. Also, **user events** for EPICS variables can be implemented easily.<br/>
-EPICS time stamp, status, severity, and optional PV fields (properties) are bound into a resulting data cluster. You avoid inconsistent data sets.<br/>
-It's easy to create an executable of your VI.
+Tested on Windows 11®, Linux (Ubuntu 24.04), and NI Linux RT (2022).
 
-**CA Lab works with Windows®, Linux and NI Linux RT.**<br/>
-This interface requires only LabVIEW™.
+## How it works
+<img width="1100" height="260" alt="Schema of CA Lab interface" src="https://github.com/user-attachments/assets/f4385b15-c598-4805-ab27-27867f366aa5" />
+<sup>Schema of CA Lab interface</sup>
 
-To use this interface, it's **not** necessary to create any LabVIEW™ project nor to use external services. CA Lab can be used directly.
+From any LabVIEW VI, you can directly call these interface VIs:
+- `CaLabGet.vi` to read EPICS variables
+- `CaLabPut.vi` to write EPICS variables
+- `CaLabEvent.vi` to create user events for EPICS variables
+- `CaLabInfo.vi` to get context information of the CA Lab library
+- `CaLabSoftIOC.vi` to create new EPICS variables and start them
 
-CA Lab is **open source** and works with all LabVIEW™ versions from 2019 up to the current version.<br/>
-It has been tested under Windows 11®, Linux (Ubuntu 24.04) and NI Linux RT (2022).
+These CA Lab VIs call the interface library `caLab`, which uses EPICS base libraries `ca` and `Com` to provide Channel Access functions.
 
-<img width="1100" height="260" alt="schema of CA Lab interface" src="https://github.com/user-attachments/assets/f4385b15-c598-4805-ab27-27867f366aa5" />
-<sup>schema of CA Lab interface</sup>
+CA Lab builds an internal PV cache and monitors PVs to improve read/write access and reduce network traffic. Optionally, you can disable caching.
 
-Any VI can use caLabGet.vi to read or caLabPut.vi to write EPICS variables.<br/>
-Use caLabEvent.vi to create user events for any EPICS variables.<br/>
-Call CaLabInfo.vi to get context information of the CA Lab library.<br/>
-You can use CaLabSoftIOC.vi to create new EPICS variables and start them.
+## Included tools
+CA Lab includes an EPICS Base package (caget, caput, camonitor, softIOC, and more).
 
-These CA Lab VIs call the interface library 'caLab', which uses EPICS base libraries 'ca' and 'Com' to provide Channel Access functions.
-
-CA Lab library builds an internal PV cache and monitors PVs to improve the read and write access and reduce network traffic. Optionally, you can disable caching.
-
-CA Lab includes an EPICS Base package (caget, caput, camonitor, softIOC and more).
-
-
-<a href="https://github.com/epics-extensions/CALab/releases">download Windows® setups and source code releases</a><br/>
-<a href="https://www.helmholtz-berlin.de/zentrum/organisation/it/calab/index_en.html">more info and examples</a>
+## Downloads and links
+- [Releases](https://github.com/epics-extensions/CALab/releases)
+- [More info and examples (Helmholtz-Zentrum Berlin)](https://www.helmholtz-berlin.de/zentrum/organisation/it/calab/index_en.html)
