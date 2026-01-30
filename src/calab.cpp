@@ -2194,6 +2194,69 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 		if (!pvsToReset.empty()) {
 			CaContextGuard _caThreadAttach;
 
+			// Build a set of PVs still referenced by other instances so we don't tear down shared channels.
+			std::unordered_set<PVItem*> pvsUsedElsewhere;
+			{
+				std::lock_guard<std::mutex> lock(g.instancesMutex);
+				for (auto* instPtr : g.instances) {
+					if (instPtr == instanceState || !instPtr || !*instPtr) {
+						continue;
+					}
+					auto* other = static_cast<MyInstanceData*>(*instPtr);
+					if (!other) {
+						continue;
+					}
+					if (other->isUnreserving.load(std::memory_order_acquire)) {
+						continue;
+					}
+					std::lock_guard<std::mutex> arrLock(other->arrayMutex);
+					if (!other->PvIndexArray || !*other->PvIndexArray) {
+						continue;
+					}
+					sLongArrayHdl hdl = other->PvIndexArray;
+					MgErr hErr = DSCheckHandle(hdl);
+					if (hErr != noErr) {
+						continue;
+					}
+					sLongArray* arr = *hdl;
+					const uInt64 dim = arr ? arr->dimSize : 0;
+					if (dim > 1'000'000) {
+						continue;
+					}
+					for (uInt64 i = 0; i < dim; ++i) {
+						PvEntryHandle entry{ &other->PvIndexArray, static_cast<size_t>(i) };
+						if (entry && entry->pvItem) {
+							pvsUsedElsewhere.insert(entry->pvItem);
+						}
+					}
+				}
+			}
+
+			// Also keep parents of in-use PVs (e.g., field PVs used directly by another instance).
+			if (!pvsUsedElsewhere.empty()) {
+				std::vector<PVItem*> parents;
+				parents.reserve(pvsUsedElsewhere.size());
+				for (PVItem* pv : pvsUsedElsewhere) {
+					if (pv && pv->parent) {
+						parents.push_back(pv->parent);
+					}
+				}
+				for (PVItem* parent : parents) {
+					pvsUsedElsewhere.insert(parent);
+				}
+			}
+
+			// Snapshot PVs referenced by user events to avoid tearing down active event sources.
+			std::unordered_set<std::string> eventPvNames;
+			{
+				std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
+				for (const auto& kv : g_eventRegistry.map) {
+					if (!kv.second.empty()) {
+						eventPvNames.insert(kv.first);
+					}
+				}
+			}
+
 			struct ResetInfo {
 				PVItem* pvItem = nullptr;
 				evid ev = nullptr;
@@ -2231,16 +2294,28 @@ extern "C" EXPORT MgErr unreserved(InstanceDataPtr* instanceState) {
 							continue;
 						}
 
+						// Skip PVs that are still used by other instances or active user events.
+						bool skipReset = false;
 						ResetInfo info;
 						info.pvItem = pvItem;
 
 						// Preserve lock order: registry (shared) first, then PV mutex.
 						{
 							std::lock_guard<std::mutex> pvLock(pvItem->ioMutex());
+							PVItem* parentPtr = pvItem->parent;
+							info.pvName = pvItem->getName();  // needed for event checks and logging
+
+							if (pvsUsedElsewhere.find(pvItem) != pvsUsedElsewhere.end() ||
+								(parentPtr && pvsUsedElsewhere.find(parentPtr) != pvsUsedElsewhere.end()) ||
+								(!eventPvNames.empty() && eventPvNames.find(info.pvName) != eventPvNames.end())) {
+								skipReset = true;
+							}
+							if (skipReset) {
+								continue;
+							}
 
 							info.ev = pvItem->eventId;
 							info.ch = pvItem->channelId;
-							info.pvName = pvItem->getName();  // only needed for logging/debugging
 
 							pvItem->eventId = nullptr;
 							pvItem->channelId = nullptr;
