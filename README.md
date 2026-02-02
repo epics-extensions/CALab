@@ -40,7 +40,11 @@ Tested on Windows 11®, Linux (Ubuntu 24.04), and NI Linux RT (2022).
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/6d1d83ab-ba10-4683-8d52-6283d5299da6">
   <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/f4385b15-c598-4805-ab27-27867f366aa5">
-  <img width="1100" height="260" alt="Schema of CA Lab interface" src="https://github.com/user-attachments/assets/f4385b15-c598-4805-ab27-27867f366aa5">
+  <img
+    src="https://github.com/user-attachments/assets/f4385b15-c598-4805-ab27-27867f366aa5"
+    alt="Schema of CA Lab interface"
+    style="width: 1100px; height: auto; max-width: 100%;"
+  >
 </picture>
 <sup>Schema of CA Lab interface</sup>
 
