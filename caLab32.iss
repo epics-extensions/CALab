@@ -92,7 +92,7 @@ ShowLanguageDialog=no
 UninstallDisplayIcon={userappdata}\calab\caLab.dll,1
 UninstallDisplayName=CA Lab 32-bit
 UninstallLogMode=append
-UsePreviousAppDir=no
+UsePreviousAppDir=yes
 VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
@@ -127,6 +127,94 @@ RunOnceId: "UninstallEntry2"; Filename: cmd; Parameters: /c taskkill /f /im soft
 RunOnceId: "UninstallEntry3"; Filename: cmd; Parameters: /c taskkill /f /im caRepeater.exe; Flags: RunHidden;
 
 [Code]
+const
+  AppIdValue = '{47C8ECDB-A386-5039-A61F-F53CEFE0EE8B}';
+
+var
+  PrevInstallDir: string;
+  DoBackup: Boolean;
+
+function SplitString(const S, Delimiter: string): TArrayOfString; forward;
+
+function NormalizePath(const Path: string): string;
+var
+  P: string;
+begin
+  P := Trim(Path);
+  if (Length(P) >= 2) and (P[1] = '"') and (P[Length(P)] = '"') then
+    P := Copy(P, 2, Length(P) - 2);
+  Result := RemoveBackslashUnlessRoot(P);
+end;
+
+function GetPreviousInstallDir: string;
+var
+  KeyName: string;
+  InstallDir: string;
+begin
+  Result := '';
+  KeyName := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + AppIdValue + '_is1';
+  if RegQueryStringValue(HKCU, KeyName, 'Inno Setup: App Path', InstallDir) then
+    Result := InstallDir
+  else if RegQueryStringValue(HKLM, KeyName, 'Inno Setup: App Path', InstallDir) then
+    Result := InstallDir;
+end;
+
+function IsUpgradeInstall: Boolean;
+var
+  AppDir: string;
+begin
+  AppDir := NormalizePath(ExpandConstant('{app}'));
+  Result := (PrevInstallDir <> '') and (CompareText(NormalizePath(PrevInstallDir), AppDir) = 0) and DirExists(AppDir);
+end;
+
+function IsPrevInstallLibDir(const DirPath: string): Boolean;
+var
+  PrevLib: string;
+  A: string;
+  B: string;
+begin
+  Result := False;
+  if PrevInstallDir = '' then
+    Exit;
+  PrevLib := AddBackslash(PrevInstallDir) + 'lib';
+  A := RemoveBackslashUnlessRoot(Trim(DirPath));
+  B := RemoveBackslashUnlessRoot(Trim(PrevLib));
+  Result := CompareText(A, B) = 0;
+end;
+
+function FindInPathInReg(RootKey: Integer; const RegKey, FileName: string): string;
+var
+  I: Integer;
+  FoldersArray: TArrayOfString;
+  Folder: string;
+  Candidate: string;
+begin
+  Result := '';
+  if RegQueryStringValue(RootKey, RegKey, 'Path', Folder) then
+  begin
+    FoldersArray := SplitString(Folder, ';');
+    for I := 0 to GetArrayLength(FoldersArray)-1 do
+    begin
+      Candidate := NormalizePath(FoldersArray[I]);
+      if Candidate <> '' then
+      begin
+        if FileExists(AddBackslash(Candidate) + FileName) then
+        begin
+          Result := Candidate;
+          Exit;
+        end;
+      end;
+    end;
+  end;
+end;
+
+function FindInPath(const FileName: string): string;
+begin
+  Result := FindInPathInReg(HKCU, 'Environment', FileName);
+  if Result = '' then
+    Result := FindInPathInReg(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', FileName);
+end;
+
 procedure CreateNextStepsHtml();
 var
   Content: String;
@@ -151,6 +239,7 @@ begin
     '<meta name="viewport" content="width=device-width, initial-scale=1"> <style>' +
     'body { font-family: Verdana, sans-serif; margin: 0; padding: 0; background-color: #f0f0f0; }' +
     'form { margin-bottom: 250px; padding: 0; } svg { margin-top: 0; }' +
+    '.next-steps-text { fill: #1f5bd6; stroke: #ffffff; stroke-width: 1.5px; paint-order: stroke fill; }' +
     'input[type="checkbox"] { transform: scale(1.5); margin-right: 10px; background-color: #f0f0f0; }' +
     'input[type="checkbox"]:checked + label { color: #000; } label { color: #666; }' +
     'button { background-color: #4caf4f30; transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; }' +
@@ -165,22 +254,23 @@ begin
     '#progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #000; }' +
     '</style> </head> <body style="font-size: larger; margin: 0em 1em 1em 1em;">' +
     '<div style="position: relative; width: 500px; height: 260px; margin: 0 auto;">' +
-    '<img src="https://github.com/epics-extensions/CALab/releases/download/v1.7.2.2/CaLab.png" alt="CA Lab Logo"' +
+    '<img src="https://github.com/epics-extensions/CALab/releases/download/v1.8.0.3/calabicon.webp" alt="CA Lab Logo"' +
     ' style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 260px; width: 260px;">' +
     '<svg width="500" height="160" style="position: absolute; top: 130px; left: 50%; transform: translate(-50%, 30px);">' +
-    '<path id="curve" d="M 120 -5 Q 230 185 375 10" fill="transparent" />' +
-    '<text width="500" y="20" style="font: 28px Verdana, sans-serif; text-anchor: middle;">' +
+    '<path id="curve" d="M 100 20 Q 250 200 385 20" fill="transparent" />' +
+    '<text width="500" y="20" class="next-steps-text" style="font: 28px Verdana, sans-serif; text-anchor: middle;">' +
     '<textPath href="#curve" startOffset="50%">' +
     '<tspan class="char" style="--char-index: 1">N</tspan>' +
     '<tspan class="char" style="--char-index: 2">e</tspan>' +
     '<tspan class="char" style="--char-index: 3">x</tspan>' +
     '<tspan class="char" style="--char-index: 4">t</tspan>' +
     '<tspan class="char" style="--char-index: 5">&nbsp;</tspan>' +
-    '<tspan class="char" style="--char-index: 6">S</tspan>' +
-    '<tspan class="char" style="--char-index: 7">t</tspan>' +
-    '<tspan class="char" style="--char-index: 8">e</tspan>' +
-    '<tspan class="char" style="--char-index: 9">p</tspan>' +
-    '<tspan class="char" style="--char-index: 10">s</tspan>' +
+    '<tspan class="char" style="--char-index: 6">&nbsp;</tspan>' +
+    '<tspan class="char" style="--char-index: 7">S</tspan>' +
+    '<tspan class="char" style="--char-index: 8">t</tspan>' +
+    '<tspan class="char" style="--char-index: 9">e</tspan>' +
+    '<tspan class="char" style="--char-index: 10">p</tspan>' +
+    '<tspan class="char" style="--char-index: 11">s</tspan>' +
     '</textPath> </text> </svg> </div>' +
     '<div class="progress-container">' +
     '<div id="progress-bar"></div>' +
@@ -282,44 +372,45 @@ end;
 function SearchPath(FileName: string): Boolean;
 { Function for Inno Setup Compiler }
 { Returns True if file is found in any PATH directory, False otherwise }
-var
-  I: Integer;
-  FoldersArray: TArrayOfString;
-  Folder: string;
 begin
-  // Get the PATH environment variable
-  if RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', Folder) then
-  begin
-    // Split the PATH variable into an array of folders
-    FoldersArray := SplitString(Folder, ';');
-    // Loop through each folder in the PATH
-    for I := 0 to GetArrayLength(FoldersArray)-1 do
-    begin
-      // If the file exists in this folder, return true
-      if FileExists(FoldersArray[I] + '\' + FileName) then
-      begin
-        Result := True;
-        Exit;
-      end;
-    end;
-  end;
-  // If the file was not found, return false
-  Result := False;
+  Result := FindInPath(FileName) <> '';
 end;
 
 // Function to perform pre-installation checks
 function InitializeSetup(): Boolean;
 { Function for Inno Setup Compiler }
 { Returns True if setup can proceed, False if conflicting files are found }
+var
+  FoundPath: string;
 begin
-  // Check for conflicting files on the system
-  if (SearchPath('caRepeater.exe') or SearchPath('ca.dll') or SearchPath('Com.dll')) then
+  PrevInstallDir := GetPreviousInstallDir();
+
+  // Check for conflicting files on the system (allow files from existing CA Lab install)
+  FoundPath := FindInPath('caRepeater.exe');
+  if (FoundPath <> '') and (not IsPrevInstallLibDir(FoundPath)) then
   begin
     MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
     Result := False;
-  end
-  else
-    Result := True;
+    Exit;
+  end;
+
+  FoundPath := FindInPath('ca.dll');
+  if (FoundPath <> '') and (not IsPrevInstallLibDir(FoundPath)) then
+  begin
+    MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+
+  FoundPath := FindInPath('Com.dll');
+  if (FoundPath <> '') and (not IsPrevInstallLibDir(FoundPath)) then
+  begin
+    MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+
+  Result := True;
 end;
 
 // Function to initialize the installation wizard
@@ -329,6 +420,12 @@ procedure InitializeWizard();
 var
   lvPath : String;
 begin
+  if PrevInstallDir <> '' then
+  begin
+    WizardForm.DirEdit.Text := PrevInstallDir;
+    Exit;
+  end;
+
   if IsAdminInstallMode then
     begin
       lvPath := '';
@@ -337,6 +434,123 @@ begin
     end
   else
     WizardForm.DirEdit.Text := ExpandConstant('{userappdata}\calab');
+end;
+
+procedure KillProcess(const ImageName: string);
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill', '/f /im ' + ImageName, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure CloseRunningProcesses;
+begin
+  KillProcess('LabVIEW.exe');
+  KillProcess('camonitor.exe');
+  KillProcess('softIoc.exe');
+  KillProcess('caRepeater.exe');
+end;
+
+procedure CopyDirRecursive(const SourceDir, DestDir: string);
+var
+  FindRec: TFindRec;
+  SourcePath: string;
+  DestPath: string;
+begin
+  if FindFirst(SourceDir + '\*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') then
+        begin
+          SourcePath := SourceDir + '\' + FindRec.Name;
+          DestPath := DestDir + '\' + FindRec.Name;
+          if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+          begin
+            if not ((CompareText(FindRec.Name, 'backup') = 0) and
+                    (CompareText(NormalizePath(SourceDir), NormalizePath(ExpandConstant('{app}'))) = 0)) then
+            begin
+              ForceDirectories(DestPath);
+              CopyDirRecursive(SourcePath, DestPath);
+            end;
+          end
+          else
+          begin
+            ForceDirectories(ExtractFileDir(DestPath));
+            CopyFile(SourcePath, DestPath, False);
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+procedure BackupExistingFiles;
+var
+  AppDir: string;
+  BackupRoot: string;
+  BackupDir: string;
+  Params: string;
+  ResultCode: Integer;
+  N: Integer;
+begin
+  try
+    AppDir := ExpandConstant('{app}');
+    Log('Backup: AppDir=' + AppDir);
+
+    Log('Backup: before BackupRoot');
+    BackupRoot := AddBackslash(AppDir) + 'backup';
+    Log('Backup: BackupRoot=' + BackupRoot);
+    Log('Backup: before BackupDir');
+    N := 1;
+    BackupDir := BackupRoot + '\backup_' + IntToStr(N);
+    while DirExists(BackupDir) do
+    begin
+      N := N + 1;
+      BackupDir := BackupRoot + '\backup_' + IntToStr(N);
+    end;
+    Log('Backup: BackupDir=' + BackupDir);
+    ForceDirectories(BackupDir);
+
+    Params := '/c robocopy "' + AppDir + '" "' + BackupDir + '" /E /XD "backup" /XJ /R:0 /W:0';
+    Log('Backup: Params=' + Params);
+    Exec('cmd.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Log('Backup: robocopy exit code=' + IntToStr(ResultCode));
+  except
+    Log('Backup: exception: ' + GetExceptionMessage);
+  end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  if IsUpgradeInstall then
+  begin
+    MsgBox('Warning: LabVIEW and EPICS processes will be terminated during installation. Please save any open work before continuing.', mbInformation, MB_OK);
+    DoBackup := (MsgBox('Existing installation detected. Create a backup before updating?', mbConfirmation, MB_YESNO) = IDYES);
+    try
+      Log('Preparing update: closing processes.');
+      CloseRunningProcesses();
+      Log('Preparing update: processes closed.');
+    except
+      Log('Preparing update: closing processes failed: ' + GetExceptionMessage);
+      MsgBox('Update preparation failed while closing processes. Error: ' + GetExceptionMessage, mbError, MB_OK);
+    end;
+
+    if DoBackup then
+    begin
+      try
+        Log('Preparing update: starting backup.');
+        BackupExistingFiles();
+        Log('Preparing update: backup complete.');
+      except
+        Log('Preparing update: backup failed: ' + GetExceptionMessage);
+        MsgBox('Update preparation failed. Backup was skipped. Error: ' + GetExceptionMessage, mbError, MB_OK);
+      end;
+    end;
+  end;
+  Result := '';
 end;
 
 // Function to add installation directory to system PATH

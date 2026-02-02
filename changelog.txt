@@ -1,4 +1,4 @@
-﻿Changelog of CA Lab (Released: Februar 2026)
+﻿Changelog of CA Lab (Released: February 2026)
 V1.8.0.4
 * Fixed a crash that occurred when the PVItem was empty.
 * Leading and trailing whitespace characters in PV names

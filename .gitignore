@@ -38,3 +38,4 @@ calab/*
 copy*.bat
 post_install*
 src/*Kopie.cpp
+build.txt
