@@ -56,7 +56,7 @@
 #endif
 
 #ifndef CALAB_VERSION
-#define CALAB_VERSION "1.8.0.4"
+#define CALAB_VERSION "1.8.0.4+"
 #endif
 
 
