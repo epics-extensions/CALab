@@ -22,6 +22,26 @@ static inline void SetEnvCompat(const char* name, const char* value) {
 #endif
 }
 
+namespace {
+static void CaLabExceptionHandler([[maybe_unused]] struct exception_handler_args args) {
+	// Intentionally suppress CA exception output (user opts in via env var).
+}
+
+static void InstallCaExceptionHandlerIfRequested() {
+	const char* suppress = std::getenv("CALAB_CA_SUPPRESS_EXCEPTIONS");
+	if (!suppress || !*suppress) {
+		return;
+	}
+#if defined(_WIN32) || defined(_WIN64)
+	ca_add_exception_event(CaLabExceptionHandler, nullptr);
+#else
+	if (ca_add_exception_event) {
+		ca_add_exception_event(CaLabExceptionHandler, nullptr);
+	}
+#endif
+}
+} // namespace
+
 Globals::Globals() {
 	// Check for environment variable to enable a specific polling mode for CaLab
 	if (getenv("CALAB_POLLING")) {
@@ -61,6 +81,7 @@ Globals::Globals() {
 	if (ca_context_create(ca_enable_preemptive_callback) == ECA_NORMAL) {
 		pcac = ca_current_context();
 		ca_attach_context(pcac);
+		InstallCaExceptionHandlerIfRequested();
 		// Start a background thread to poll for Channel Access events.
 		pollThread_ = std::thread([this]() {
 			int status = ca_attach_context(this->pcac);

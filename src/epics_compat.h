@@ -196,6 +196,19 @@
   } evargs;
   typedef void caCh(struct connection_handler_args args);
   typedef void caEventCallBackFunc(struct event_handler_args);
+  struct exception_handler_args {
+      void* usr;
+      chanId chid;
+      long type;
+      long count;
+      void* addr;
+      long stat;
+      long op;
+      const char* ctx;
+      const char* pFile;
+      unsigned lineNo;
+  };
+  typedef void caExceptionHandler(struct exception_handler_args);
 
   // DBF/DBR base
   #define DBF_STRING 0
@@ -255,7 +268,7 @@
 
   // -------------------- Function pointer types --------------------
   typedef struct ca_client_context* (*ca_current_context_t)();
-  typedef int   (*ca_add_exception_event_t)(void*, void*);
+  typedef int   (*ca_add_exception_event_t)(caExceptionHandler*, void*);
   typedef int   (*ca_array_get_t)(chtype, unsigned long, chid, void*);
   typedef int   (*ca_array_put_t)(chtype, unsigned long, chid, const void*);
   typedef int   (*ca_array_put_callback_t)(chtype, unsigned long, chid, const void*, caEventCallBackFunc*, void*);
