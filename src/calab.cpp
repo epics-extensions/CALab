@@ -273,7 +273,7 @@ static void deferredDeletionWorker(std::vector<PvIndexEntry*> entries) {
 	}
 }
 
-inline bool tryClaimAndDeletePvIndexEntry(void* eltPtr) {
+static inline bool tryClaimAndDeletePvIndexEntry(void* eltPtr) {
 	if (!eltPtr) return false;
 	auto atomicElt = reinterpret_cast<atomic_ptr_t*>(eltPtr);
 	uintptr_t raw = atomicElt->load(std::memory_order_acquire);
@@ -1337,12 +1337,16 @@ extern "C" EXPORT void putValue(sStringArrayHdl* PvNameArray, sLongArrayHdl* PvI
 					tryClaimAndDeletePvIndexEntry(&(**PvIndexArray)->elt[i]);
 				}
 
-				PVMetaInfo* metaInfo = new PVMetaInfo(pvItem);
-				metaInfo->functionName = "putValue";
-				PvIndexEntry* entry = new PvIndexEntry(pvItem, metaInfo);
+				const bool canStoreIndex =
+					(PvIndexArray && *PvIndexArray && **PvIndexArray && (**PvIndexArray)->dimSize > i);
+				if (canStoreIndex) {
+					PVMetaInfo* metaInfo = new PVMetaInfo(pvItem);
+					metaInfo->functionName = "putValue";
+					PvIndexEntry* entry = new PvIndexEntry(pvItem, metaInfo);
 
-				auto atomicElt = reinterpret_cast<atomic_ptr_t*>(&(**PvIndexArray)->elt[i]);
-				atomicElt->store(reinterpret_cast<uintptr_t>(entry), std::memory_order_release);
+					auto atomicElt = reinterpret_cast<atomic_ptr_t*>(&(**PvIndexArray)->elt[i]);
+					atomicElt->store(reinterpret_cast<uintptr_t>(entry), std::memory_order_release);
+				}
 
 				connectPv(pvItem, false);
 				return pvItem;
@@ -2626,8 +2630,9 @@ void postEventForPv(const std::string& pvName) {
 	{
 		std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
 		auto it = g_eventRegistry.map.find(pvName);
-		if (it == g_eventRegistry.map.end()) return;
-		subscribers = it->second;
+		if (it != g_eventRegistry.map.end()) {
+			subscribers = it->second;
+		}
 	}
 
 	// Locate the PVItem.
@@ -2662,19 +2667,25 @@ void postEventForPv(const std::string& pvName) {
 		}
 		if (postErr != mgNoErr) {
 			// remove event from registry
-			try {
-				std::lock_guard<std::mutex> lock(g_eventRegistry.mtx);
-				auto it = g_eventRegistry.map.find(pvName);
-				if (it != g_eventRegistry.map.end()) {
-					auto& vec = it->second;
-					vec.erase(std::remove_if(vec.begin(), vec.end(),
-						[&](const auto& pair) { return pair.first == ref; }), vec.end());
-					if (vec.empty()) {
-						g_eventRegistry.map.erase(it);
+			bool removalFailed = false;
+			{
+				std::lock_guard<std::mutex> registryLock(g_eventRegistry.mtx);
+				try {
+					auto it = g_eventRegistry.map.find(pvName);
+					if (it != g_eventRegistry.map.end()) {
+						auto& vec = it->second;
+						vec.erase(std::remove_if(vec.begin(), vec.end(),
+							[&](const auto& pair) { return pair.first == ref; }), vec.end());
+						if (vec.empty()) {
+							g_eventRegistry.map.erase(it);
+						}
 					}
 				}
+				catch (...) {
+					removalFailed = true;
+				}
 			}
-			catch (...) {
+			if (removalFailed) {
 				CaLabDbgPrintf("postEventForPv: Exception while removing failed event for %s", pvName.c_str());
 			}
 			CaLabDbgPrintf("PostLVUserEvent failed for %s with error %d", pvName.c_str(), postErr);
@@ -3431,7 +3442,7 @@ std::vector<uInt32> getChangedPvIndices(sLongArrayHdl* PvIndexArray, double Time
 				}
 
 				size_t headerSize = dbr_size[requestedDbrType];
-				size_t bufSize = headerSize + elemSize * (nElems > 0 ? nElems - 1 : 0);
+				size_t bufSize = headerSize + (elemSize * static_cast<size_t>(nElems > 0 ? nElems - 1 : 0));
 
 				PendingGet pg;
 				pg.idx = idx;
@@ -4211,7 +4222,7 @@ MgErr prepareOutputArrays(uInt32 nameCount, uInt32 maxNumberOfValues, int filter
 			(**DoubleValueArray)->dimSizes[0] != nameCount ||
 			(**DoubleValueArray)->dimSizes[1] != maxNumberOfValues) {
 
-			err = NumericArrayResize(fD, 2, (UHandle*)DoubleValueArray, nameCount * maxNumberOfValues);
+			err = NumericArrayResize(fD, 2, (UHandle*)DoubleValueArray, static_cast<size_t>(nameCount) * static_cast<size_t>(maxNumberOfValues));
 			if (err != noErr) return err;
 			(**DoubleValueArray)->dimSizes[0] = nameCount;
 			(**DoubleValueArray)->dimSizes[1] = maxNumberOfValues;
@@ -4531,9 +4542,11 @@ std::vector<std::pair<std::string, std::string>> collectEnvironmentInfo() {
 
 	// CALab Environment Variables
 	const char* calabPolling = getenv("CALAB_POLLING");
-	info.push_back({ "CALAB_POLLING", calabPolling ? calabPolling : "undefined" });
+	info.push_back({ "CALAB_POLLING", calabPolling ? calabPolling : "undefined (MDEL in use)" });
 	const char* calabNoDbg = getenv("CALAB_NODBG");
-	info.push_back({ "CALAB_NODBG", calabNoDbg ? calabNoDbg : "undefined" });
+	info.push_back({ "CALAB_NODBG", calabNoDbg ? calabNoDbg : "undefined (no debug file path defined)" });
+	const char* calabSuppressExceptions = getenv("CALAB_CA_SUPPRESS_EXCEPTIONS");
+	info.push_back({ "CALAB_CA_SUPPRESS_EXCEPTIONS", calabSuppressExceptions ? calabSuppressExceptions : "undefined (CA exceptions are not suppressed)" });
 
 	return info;
 }
@@ -4578,7 +4591,7 @@ MgErr populateInfoStringArray(sStringArray2DHdl* InfoStringArray2D, const std::v
 				reinterpret_cast<sStringArray2DHdl>(
 					DSNewHClr(static_cast<uInt32>(totalSize)));
 
-			if (**InfoStringArray2D) {
+			if (*InfoStringArray2D && **InfoStringArray2D) {
 				(**InfoStringArray2D)->dimSizes[0] = rows;
 				(**InfoStringArray2D)->dimSizes[1] = cols;
 			}
@@ -4600,16 +4613,18 @@ MgErr populateInfoStringArray(sStringArray2DHdl* InfoStringArray2D, const std::v
 		}
 	}
 
+	if (!*InfoStringArray2D || **InfoStringArray2D == nullptr) {
+		return noErr;
+	}
+
 	if (rows == 0) return noErr;
 
 	// Fill content: row-major layout [row * dimSizes[1] + col]
 	for (uInt32 r = 0; r < rows; ++r) {
 		const auto& kv = info[r];
 		const uInt32 base = r * cols;
-		if (**InfoStringArray2D != nullptr) {
-			setLVString((**InfoStringArray2D)->elt[base + 0], kv.first);
-			setLVString((**InfoStringArray2D)->elt[base + 1], kv.second);
-		}
+		setLVString((**InfoStringArray2D)->elt[base + 0], kv.first);
+		setLVString((**InfoStringArray2D)->elt[base + 1], kv.second);
 	}
 
 	return noErr;
