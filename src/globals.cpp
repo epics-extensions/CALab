@@ -48,12 +48,12 @@ Globals::Globals() {
 
 	if (!caConnTmo || !*caConnTmo) {
 		// Default: reduce initial search timeout from ~30s to 3s.
-		SetEnvCompat("EPICS_CA_CONN_TMO", "3.0");
+		SetEnvCompat("EPICS_CA_CONN_TMO", "3");
 	}
 
 	if (!caMaxSearch || !*caMaxSearch) {
 		// Default: cap exponential backoff to 60s (instead of 300s).
-		SetEnvCompat("EPICS_CA_MAX_SEARCH_PERIOD", "60.0");
+		SetEnvCompat("EPICS_CA_MAX_SEARCH_PERIOD", "60");
 	}
 	pendingCallbacks.store(0);
 	stopped.store(false);
