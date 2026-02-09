@@ -6,7 +6,10 @@ V1.8.0.4
 * Extend the unreserved function to protect PVs used by other
   instances or active user events to prevent unwanted resets.
 * New input to show/hide terminal of SoftIOC
-
+* Windows Setup: 
+  - Moved Start menu entries. From "National Instruments" to "Ca Lab".
+  - It is now possible to perform a new or reinstallation directly
+    via the setup.
 ----------------------------------------------------------------------
 
 V1.8.0.3 (Released: January 2026)

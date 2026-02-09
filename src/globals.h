@@ -180,6 +180,23 @@ public:
 
     void unregisterArraysForInstance(InstanceDataPtr* instance);
 
+    /**
+     * @brief Defer posting a LabVIEW user event for a PV name.
+     *
+     * Used when the PV registry lock is contended; names are coalesced and
+     * posted later by the CA polling thread.
+     *
+     * @param pvName PV name to post later.
+     */
+    void enqueueDeferredEvent(const std::string& pvName);
+
+    /**
+     * @brief Drain all deferred event names.
+     *
+     * Returns a snapshot and clears the internal set.
+     */
+    std::vector<std::string> drainDeferredEvents();
+
     // Disable copy constructor and copy assignment operator.
     Globals(const Globals&) = delete;
     Globals& operator=(const Globals&) = delete;
@@ -217,6 +234,10 @@ private:
     mutable std::mutex workersMutex_;
     // Registered background workers to be stopped during teardown.
     std::vector<std::pair<std::string, std::function<void()>>> backgroundWorkers_;
+
+    // Deferred PV event names for later posting.
+    mutable std::mutex deferredEventsMutex_;
+    std::unordered_set<std::string> deferredEvents_;
 };
 
 //==================================================================================================

@@ -2,36 +2,36 @@
 
 [Files]
 // General Installation Files
-Source: "x64\Release\calab.dll"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab
-Source: "src\*.cpp"; DestDir: "{app}\src"; Flags: confirmoverwrite; Components: sources
-Source: "src\*.h"; DestDir: "{app}\src"; Flags: confirmoverwrite; Components: sources
+Source: "x64\Release\calab.dll"; DestDir: "{app}\lib"; Components: caLab
+Source: "src\*.cpp"; DestDir: "{app}\src"; Components: sources
+Source: "src\*.h"; DestDir: "{app}\src"; Components: sources
 
 // EPICS Dependencies
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\*.dll"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab or caTools
-Source: "..\..\..\epics\current-epics-base\bin\windows-x64\*.exe"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caTools
-Source: "..\..\..\epics\current-epics-base\dbd\softIoc.dbd"; DestDir: "{app}\lib"; Flags: confirmoverwrite; Components: caLab or caTools
+Source: "..\..\..\epics\current-epics-base\bin\windows-x64\*.dll"; DestDir: "{app}\lib"; Components: caLab or caTools
+Source: "..\..\..\epics\current-epics-base\bin\windows-x64\*.exe"; DestDir: "{app}\lib"; Components: caTools
+Source: "..\..\..\epics\current-epics-base\dbd\softIoc.dbd"; DestDir: "{app}\lib"; Components: caLab or caTools
 
 // Visual Studio Redistributable
 Source: "..\VC_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 // LabVIEW VIs
-Source: "vis\*.txt"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\*.vi"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\*.ctl"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\*.mnu"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\*.lvlib"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\*.lvproj"; DestDir: "{app}"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\private\*"; DestDir: "{app}\private"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\utilities\*"; DestDir: "{app}\utilities"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\*.txt"; DestDir: "{app}"; Components: caLab
+Source: "vis\*.vi"; DestDir: "{app}"; Components: caLab
+Source: "vis\*.ctl"; DestDir: "{app}"; Components: caLab
+Source: "vis\*.mnu"; DestDir: "{app}"; Components: caLab
+Source: "vis\*.lvlib"; DestDir: "{app}"; Components: caLab
+Source: "vis\*.lvproj"; DestDir: "{app}"; Components: caLab
+Source: "vis\private\*"; DestDir: "{app}\private"; Components: caLab
+Source: "vis\utilities\*"; DestDir: "{app}\utilities"; Components: caLab
 
 // Demo Files
-Source: "vis\demo\*.*"; DestDir: "{app}\demo"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\demo\db\*.*"; DestDir: "{app}\demo\db"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\examples\*.*"; DestDir: "{app}\examples"; Flags: confirmoverwrite; Components: caLab
-Source: "vis\examples\Parallel Event Demo Sub\*.*"; DestDir: "{app}\examples\Parallel Event Demo Sub"; Flags: confirmoverwrite; Components: caLab
+Source: "vis\demo\*.*"; DestDir: "{app}\demo"; Components: caLab
+Source: "vis\demo\db\*.*"; DestDir: "{app}\demo\db"; Components: caLab
+Source: "vis\examples\*.*"; DestDir: "{app}\examples"; Components: caLab
+Source: "vis\examples\Parallel Event Demo Sub\*.*"; DestDir: "{app}\examples\Parallel Event Demo Sub"; Components: caLab
 
 // Documentation
-Source: "readMeFirst.txt"; DestDir: "{app}\docs"; DestName: "readMeFirst.txt"; Flags: confirmoverwrite; Components: caLab
+Source: "readMeFirst.txt"; DestDir: "{app}\docs"; DestName: "readMeFirst.txt"; Components: caLab
 Source: "changelog.txt"; DestDir: "{app}\docs"; DestName: "changelog.txt"
 
 [Dirs]
@@ -47,7 +47,7 @@ Name: custom; Description: Custom installation; Flags: iscustom
 [Components]
 Name: caLab; Description: LabVIEW™️ VIs for get PVs, put PVs and create new PVs at EPICS; Types: full vis
 Name: catools; Description: native tools (caget.exe, camonitor.exe, caput.exe, cainfo.exe); Types: full
-Name: sources; Description: sources; Types: full
+Name: sources; Description: sources
 
 [Languages]
 Name: en; MessagesFile: compiler:Default.isl; LicenseFile: "LICENSE"
@@ -56,11 +56,12 @@ Name: en; MessagesFile: compiler:Default.isl; LicenseFile: "LICENSE"
 UninstalledAll=%1 was successfully removed from your computer. Please check if you still need to remove CA Lab from palette set (LabVIEW™️)
 
 [Setup]
-AllowNoIcons=true
+AllowNoIcons=false
+UsePreviousGroup=no
 AlwaysRestart=false
 AlwaysShowDirOnReadyPage=true
 AlwaysShowGroupOnReadyPage=true
-AlwaysUsePersonalGroup=true
+AlwaysUsePersonalGroup=false
 AppComments=Before un/installing CA Lab, you should close all EPICS applications!
 AppContact=carsten.winkler@helmholtz-berlin.de
 AppCopyright=HZB GmbH
@@ -76,7 +77,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=true
 DefaultDirName={autopf}\user.lib\calab
-DefaultGroupName=National Instruments\caLab
+DefaultGroupName=CA Lab
 DirExistsWarning=no
 DisableStartupPrompt=true
 InfoAfterFile=
@@ -89,7 +90,8 @@ PrivilegesRequired=none
 PrivilegesRequiredOverridesAllowed=dialog
 SetupIconFile=res\caLab.ico
 ShowLanguageDialog=no
-UninstallDisplayIcon={userappdata}\calab\caLab.dll,1
+UninstallIconFile={app}\lib\caLab.dll,1
+UninstallDisplayIcon={app}\lib\caLab.dll,1
 UninstallDisplayName=CA Lab 64-bit
 UninstallLogMode=append
 UsePreviousAppDir=yes
@@ -100,19 +102,19 @@ VersionInfoProductName=CA Lab
 VersionInfoProductVersion=1.8.0.4
 VersionInfoTextVersion=1.8.0.4
 VersionInfoVersion=1.8.0.4
-WizardImageFile="res\WizardImage-IS.bmp"
-WizardSmallImageFile=res\WizardSmallImage-IS2.bmp
+WizardImageFile="res\WizardImage-IS-202x386.bmp,res\WizardImage-IS-269x515.bmp,res\WizardImage-IS-336x643.bmp,res\WizardImage-IS-403x772.bmp,res\WizardImage-IS-430x824.bmp,res\WizardImage-IS-498x953.bmp,res\WizardImage-IS-534x1022.bmp"
+WizardSmallImageFile=res\WizardSmallImage-IS-58x58.bmp,res\WizardSmallImage-IS-77x77.bmp,res\WizardSmallImage-IS-97x97.bmp,res\WizardSmallImage-IS-116x116.bmp,res\WizardSmallImage-IS-124x124.bmp,res\WizardSmallImage-IS-143x143.bmp,res\WizardSmallImage-IS-159x159.bmp
 MinVersion=0,6.1sp1
 VersionInfoProductTextVersion=Version: 1.8.0.4
 VersionInfoOriginalFileName=caLabSetup_1804x64.exe
 
 [Icons]
-Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\caLab.dll; IconIndex: 0
+Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\lib\caLab.dll; IconIndex: 0
 Name: {group}\Online documentation; Filename: https://hz-b.de/calab
-Name: {group}\Start Demo; Filename: {app}\batch\startDemo.bat; Flags: createonlyiffileexists; WorkingDir: {app}; IconFilename: {app}\caLab.dll; IconIndex: 2
-Name: {group}\Demo SoftIOC; Filename: {app}\Demo\DemoIOC.cmd; Flags: createonlyiffileexists; Components: ; WorkingDir: {app}\Demo; IconFilename: {app}\caLab.dll; IconIndex: 2
-Name: {group}\Uninstall; Filename: {uninstallexe}; IconFilename: {app}\caLab.dll; IconIndex: 1
-
+Name: {group}\Start Demo; Filename: {app}\batch\startDemo.bat; Flags: createonlyiffileexists; WorkingDir: {app}; IconFilename: {app}\lib\caLab.dll; IconIndex: 2
+Name: {group}\Demo SoftIOC; Filename: {app}\Demo\DemoIOC.cmd; Flags: createonlyiffileexists; Components: ; WorkingDir: {app}\Demo; IconFilename: {app}\lib\caLab.dll; IconIndex: 2
+Name: {group}\Post Installation Checklist; Filename: {app}\docs\post_install.html
+Name: {group}\Uninstall; Filename: {uninstallexe}; IconFilename: {app}\lib\caLab.dll; IconIndex: 1
 [Run]
 // install redistributable packages for Visual Studio 2015, 2017, 2019, and 2022
 // https://docs.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
@@ -182,6 +184,24 @@ begin
   Result := CompareText(A, B) = 0;
 end;
 
+function IsCaLabLibDir(const DirPath: string): Boolean;
+var
+  LibDir: string;
+begin
+  Result := False;
+  LibDir := NormalizePath(DirPath);
+  if LibDir = '' then
+    Exit;
+  // Allow if this looks like an existing CA Lab lib folder
+  if FileExists(AddBackslash(LibDir) + 'calab.dll') then
+    Result := True;
+end;
+
+function IsAllowedEpicsPath(const DirPath: string): Boolean;
+begin
+  Result := IsPrevInstallLibDir(DirPath) or IsCaLabLibDir(DirPath);
+end;
+
 function FindInPathInReg(RootKey: Integer; const RegKey, FileName: string): string;
 var
   I: Integer;
@@ -231,7 +251,7 @@ begin
       '<div class="substep">' +
       '<input type="checkbox" id="substep4" name="substep4" value="substep4">' +
       '<label for="substep4"> open LabVIEW<sup>&trade;</sup> &rarr; and run <code id="code1">"<span id="lvPath"></span>\utilities\add CaLab palette.vi"</code>' +
-      '<button type="button" onclick="copyToClipboard(''code1'', this)">copy code</button></label><br>' +
+      '<button type="button" onclick="copyToClipboard(''code1'', this)">copy path</button></label><br>' +
       '</div>';
   end;
 
@@ -282,13 +302,13 @@ begin
     '<input type="checkbox" id="substep1" name="substep1" value="substep1">' +
     '<label for="substep1"> open LabVIEW<sup>&trade;</sup> and run<br>&nbsp;&nbsp;&nbsp;&nbsp;' +
     '<code id="code2">"<span id="lvPath"></span>\utilities\mass compile.vi"</code>' +
-    '<button type="button" onclick="copyToClipboard(''code2'', this)">copy code</button>' +
+    '<button type="button" onclick="copyToClipboard(''code2'', this)">copy path</button>' +
     '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(CA Lab VIs will be compiled for the current LabVIEW version.)</label></div>' +
     PaletteSection +
     '<label for="step3" class="step"> Lets see if everything is working fine</label><br>' +
     '<div class="substep"><input type="checkbox" id="substep5" name="substep5" value="substep5">' +
     '<label for="substep5"> open LabVIEW<sup>&trade;</sup> and run<br>' +
-    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code3">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code> <button type="button" onclick="copyToClipboard(''code3'', this)">copy code</button><br>' +
+    '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code id="code3">"<span id="lvPath"></span>\examples\SoftIOC Demo.vi"</code> <button type="button" onclick="copyToClipboard(''code3'', this)">copy path</button><br>' +
     '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(softIoc and caRepeater may trigger the firewall. You should grant them access.)</label></div><br>' +
     '<label for="step4" class="step"> EPICS Base control commands</label><br>' +
     '<label for="substep21" class="substep">open a command prompt</label><br>' +
@@ -368,6 +388,27 @@ begin
   Result[Length(Result)-1] := Copy(S, Start, MaxInt);
 end;
 
+function IsDirectoryEmpty(const Dir: string): Boolean;
+var
+  FindRec: TFindRec;
+begin
+  Result := True;
+  if FindFirst(AddBackslash(Dir) + '*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') then
+        begin
+          Result := False;
+          Break;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
 // Function to check if a file exists in system PATH
 function SearchPath(FileName: string): Boolean;
 { Function for Inno Setup Compiler }
@@ -387,7 +428,7 @@ begin
 
   // Check for conflicting files on the system (allow files from existing CA Lab install)
   FoundPath := FindInPath('caRepeater.exe');
-  if (FoundPath <> '') and (not IsPrevInstallLibDir(FoundPath)) then
+  if (FoundPath <> '') and (not IsAllowedEpicsPath(FoundPath)) then
   begin
     MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
     Result := False;
@@ -395,7 +436,7 @@ begin
   end;
 
   FoundPath := FindInPath('ca.dll');
-  if (FoundPath <> '') and (not IsPrevInstallLibDir(FoundPath)) then
+  if (FoundPath <> '') and (not IsAllowedEpicsPath(FoundPath)) then
   begin
     MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
     Result := False;
@@ -403,7 +444,7 @@ begin
   end;
 
   FoundPath := FindInPath('Com.dll');
-  if (FoundPath <> '') and (not IsPrevInstallLibDir(FoundPath)) then
+  if (FoundPath <> '') and (not IsAllowedEpicsPath(FoundPath)) then
   begin
     MsgBox('The files caRepeater.exe, ca.dll or Com.dll have already been found on the computer. To avoid incompatibility with CA Lab libraries, the setup will be cancelled.', mbError, MB_OK);
     Result := False;
@@ -777,5 +818,9 @@ begin
 
     // Remove PATH entry
     RemovePath;
+
+    // Remove app directory if empty
+    if DirExists(ExpandConstant('{app}')) and IsDirectoryEmpty(ExpandConstant('{app}')) then
+      RemoveDir(ExpandConstant('{app}'));
   end;
 end;

@@ -105,7 +105,7 @@ typedef struct {
 	LStrHandle SeverityString;         // Severity as text (e.g., MINOR)
 	int16_t SeverityNumber;            // Severity as numeric code
 	LStrHandle TimeStampString;        // Timestamp in human-readable format
-	uInt32 TimeStampNumber;            // Seconds since EPICS epoch (or Unix epoch)
+	uInt32 TimeStampNumber;            // Seconds since Unix epoch (converted from EPICS epoch)
 	sStringArrayHdl FieldNameArray;    // Optional: field names cached for this PV
 	sStringArrayHdl FieldValueArray;   // Optional: field values as strings
 	sError ErrorIO;                    // Error cluster for per-PV issues

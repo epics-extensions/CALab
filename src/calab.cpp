@@ -2625,6 +2625,19 @@ extern "C" EXPORT void destroyEvent(LVUserEventRef* RefNum) {
 void postEventForPv(const std::string& pvName) {
 	if (pvName.empty()) return;
 
+	// Locate the PVItem.
+	PVItem* pvItem = nullptr;
+	{
+		std::shared_lock<std::shared_timed_mutex> rlock(Globals::getInstance().pvRegistryLock, std::try_to_lock);
+		if (!rlock.owns_lock()) {
+			Globals::getInstance().enqueueDeferredEvent(pvName);
+			return;
+		}
+		auto it = Globals::getInstance().pvRegistry.find(pvName);
+		if (it == Globals::getInstance().pvRegistry.end() || !it->second) return;
+		pvItem = it->second.get();
+	}
+
 	// Snapshot subscribers to avoid holding the lock during LV calls.
 	std::vector<std::pair<LVUserEventRef, sResult*>> subscribers;
 	{
@@ -2635,15 +2648,7 @@ void postEventForPv(const std::string& pvName) {
 		}
 	}
 
-	// Locate the PVItem.
-	PVItem* pvItem = nullptr;
-	{
-		TimeoutSharedLock<std::shared_timed_mutex> rlock(Globals::getInstance().pvRegistryLock, "postEvent-lookup", std::chrono::milliseconds(200));
-		if (!rlock.isLocked()) return;
-		auto it = Globals::getInstance().pvRegistry.find(pvName);
-		if (it == Globals::getInstance().pvRegistry.end() || !it->second) return;
-		pvItem = it->second.get();
-	}
+	if (subscribers.empty()) return;
 
 	// Prepare and post an event for each subscriber.
 	for (auto& sub : subscribers) {
@@ -3925,6 +3930,7 @@ void connectionChanged(connection_handler_args args) {
 	}
 	short dbrType = ca_field_type(args.chid);
 	uInt32 nElems = ca_element_count(args.chid);
+	evid evToClear = nullptr;
 
 	{
 		std::lock_guard<std::mutex> lock(pvItem->ioMutex());
@@ -3937,11 +3943,18 @@ void connectionChanged(connection_handler_args args) {
 			pvItem->setNumberOfValues(nElems);
 		}
 		if (args.op == CA_OP_CONN_DOWN) {
+			pvItem->setConnected(false);
+			pvItem->setHasValue(false);
 			pvItem->setSeverity(epicsSevInvalid);
 			pvItem->setStatus(epicsAlarmComm);
 			pvItem->setErrorCode(ECA_DISCONNCHID);
+			evToClear = pvItem->eventId;
+			pvItem->eventId = nullptr;
 			pvItem->updateChangeHash();
 		}
+	}
+	if (evToClear) {
+		ca_clear_subscription(evToClear);
 	}
 	g.removePendingConnection(pvItem);
 	g.notify();

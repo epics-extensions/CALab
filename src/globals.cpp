@@ -27,6 +27,26 @@ static void CaLabExceptionHandler([[maybe_unused]] struct exception_handler_args
 	// Intentionally suppress CA exception output (user opts in via env var).
 }
 
+// Track reconnect attempts to avoid thrashing ca_create_channel on every poll tick.
+struct ReconnectTracker {
+	std::mutex mtx;
+	std::unordered_map<PVItem*, std::chrono::steady_clock::time_point> lastAttempt;
+};
+static ReconnectTracker g_reconnectTracker;
+
+static bool shouldAttemptReconnect(PVItem* item,
+	const std::chrono::steady_clock::time_point& now,
+	const std::chrono::milliseconds minInterval) {
+	if (!item) return false;
+	std::lock_guard<std::mutex> lk(g_reconnectTracker.mtx);
+	auto it = g_reconnectTracker.lastAttempt.find(item);
+	if (it == g_reconnectTracker.lastAttempt.end() || (now - it->second) >= minInterval) {
+		g_reconnectTracker.lastAttempt[item] = now;
+		return true;
+	}
+	return false;
+}
+
 static void InstallCaExceptionHandlerIfRequested() {
 	const char* suppress = std::getenv("CALAB_CA_SUPPRESS_EXCEPTIONS");
 	if (!suppress || !*suppress) {
@@ -90,10 +110,102 @@ Globals::Globals() {
 					ca_message_safe(status));
 				return;
 			}
-			while (!stopped.load()) {
-				// Process pending CA events and flush I/O buffers.
-				ca_poll();
-				ca_flush_io();
+			auto lastReconnectSweep = std::chrono::steady_clock::now();
+			const auto sweepInterval = std::chrono::milliseconds(500);
+			const auto minReconnectInterval = std::chrono::seconds(2);
+
+	while (!stopped.load()) {
+		// Process pending CA events and flush I/O buffers.
+		ca_poll();
+		ca_flush_io();
+
+				// Periodically attempt to re-establish disconnected channels.
+				const auto now = std::chrono::steady_clock::now();
+				if (now - lastReconnectSweep >= sweepInterval) {
+					lastReconnectSweep = now;
+					std::vector<PVItem*> items;
+					std::unordered_set<std::string> notifyNames;
+					std::vector<PVItem*> toSubscribe;
+					{
+						TimeoutSharedLock<std::shared_timed_mutex> lock(
+							this->pvRegistryLock, "Globals-reconnect-scan", std::chrono::milliseconds(50));
+						if (lock.isLocked()) {
+							items.reserve(this->pvRegistry.size());
+							for (auto& kv : this->pvRegistry) {
+								if (kv.second) items.push_back(kv.second.get());
+							}
+						}
+					}
+
+					for (PVItem* item : items) {
+						if (!item) continue;
+
+						bool needsConnect = false;
+						bool needsSubscribe = false;
+						{
+							std::lock_guard<std::mutex> lk(item->ioMutex());
+							chanId ch = item->channelId;
+							if (!ch) {
+								needsConnect = true;
+							}
+							else {
+								channel_state st = ca_state(ch);
+								if (st != cs_conn) {
+									needsConnect = true;
+								}
+								else if (!item->isConnected()) {
+									// CA says we're connected; fix stale internal flags.
+									short dbrType = ca_field_type(ch);
+									uInt32 nElems = ca_element_count(ch);
+									item->setConnected(true);
+									item->setErrorCode(ECA_NORMAL);
+									item->setDbrType(dbrType);
+									item->setNumberOfValues(nElems);
+									// Wake user events for this PV (and parent if any).
+									notifyNames.insert(item->getName());
+									if (item->parent) {
+										notifyNames.insert(item->parent->getName());
+									}
+								}
+							}
+							if (item->isConnected() && item->eventId == nullptr) {
+								needsSubscribe = true;
+							}
+						}
+
+						if (needsConnect && shouldAttemptReconnect(item, now, minReconnectInterval)) {
+							// Reconnect only this PV; avoid creating .RTYP automatically here.
+							connectPv(item, /*connectRtyp=*/false);
+						}
+						if (needsSubscribe && shouldAttemptReconnect(item, now, minReconnectInterval)) {
+							toSubscribe.push_back(item);
+						}
+					}
+
+					for (auto* item : toSubscribe) {
+						subscribePv(item);
+					}
+					if (!toSubscribe.empty()) {
+						ca_flush_io();
+						ca_poll();
+					}
+
+					for (const auto& name : notifyNames) {
+						postEventForPv(name);
+					}
+				}
+
+				// Post deferred LV events if any (coalesced).
+				static auto lastEventDrain = std::chrono::steady_clock::now();
+				const auto eventDrainInterval = std::chrono::milliseconds(100);
+				if (now - lastEventDrain >= eventDrainInterval) {
+					lastEventDrain = now;
+					auto deferred = this->drainDeferredEvents();
+					for (const auto& name : deferred) {
+						postEventForPv(name);
+					}
+				}
+
 				std::this_thread::sleep_for(std::chrono::milliseconds(10));
 			}
 			ca_detach_context();
@@ -120,6 +232,10 @@ Globals::~Globals() {
 		fclose(pCaLabDbgFile);
 		pCaLabDbgFile = nullptr;
 	}
+	{
+		std::lock_guard<std::mutex> lock(deferredEventsMutex_);
+		deferredEvents_.clear();
+	}
 	pvRegistry.clear();
 }
 
@@ -142,6 +258,24 @@ void Globals::clearPendingConnections() {
 std::vector<PVItem*> Globals::getPendingConnections() const {
 	std::lock_guard<std::mutex> lock(pendingConnectionsMutex);
 	return std::vector<PVItem*>(pendingConnections.begin(), pendingConnections.end());
+}
+
+void Globals::enqueueDeferredEvent(const std::string& pvName) {
+	if (pvName.empty()) return;
+	std::lock_guard<std::mutex> lock(deferredEventsMutex_);
+	deferredEvents_.insert(pvName);
+}
+
+std::vector<std::string> Globals::drainDeferredEvents() {
+	std::vector<std::string> out;
+	std::lock_guard<std::mutex> lock(deferredEventsMutex_);
+	if (deferredEvents_.empty()) return out;
+	out.reserve(deferredEvents_.size());
+	for (const auto& name : deferredEvents_) {
+		out.push_back(name);
+	}
+	deferredEvents_.clear();
+	return out;
 }
 
 void Globals::waitForNotification(std::chrono::milliseconds timeout) {

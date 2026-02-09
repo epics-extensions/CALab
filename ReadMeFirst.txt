@@ -1,76 +1,89 @@
 ######################################################################
-### CA Lab ReadMe for Windows® OS
+### CA Lab ReadMe for Windows OS
 ######################################################################
 
 ----------------------------------------------------------------------
 --- 1. General Information
 ----------------------------------------------------------------------
 
-Before you start, please follow the instructions in "post_install.html".
+After installation, open the post-installation checklist:
+    %CALAB_HOME%\docs\post_install.html
+The installer usually opens it automatically.
 
-When you run any caLab-VI for the first time, you may see some warnings
-due to a new context. To prevent these warnings from appearing again,
-save the changes.
-A more efficient method is described in Chapter 2 (Mass Compiling VIs).
+When you run a CA Lab VI for the first time, LabVIEW may show
+warning dialogs caused by a new context. Save the changes to suppress
+them. A faster method is described in Chapter 2 (Mass Compiling VIs).
 
-If CA Lab is not installed in the standard path of LabVIEW™,
-errors may occur due to incorrect paths for installed libraries.
-To resolve this issue, refer to Chapter 3.2.
+CA Lab should be installed in the default location selected by the
+installer. If you move the folder afterwards, LabVIEW paths may break.
+Use %CALAB_HOME% as the installed root folder.
 
-If the setup created a start menu shortcut for CA Lab, it will appear
-as a sub-entry of National Instruments. This sub-entry contains
-"CA Lab project", which directs to the installed VIs.
+Start menu entries are under:
+    Start Menu -> CA Lab
+The "CA Lab project" shortcut opens the installed VI folder.
 
 ----------------------------------------------------------------------
 --- 2. First Use of CA Lab
 ----------------------------------------------------------------------
 
 Mass Compiling VIs:
-1. Select Tools->Advanced->Mass Compile...
-2. Choose the CA Lab directory in %APPDATA%\caLab and click the "Select" button.
-3. Click the "Mass Compile" button.
-4. Finish with the "Done" button.
+1. In LabVIEW, select Tools -> Advanced -> Mass Compile...
+2. Choose the CA Lab installation directory (%CALAB_HOME%).
+3. Click "Mass Compile".
+4. Finish with "Done".
 
-To start your first test, choose "startDemo" from Start:
-    Programs->National Instruments->caLab->"start Demo"
-This will do the following:
+Start a first test via Start Menu -> CA Lab -> Start Demo.
+This will:
 1. Start a demo IOC Shell with prepared test variables.
 2. Write random values to those variables.
 3. Monitor those variables.
 4. Show the currently used EPICS context.
 
 ----------------------------------------------------------------------
---- 3. Resolved Issues
+--- 3. Troubleshooting
 ----------------------------------------------------------------------
 
 --- 3.1 Environment Variables for CA Lab
 
-Environment variables need to be set for EPICS applications.
-Please read this document:
-             http://www.aps.anl.gov/epics/base/R3-14/1-docs/CAref.html
-It's necessary to add %APPDATA%\caLab to the PATH environment variable.
+CA Lab uses EPICS Channel Access and requires environment variables.
+The installer sets:
+    CALAB_HOME = <CA Lab install folder>
+    PATH += %CALAB_HOME%\lib
 
---- 3.2 Problems to execute VIs
+EPICS applications also use some more enviroment variables.
+Please read more here:
+https://epics.anl.gov/base/R3-15/2-docs/CAref.html#EPICS
 
-All provided VIs depend on correct set absolute path to "caLab.dll", "ca.dll"
-and "com.dll". This libraries are in %APPDATA%\calab
+If these variables are missing, add them manually and restart
+LabVIEW and any command prompts.
 
---- 3.3 Issues with Creating an Executable with the Application Builder
+--- 3.2 Problems executing VIs
 
-If you encounter issues when creating a working executable with the
-Application Builder, try changing the target folder from user.lib to
-another target (sometimes only root works).
-The following libraries and services are required by CA Lab:
-caLab.dll, ca.dll, Com.dll, caRepeater.exe, and either
-https://aka.ms/vs/17/release/vc_redist.x86.exe (32bit) or 
-https://aka.ms/vs/17/release/vc_redist.x64.exe (64bit).
-The PATH environment variable needs to be set to these files.
-If you encounter dependency issues, install CA Lab on the target
-computer and set the PATH environment variable.
+All provided VIs depend on correct absolute paths to:
+    caLab.dll, ca.dll, Com.dll
+These files are located in:
+    %CALAB_HOME%\lib
 
---- 3.4 Issues After Installing a New CA Lab Version
+--- 3.3 Issues creating an executable (Application Builder)
 
-If you upgrade existing VIs with CA Lab, please check for greyed out
-CA Lab VIs. Right-click on greyed out CA Lab VIs and use
-"Relink to SubVI".
-Be aware that LabVIEW™ may result in a misalignment of connectors.
+If you encounter issues creating a working executable, try changing the
+target folder from user.lib to another location (sometimes only the
+drive root works).
+
+The following files must be available on the target machine:
+    caLab.dll, ca.dll, Com.dll, caRepeater.exe
+and the correct Visual C++ Redistributable:
+    32-bit: https://aka.ms/vs/17/release/vc_redist.x86.exe
+    64-bit: https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+Ensure the folder containing these files is on PATH
+(usually %CALAB_HOME%\lib).
+
+If dependencies are missing, install CA Lab on the target computer and
+make sure PATH is updated.
+
+--- 3.4 Issues after installing a new CA Lab version
+
+If you upgrade existing VIs to a new CA Lab version, check for greyed
+out CA Lab VIs. Right-click them and use "Relink to SubVI".
+LabVIEW may also misalign connector panes after a relink.

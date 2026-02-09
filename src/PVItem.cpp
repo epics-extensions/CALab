@@ -224,7 +224,12 @@ short PVItem::getDbrType() const { return dbrType_.load(); }
 uInt32 PVItem::getNumberOfValues() const { return numberOfValues_; }
 const std::string& PVItem::getRecordType() const { return recordType_; }
 const void* PVItem::getDbr() const { return nativeFieldType_.load(); }
-uInt32 PVItem::getTimestamp() const { return timestamp_.load(); }
+uInt32 PVItem::getTimestamp() const {
+    // EPICS timestamps are seconds past the EPICS epoch (1990-01-01).
+    // Convert to Unix epoch (1970-01-01) for consistency with string output.
+    constexpr uInt32 kEpicsUnixEpochOffset = 631152000u; // 20 years incl. leap days
+    return timestamp_.load() + kEpicsUnixEpochOffset;
+}
 uInt32 PVItem::getTimestampNSec() const { return timestamp_nsec_.load(); }
 int16_t PVItem::getStatus() const { return status_.load(); }
 int16_t PVItem::getSeverity() const { return severity_.load(); }
@@ -752,7 +757,10 @@ std::string PVItem::getErrorAsString(void) const {
 
 std::string PVItem::getTimestampAsString(void) const {
     // Cache values locally to minimize atomic accesses
-    const std::time_t t = static_cast<std::time_t>(timestamp_.load());
+    // EPICS timestamps are seconds past the EPICS epoch (1990-01-01).
+    // Convert to Unix epoch (1970-01-01) for std::time_t/localtime.
+    constexpr std::time_t kEpicsUnixEpochOffset = static_cast<std::time_t>(631152000); // 20 years incl. leap days
+    const std::time_t t = static_cast<std::time_t>(timestamp_.load()) + kEpicsUnixEpochOffset;
     const uInt32 nsec = timestamp_nsec_.load();
 
     // Initialize tm struct
