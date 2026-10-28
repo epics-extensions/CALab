@@ -1,7 +1,7 @@
 ﻿//==================================================================================================
 // Name      : calab.cpp
 // Authors   : Carsten Winkler, Brian Powell
-// Version   : 1.8.0.4
+// Version   : 1.8.0.5
 // Copyright : HZB
 // Description: Modernized CALab core for reading/writing EPICS PVs and LabVIEW events
 // GitHub    : https://github.com/epics-extensions/CALab
@@ -56,7 +56,7 @@
 #endif
 
 #ifndef CALAB_VERSION
-#define CALAB_VERSION "1.8.0.4"
+#define CALAB_VERSION "1.8.0.5"
 #endif
 
 
