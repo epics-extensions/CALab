@@ -66,13 +66,13 @@ AppComments=Before un/installing CA Lab, you should close all EPICS applications
 AppContact=carsten.winkler@helmholtz-berlin.de
 AppCopyright=HZB GmbH
 AppendDefaultGroupName=true
-AppId={{47C8ECDB-A386-5039-A61F-F53CEFE0EE8B}
+AppId={{3B589332-5F9D-5B5C-9B21-3706F4112BD4}
 AppName=CA Lab 32-bit
 AppPublisher=HZB GmbH
 AppPublisherURL=www.helmholtz-berlin.de
 AppSupportURL=https://hz-b.de/calab
 AppUpdatesURL=https://hz-b.de/calab
-AppVersion=1.8.0.4
+AppVersion=1.8.0.5
 
 
 ChangesEnvironment=true
@@ -84,7 +84,7 @@ InfoAfterFile=
 InfoBeforeFile="changelog.txt"
 LanguageDetectionMethod=none
 LicenseFile="LICENSE"
-OutputBaseFilename=caLabSetup_1804x86
+OutputBaseFilename=caLabSetup_1805x86
 OutputDir=.
 PrivilegesRequired=none
 PrivilegesRequiredOverridesAllowed=dialog
@@ -99,14 +99,14 @@ VersionInfoCompany=HELMHOLTZ-ZENTRUM BERLIN
 VersionInfoCopyright=HZB
 VersionInfoDescription=CA Lab Setup
 VersionInfoProductName=CA Lab
-VersionInfoProductVersion=1.8.0.4
-VersionInfoTextVersion=1.8.0.4
-VersionInfoVersion=1.8.0.4
+VersionInfoProductVersion=1.8.0.5
+VersionInfoTextVersion=1.8.0.5
+VersionInfoVersion=1.8.0.5
 WizardImageFile="res\WizardImage-IS-202x386.bmp,res\WizardImage-IS-269x515.bmp,res\WizardImage-IS-336x643.bmp,res\WizardImage-IS-403x772.bmp,res\WizardImage-IS-430x824.bmp,res\WizardImage-IS-498x953.bmp,res\WizardImage-IS-534x1022.bmp"
 WizardSmallImageFile=res\WizardSmallImage-IS-58x58.bmp,res\WizardSmallImage-IS-77x77.bmp,res\WizardSmallImage-IS-97x97.bmp,res\WizardSmallImage-IS-116x116.bmp,res\WizardSmallImage-IS-124x124.bmp,res\WizardSmallImage-IS-143x143.bmp,res\WizardSmallImage-IS-159x159.bmp
 MinVersion=0,6.1sp1
-VersionInfoProductTextVersion=Version: 1.8.0.4
-VersionInfoOriginalFileName=caLabSetup_1804x86.exe
+VersionInfoProductTextVersion=Version: 1.8.0.5
+VersionInfoOriginalFileName=caLabSetup_1805x86.exe
 
 [Icons]
 Name: {group}\CA Lab project; Filename: {app}; IconFilename: {app}\lib\caLab.dll; IconIndex: 0
@@ -131,7 +131,7 @@ RunOnceId: "UninstallEntry3"; Filename: cmd; Parameters: /c taskkill /f /im caRe
 
 [Code]
 const
-  AppIdValue = '{47C8ECDB-A386-5039-A61F-F53CEFE0EE8B}';
+  AppIdValue = '{3B589332-5F9D-5B5C-9B21-3706F4112BD4}';
 
 var
   PrevInstallDir: string;
